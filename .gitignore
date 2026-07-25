@@ -2,3 +2,4 @@
 node_modules/
 *.log
 .shipward/*.tmp
+.shipward/*.lock*

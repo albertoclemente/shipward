@@ -101,7 +101,7 @@
       "claude": "done",
       "branch": "feat/mcp-tracker-server",
       "commit": "b390868",
-      "note": "Stage A of SW-005. Extracted read/validate/atomic-write into shipward/tracker-store.mjs behind an O_EXCL advisory lock spanning the whole read-modify-write; serve.mjs is now a client and its in-process promise chain is gone. That chain only protected same-process writes — the MCP server and Claude Code direct edits both sit outside it. Lock records pid+timestamp, aged out after 5s so a crashed holder cannot deadlock the desk. 34 tests pass: store.test.mjs spawns real child processes (12 concurrent writers all land, stale locks broken, fresh locks waited for not stolen, invalid mutations write nothing and still release); desk-core suite passes unchanged as the regression gate.",
+      "note": "Stage A of SW-005. Extracted read/validate/atomic-write into shipward/tracker-store.mjs behind an O_EXCL advisory lock spanning the whole read-modify-write; serve.mjs is now a client and its in-process promise chain is gone. That chain only protected same-process writes — the MCP server and Claude Code direct edits both sit outside it. Lock records pid+timestamp, aged out after 5s so a crashed holder cannot deadlock the desk. 34 tests pass: store.test.mjs spawns real child processes (12 concurrent writers all land, stale locks broken, fresh locks waited for not stolen, invalid mutations write nothing and still release); desk-core suite passes unchanged as the regression gate. ⚠️ PULLED BACK FROM REVIEW 2026-07-25: adversarial review REPRODUCED five failures — the lock does not hold. (1) Contended stale-break: 4 processes vs one stale lock, 9/25 trials LOST WRITES, because detect-and-break is three non-atomic steps and each breaker unlinks the previous winner’s fresh lock. (2) A 6s mutation gets its lock stolen at 5s; both processes exit 0 and one write vanishes silently. (3) A dangling symlink at the lock path spins acquire() forever at 100% CPU — two of three loop paths skip the deadline check. (4) replace() (every card drag) never re-reads under the lock, so a desk PUT erased a Claude write that had committed correctly. (5) rename resets file mode 600→644. Also: feed at exactly 200 makes validate() reject every subsequent write and freezes the tracker; lost in-process FIFO ordering; GET re-serializes instead of returning raw bytes. 34 tests passed throughout — none of them covered contention. || REWORKED after review: the lock was redesigned, not patched. Publish via write-scratch-then-link(): link is atomic AND never leaves an empty lock visible, which open(wx) did — under contention a process starved between create and stamp, waiters read a bodyless lock and broke a LIVE holder’s. Break a dead lock by rename (one atomic step) so two breakers cannot both win and delete each other’s fresh lock. Ownership token: a holder only ever releases the lock it took. Liveness (process.kill(pid,0)) over age, plus a utimes heartbeat — utimes not writeFile, because rewriting the body truncates it and reopens the same window. Every retry path now checks the deadline and sleeps (two used to spin at 100% CPU). Also: feed cap truncates instead of rejecting (rejection froze the tracker permanently at 200 entries); file mode preserved across rename; fsync before rename; read() distinguishes ENOENT from EACCES; GET returns raw bytes not a re-serialization; in-process FIFO queue restored in front of the lock; err.name instead of instanceof; orphan tmp and lock-scratch files swept on break. 41 tests pass. Stress: 25 trials x 4 contended writers against a stale lock = 0 lost writes, 0 leftovers (was 9/25 losing writes). 12-writer repro 12/12 across three runs.",
       "created": "2026-07-25T15:06:49.615Z",
       "pushed": null,
       "shipped": null
@@ -121,9 +121,65 @@
       "created": "2026-07-25T15:06:49.615Z",
       "pushed": null,
       "shipped": null
+    },
+    {
+      "id": "SW-008",
+      "p": "shipward",
+      "title": "PUT /api/tracker is last-write-wins — decide if it should be",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "REPRODUCED by adversarial review against a live server: desk GETs at T0, Claude Code appends a card via mutate() at T1 (correctly locked, committed), desk PUTs its T0 snapshot at T2 — PUT 200 and Claude’s card is GONE. The lock worked perfectly and the data was still destroyed, because replace() never re-reads under the lock: its base document came from an unlocked GET seconds earlier. This is the primary remaining loss path. It is also a CONTRADICTION between two live contracts. spec-mcp-tracker-server.md Always says two processes must never start a mutation from the same base document; spec-shipward-desk-core.md accepts no optimistic concurrency on PUT, last write wins, as a documented assumption. NEEDS ALBERTO: either add optimistic concurrency (If-Match on a version or etag, 409 on conflict, UI re-reads and retries) which is an Ask First change to the HTTP surface, or narrow the stage-A Always to say the lock protects mutate() callers only and PUT stays last-write-wins by design. Referenced from a comment in tracker-store.mjs replace().",
+      "created": "2026-07-25T15:25:44.607Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-009",
+      "p": "shipward",
+      "title": "serve.test.mjs binds a fixed port and cannot run concurrently",
+      "type": "chore",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "The sandbox server in serve.test.mjs hard-codes port 4749. A leftover server from an earlier or parallel run holds the port, the new server fails to bind, and the tests silently assert against the STALE server — observed here as three phantom failures (GET returning 200 for a missing tracker). Fix: bind port 0, read the assigned port back from the server, pass it to the tests. The sandbox server should also log bind failures rather than dying silently.",
+      "created": "2026-07-25T15:25:44.607Z",
+      "pushed": null,
+      "shipped": null
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-25T15:25:44.607Z",
+      "p": "shipward",
+      "msg": "SW-006 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:25:44.607Z",
+      "p": "shipward",
+      "msg": "You added SW-008 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:25:44.607Z",
+      "p": "shipward",
+      "msg": "You added SW-009 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:15:42.539Z",
+      "p": "shipward",
+      "msg": "SW-006 sent back to Backlog",
+      "by": "claude"
+    },
     {
       "t": "2026-07-25T15:06:49.615Z",
       "p": "shipward",

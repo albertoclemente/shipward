@@ -7,7 +7,7 @@ import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, extname, resolve, sep } from 'node:path';
-import { read, replace, serialize, TRACKER, ValidationError, MissingTrackerError } from './tracker-store.mjs';
+import { readRaw, replace, TRACKER } from './tracker-store.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, 'public');
@@ -27,17 +27,34 @@ const send = (res, code, body, type = TYPES['.json']) => {
 };
 const fail = (res, code, msg) => send(res, code, JSON.stringify({ error: msg }));
 
+// err.name, not instanceof: the store can legitimately be loaded under two
+// specifiers (the test sandbox already does), and instanceof would then fail
+// and turn a client's 400 into a 500.
+const named = (err, name) => err?.name === name;
+
 async function readTracker(res) {
   try {
-    send(res, 200, serialize(await read()));
+    // The file's own bytes, not a re-serialization — a poll must not silently
+    // reformat what Claude Code wrote.
+    send(res, 200, (await readRaw()).raw);
   } catch (err) {
-    if (err instanceof MissingTrackerError) return fail(res, 404, err.message);
+    if (named(err, 'MissingTrackerError')) return fail(res, 404, err.message);
     // Claude Code writes this file directly, so a GET can surface damage no
     // PUT ever saw. Say so rather than serving something unrenderable.
-    if (err instanceof ValidationError) return fail(res, 500, err.message);
+    if (named(err, 'ValidationError') || named(err, 'TrackerReadError')) return fail(res, 500, err.message);
     throw err;
   }
 }
+
+// Overlapping PUTs from one tab must land in arrival order. The file lock
+// serializes across processes but its retry poll is unfair, so in-process
+// ordering needs its own queue in front of it.
+let putQueue = Promise.resolve();
+const enqueue = (fn) => {
+  const run = putQueue.then(fn, fn);
+  putQueue = run.then(() => {}, () => {});
+  return run;
+};
 
 async function writeTracker(req, res) {
   const chunks = [];
@@ -53,9 +70,10 @@ async function writeTracker(req, res) {
     return fail(res, 400, 'body is not valid JSON');
   }
   try {
-    send(res, 200, await replace(doc));
+    const { body } = await enqueue(() => replace(doc));
+    send(res, 200, body);
   } catch (err) {
-    if (err instanceof ValidationError) return fail(res, 400, `body is not a valid tracker document: ${err.message}`);
+    if (named(err, 'ValidationError')) return fail(res, 400, `body is not a valid tracker document: ${err.message}`);
     return fail(res, 500, `write failed: ${err.message}`);
   }
 }

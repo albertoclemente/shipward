@@ -126,8 +126,11 @@ test('GET refuses to serve a tracker that is not a tracker', async () => {
 test('GET answers 404 when the tracker is missing', async () => {
   const { rename: mv } = await import('node:fs/promises');
   await mv(tracker, `${tracker}.hidden`);
-  assert.equal((await fetch(`${base}/api/tracker`)).status, 404);
-  await mv(`${tracker}.hidden`, tracker);
+  try {
+    assert.equal((await fetch(`${base}/api/tracker`)).status, 404);
+  } finally {
+    await mv(`${tracker}.hidden`, tracker);   // restore even on failure, or every later test cascades
+  }
 });
 
 test('unsupported methods are refused', async () => {

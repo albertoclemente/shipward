@@ -13,7 +13,7 @@
     {
       "id": "SW-001",
       "p": "shipward",
-      "title": "Build the Shipward tracker app (server + UI)",
+      "title": "Build the Shipward desk core (server + board)",
       "type": "feature",
       "pri": "P1",
       "effort": "L",
@@ -21,7 +21,7 @@
       "claude": "working",
       "branch": "feat/shipward-tracker-app",
       "commit": null,
-      "note": "Built via bmad-quick-dev against _bmad-output/specs/spec-shipward/SPEC.md. Recreate the hi-fi prototype at design_handoff_shipward/design-reference/Shipward-Modernist.dc.html as a static no-build web app in shipward/public, served by shipward/serve.mjs (~60 lines, zero deps, port 4747): GET /api/tracker reads .shipward/tracker.json, PUT /api/tracker does an atomic write (tmp + rename). UI polls GET ~3s so Claude Code's direct file edits appear live. Four views: Board (4 columns + drag & drop), Archive, Raw data, Card dialog. Tokens in design_handoff_shipward/design-reference/assets/modernist-scoped.css — strip the #sw-1a scoping prefix. Radius 0 everywhere. .shipward/schema.json is normative. Full spec: design_handoff_shipward/README.md.",
+      "note": "SCOPE NARROWED at the quick-dev step-01 checkpoint to the desk core: CAP-1,2,3,6,7,8,9 — serve.mjs, board with drag & drop, card dialog, activity strip, 3s live poll. Archive (SW-003), Raw data (SW-004) and the MCP server (SW-005) split out as separate cards. Built via bmad-quick-dev against _bmad-output/specs/spec-shipward/SPEC.md. Recreate the hi-fi prototype at design_handoff_shipward/design-reference/Shipward-Modernist.dc.html as a static no-build web app in shipward/public, served by shipward/serve.mjs (~60 lines, zero deps, port 4747): GET /api/tracker reads .shipward/tracker.json, PUT /api/tracker does an atomic write (tmp + rename). UI polls GET ~3s so Claude Code's direct file edits appear live. Four views: Board (4 columns + drag & drop), Archive, Raw data, Card dialog. Tokens in design_handoff_shipward/design-reference/assets/modernist-scoped.css — strip the #sw-1a scoping prefix. Radius 0 everywhere. .shipward/schema.json is normative. Full spec: design_handoff_shipward/README.md.",
       "created": "2026-07-25T12:29:17Z",
       "pushed": null,
       "shipped": null
@@ -41,9 +41,75 @@
       "created": "2026-07-25T12:47:00Z",
       "pushed": null,
       "shipped": null
+    },
+    {
+      "id": "SW-003",
+      "p": "shipward",
+      "title": "Archive view — shipped cards table",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "SPEC CAP-4. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Shipped & archived' + muted lede, .table sorted by shipped desc: Shipped (Mon D) / ID (mono 12px) / What went out / Type / Effort / Commit (mono). Tab label carries the count. Read-only projection over state the desk core already builds.",
+      "created": "2026-07-25T13:18:00Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-004",
+      "p": "shipward",
+      "title": "Raw data view — JSON with copy button",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped.",
+      "created": "2026-07-25T13:18:00Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-005",
+      "p": "shipward",
+      "title": "MCP server so Claude Code reaches the tracker over MCP",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "L",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "Alberto answered 'I want the MCP' at the quick-dev step-01 checkpoint, overriding the decorative-tag default. Real MCP server exposing the tracker as tools, so Claude Code reads/writes cards over MCP instead of editing tracker.json directly, and the header's MCP CONNECTED tag reflects a real connection. CONSEQUENCES: invalidates the SPEC non-goal 'No MCP server is built' (needs a bmad-spec re-derive) and implies rewriting CLAUDE.md, whose protocol currently instructs direct file edits. Independent of the desk core — a second client onto the same tracker.json. Until this lands, the header tag renders per the prototype but is wired to nothing.",
+      "created": "2026-07-25T13:18:00Z",
+      "pushed": null,
+      "shipped": null
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-25T13:18:00Z",
+      "p": "shipward",
+      "msg": "You added SW-005 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T13:18:00Z",
+      "p": "shipward",
+      "msg": "You added SW-004 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T13:18:00Z",
+      "p": "shipward",
+      "msg": "You added SW-003 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-25T13:04:00Z",
       "p": "shipward",

@@ -27,6 +27,8 @@ Any column-to-column drag is permitted; the diagram shows the intended flow, not
 | `shipped` | reached only via the "File to archive" ghost button on a `pushed` card; set `shipped` to now. The card leaves the board for the Archive tab |
 | `backlog` | clear `claude` back to null |
 
+**Clearing `claude` on the way out.** Leaving `claude` for anywhere other than backlog settles the field to `"done"`; leaving for backlog nulls it. Only applies when `claude` was `queued` or `working` — an already-`done` or null field is left alone. A drag onto the column a card already occupies is a no-op: no write, no feed entry.
+
 Every transition persists immediately and appends one feed entry.
 
 ## Feed copy — verbatim
@@ -40,7 +42,10 @@ These are user-visible strings, not templates to paraphrase. `{id}` is the card 
 | → `review` | `{id} moved to Review — give it a look` |
 | → `pushed` | `{id} pushed to production — nice work` |
 | → `shipped` | `{id} filed to the archive` |
+| → `backlog` (sent back) | `{id} sent back to Backlog` |
 | deleted | `{id} deleted — one less thing` |
+
+The "sent back" line is absent from the README's copy list but present in the prototype's `moveMsg`; the prototype is the only source for it.
 
 UI-originated entries are `by: "user"`; Claude Code writes `by: "claude"`.
 

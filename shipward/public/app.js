@@ -14,6 +14,7 @@ const state = {
   editing: null,    // card id | 'new' | null
   dragOver: null,
   dragging: null,
+  etag: null,      // from the last GET; PUT must match it
   offline: false,
   error: null,      // server said no, as opposed to server is gone
 };
@@ -47,21 +48,29 @@ const icon = (name, cls) => el('span', { class: cls, html: ICON[name] });
 async function load() {
   const res = await fetch('/api/tracker', { cache: 'no-store' });
   if (!res.ok) throw new Error(`GET ${res.status}`);
-  return res.json();
+  return { doc: await res.json(), etag: res.headers.get('etag') };
 }
 
-// Whole-file write. The server does the atomic rename; last write wins.
-async function persist(doc) {
+// Whole-file write, guarded by the etag we last read. The server compares it
+// inside the lock and refuses rather than clobbering a newer document.
+async function persist(doc, etag) {
   const res = await fetch('/api/tracker', {
     method: 'PUT',
-    headers: { 'content-type': 'application/json' },
+    headers: { 'content-type': 'application/json', 'if-match': etag ?? '' },
     body: JSON.stringify(doc),
   });
+  if (res.status === 409) {
+    const { tracker } = await res.json().catch(() => ({}));
+    const conflict = new Error('tracker changed underneath');
+    conflict.name = 'ConflictError';
+    conflict.current = { doc: tracker, etag: res.headers.get('etag') };
+    throw conflict;
+  }
   if (!res.ok) {
     const { error } = await res.json().catch(() => ({}));
     throw new Error(error || `PUT ${res.status}`);
   }
-  return res.json();
+  return { doc: await res.json(), etag: res.headers.get('etag') };
 }
 
 // Apply a pure mutation to the current doc, render optimistically, then persist.
@@ -77,13 +86,32 @@ async function commit(mutate) {
   render();
   writesInFlight++;
   try {
-    state.doc = await persist(next);
+    let out;
+    try {
+      out = await persist(next, state.etag);
+    } catch (err) {
+      if (err.name !== 'ConflictError') throw err;
+      // Something else wrote while we were composing. Re-apply the same intent
+      // to the document that actually won — commit() takes a mutation, not a
+      // snapshot, precisely so this is possible — and try once more.
+      const retried = mutate(structuredClone(err.current.doc));
+      if (!retried) { state.doc = err.current.doc; state.etag = err.current.etag; return false; }
+      out = await persist(retried, err.current.etag);
+    }
+    state.doc = out.doc;
+    state.etag = out.etag;
     state.offline = false;
     return true;
   } catch (err) {
     // Distinguish "the server said no" from "the server is gone" — both used to
     // render the same chip, so a rejected write looked like a lost one.
     state.doc = base;
+    if (err.name === 'ConflictError') {
+      // Lost the retry too — adopt the winner rather than insisting.
+      state.doc = err.current.doc; state.etag = err.current.etag;
+      state.offline = false; state.error = 'someone else changed that card — reloaded';
+      return false;
+    }
     if (err.name === 'TypeError') { state.offline = true; state.error = null; }
     else { state.offline = false; state.error = err.message; }
     return false;
@@ -431,7 +459,7 @@ async function poll() {
   // and the next edit then wrote it back.
   if (writesInFlight > 0) return;
   try {
-    const fresh = await load();
+    const { doc: fresh, etag } = await load();
     if (writesInFlight > 0) return;               // a write started while we waited
     const recovered = state.offline;              // clearing the banner is itself a change
     state.offline = false;
@@ -439,6 +467,7 @@ async function poll() {
     // Repaint periodically even without a change, so the activity strip's
     // relative time ages instead of reading "just now" for an hour.
     const stale = Date.now() - lastPaint > 30000;
+    state.etag = etag;
     if (recovered || changed || stale) {
       state.doc = fresh;
       lastPaint = Date.now();

@@ -21,7 +21,7 @@
 import { readFile, writeFile, rename, unlink, open, lstat, stat, chmod, readdir, utimes, link } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename } from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const TRACKER = process.env.SHIPWARD_TRACKER || join(HERE, '..', '.shipward', 'tracker.json');
@@ -45,6 +45,15 @@ export class MissingTrackerError extends Error {
 export class TrackerReadError extends Error {
   constructor(msg) { super(msg); this.name = 'TrackerReadError'; }
 }
+// Thrown when a caller's base document is no longer current. Carries the
+// document that actually won, so the caller can re-apply its intent to it.
+export class ConflictError extends Error {
+  constructor(msg, current) { super(msg); this.name = 'ConflictError'; this.current = current; }
+}
+
+// Content-derived, so it is stable across re-reads and changes only when the
+// bytes do — unlike mtime, which a heartbeat or a touch would move.
+export const etagOf = (raw) => `"${createHash('sha256').update(raw).digest('hex').slice(0, 16)}"`;
 
 /* ── validation ──────────────────────────────────────────────
    The tracker is Claude Code's memory: a write that satisfies the caller but
@@ -246,7 +255,7 @@ export async function readRaw() {
   }
   const bad = validate(doc);
   if (bad) throw new ValidationError(`tracker.json is not a valid tracker document: ${bad}`);
-  return { raw, doc };
+  return { raw, doc, etag: etagOf(raw) };
 }
 
 export const read = async () => (await readRaw()).doc;
@@ -297,18 +306,33 @@ export async function mutate(fn) {
     const bad = validate(out);
     if (bad) throw new ValidationError(`refusing to write an invalid tracker document: ${bad}`);
     const body = await atomicWrite(out);
-    return { doc: out, body, changed: true };
+    return { doc: out, body, changed: true, etag: etagOf(body) };
   });
 }
 
 // Replace the whole document — the shape PUT /api/tracker needs. Validated
 // before the lock so a bad body never contends for it.
 //
-// NOTE: the caller's base document came from an earlier unlocked GET, so this
-// is last-write-wins by construction. See SW-008.
-export async function replace(doc) {
+// `ifMatch` is the etag the caller last read. It is compared INSIDE the lock
+// against what is actually on disk, so a caller whose base document has since
+// been overtaken is refused rather than silently clobbering the winner. This
+// closes the last loss path: the lock alone could not help, because the desk's
+// base came from an unlocked GET seconds earlier.
+export async function replace(doc, ifMatch) {
   const out = normalize(doc);
   const bad = validate(out);
   if (bad) throw new ValidationError(bad);
-  return withLock(async () => ({ doc: out, body: await atomicWrite(out), changed: true }));
+  return withLock(async () => {
+    if (ifMatch !== undefined) {
+      const current = await readRaw();
+      if (current.etag !== ifMatch) {
+        throw new ConflictError(
+          `tracker changed since you read it (expected ${ifMatch}, found ${current.etag})`,
+          current,
+        );
+      }
+    }
+    const body = await atomicWrite(out);
+    return { doc: out, body, changed: true, etag: etagOf(body) };
+  });
 }

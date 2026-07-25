@@ -45,8 +45,11 @@ before(async () => {
 
 after(() => proc?.kill());
 
-const put = (body) => fetch(`${base}/api/tracker`, {
-  method: 'PUT', headers: { 'content-type': 'application/json' },
+const etag = async () => (await fetch(`${base}/api/tracker`)).headers.get('etag');
+
+const put = async (body, ifMatch) => fetch(`${base}/api/tracker`, {
+  method: 'PUT',
+  headers: { 'content-type': 'application/json', 'if-match': ifMatch ?? (await etag()) },
   body: typeof body === 'string' ? body : JSON.stringify(body),
 });
 
@@ -95,22 +98,31 @@ test('a valid write persists and round-trips', async () => {
   await put(seed());   // restore
 });
 
-test('concurrent writes never corrupt the file', async () => {
-  // Reproduces the original defect: overlapping PUTs shared one temp path and
-  // truncated each other, leaving unparseable JSON.
+test('concurrent writes from one base: exactly one wins, the rest 409', async () => {
+  // Originally this asserted all six succeeded — that was the bug. Overlapping
+  // PUTs also shared one temp path and left unparseable JSON. Now the file
+  // stays valid AND a writer working from an overtaken base is refused rather
+  // than silently overwriting the winner.
   for (let round = 0; round < 15; round++) {
+    const base = await etag();
     const docs = Array.from({ length: 6 }, (_, i) => {
       const d = seed();
       d.cards[0].title = `concurrent ${round}-${i}`.padEnd(500, 'x');
       return d;
     });
-    const codes = await Promise.all(docs.map((d) => put(d).then((r) => r.status)));
-    assert.ok(codes.every((c) => c === 200), `round ${round}: ${codes}`);
+    const codes = await Promise.all(docs.map((d) => put(d, base).then((r) => r.status)));
+    assert.equal(codes.filter((c) => c === 200).length, 1, `round ${round}: one winner, got ${codes}`);
+    assert.ok(codes.every((c) => c === 200 || c === 409), `round ${round}: ${codes}`);
+
     const raw = await readFile(tracker, 'utf8');
     assert.doesNotThrow(() => JSON.parse(raw), `round ${round} left unparseable JSON`);
+    assert.equal(JSON.parse(raw).cards[0].title.startsWith(`concurrent ${round}-`), true,
+      'the file holds one writer\'s whole document, not a blend');
   }
-  const leftovers = (await readdir(join(sandbox, '.shipward'))).filter((f) => f.endsWith('.tmp'));
-  assert.deepEqual(leftovers, [], 'no orphan temp files');
+  const leftovers = (await readdir(join(sandbox, '.shipward')))
+    .filter((f) => f.endsWith('.tmp') || f.includes('.lock'));
+  assert.deepEqual(leftovers, [], 'no orphan temp or lock files');
+  await put(seed());
 });
 
 test('GET refuses to serve a tracker that is not a tracker', async () => {
@@ -131,6 +143,74 @@ test('GET answers 404 when the tracker is missing', async () => {
   } finally {
     await mv(`${tracker}.hidden`, tracker);   // restore even on failure, or every later test cascades
   }
+});
+
+test('GET carries an ETag that tracks content, not time', async () => {
+  const res = await fetch(`${base}/api/tracker`);
+  const tag = res.headers.get('etag');
+  assert.match(tag, /^"[0-9a-f]{16}"$/);
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(await etag(), tag, 'unchanged content keeps the same ETag');
+
+  const doc = seed();
+  doc.cards[0].title = 'retitled';
+  await put(doc);
+  assert.notEqual(await etag(), tag, 'changed content changes the ETag');
+  await put(seed());
+});
+
+test('PUT without If-Match is refused', async () => {
+  const before = await readFile(tracker, 'utf8');
+  const res = await fetch(`${base}/api/tracker`, {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(seed()),
+  });
+  assert.equal(res.status, 428);
+  assert.match((await res.json()).error, /If-Match required/);
+  assert.equal(await readFile(tracker, 'utf8'), before, 'nothing written');
+});
+
+test('a stale If-Match is refused with 409 and the winning document', async () => {
+  // The loss path this card exists to close: the desk holds a snapshot from an
+  // earlier GET while another writer commits, then PUTs over it.
+  const stale = await etag();
+
+  const winner = seed();
+  winner.cards.push({
+    id: 'TS-042', p: 'test', title: 'written by someone else', type: 'feature', pri: 'P2',
+    effort: 'M', status: 'backlog', claude: null, branch: null, commit: null,
+    created: '2026-07-02T00:00:00Z', pushed: null, shipped: null,
+  });
+  assert.equal((await put(winner)).status, 200);
+
+  const loser = seed();
+  loser.cards[0].title = 'stale desk snapshot';
+  const res = await put(loser, stale);
+  assert.equal(res.status, 409);
+
+  const body = await res.json();
+  assert.match(body.error, /changed since you read it/);
+  assert.ok(body.tracker.cards.some((c) => c.id === 'TS-042'), '409 returns the document that won');
+  assert.equal(res.headers.get('etag'), await etag(), 'and its current ETag');
+
+  const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.ok(onDisk.cards.some((c) => c.id === 'TS-042'), 'the committed write survived');
+  assert.equal(onDisk.cards[0].title, 'A card', 'the stale write was not applied');
+  await put(seed());
+});
+
+test('retrying with the ETag from a 409 succeeds', async () => {
+  const stale = await etag();
+  const first = seed();
+  first.cards[0].title = 'first';
+  await put(first);
+
+  const res = await put(seed(), stale);
+  assert.equal(res.status, 409);
+  const fresh = res.headers.get('etag');
+
+  const retry = await put(seed(), fresh);
+  assert.equal(retry.status, 200, 'the retry lands with the current ETag');
+  assert.equal(retry.headers.get('etag'), await etag());
 });
 
 test('unsupported methods are refused', async () => {

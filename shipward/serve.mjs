@@ -21,11 +21,11 @@ const TYPES = {
   '.svg': 'image/svg+xml',
 };
 
-const send = (res, code, body, type = TYPES['.json']) => {
+const send = (res, code, body, type = TYPES['.json'], extra = {}) => {
   if (res.writableEnded) return;
-  res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store' }).end(body);
+  res.writeHead(code, { 'content-type': type, 'cache-control': 'no-store', ...extra }).end(body);
 };
-const fail = (res, code, msg) => send(res, code, JSON.stringify({ error: msg }));
+const fail = (res, code, msg, extra = {}) => send(res, code, JSON.stringify({ error: msg }), TYPES['.json'], extra);
 
 // err.name, not instanceof: the store can legitimately be loaded under two
 // specifiers (the test sandbox already does), and instanceof would then fail
@@ -35,8 +35,9 @@ const named = (err, name) => err?.name === name;
 async function readTracker(res) {
   try {
     // The file's own bytes, not a re-serialization — a poll must not silently
-    // reformat what Claude Code wrote.
-    send(res, 200, (await readRaw()).raw);
+    // reformat what Claude Code wrote. The ETag is what a later PUT must match.
+    const { raw, etag } = await readRaw();
+    send(res, 200, raw, TYPES['.json'], { etag });
   } catch (err) {
     if (named(err, 'MissingTrackerError')) return fail(res, 404, err.message);
     // Claude Code writes this file directly, so a GET can surface damage no
@@ -69,11 +70,24 @@ async function writeTracker(req, res) {
   } catch {
     return fail(res, 400, 'body is not valid JSON');
   }
+  // Optimistic concurrency. Without a precondition a client would be writing a
+  // document built from an unlocked GET, which is how a desk write erased a
+  // committed Claude write even with the lock working perfectly.
+  const ifMatch = req.headers['if-match'];
+  if (!ifMatch) {
+    return fail(res, 428, 'If-Match required: GET /api/tracker first and send back its ETag');
+  }
   try {
-    const { body } = await enqueue(() => replace(doc));
-    send(res, 200, body);
+    const { body, etag } = await enqueue(() => replace(doc, ifMatch));
+    send(res, 200, body, TYPES['.json'], { etag });
   } catch (err) {
     if (named(err, 'ValidationError')) return fail(res, 400, `body is not a valid tracker document: ${err.message}`);
+    if (named(err, 'ConflictError')) {
+      // Hand back what actually won so the client can re-apply its intent
+      // rather than guess.
+      return send(res, 409, JSON.stringify({ error: err.message, tracker: err.current.doc }),
+        TYPES['.json'], { etag: err.current.etag });
+    }
     return fail(res, 500, `write failed: ${err.message}`);
   }
 }

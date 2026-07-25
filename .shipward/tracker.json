@@ -51,7 +51,7 @@
       "effort": "S",
       "status": "backlog",
       "claude": null,
-      "branch": null,
+      "branch": "feat/archive-view-shipped",
       "commit": null,
       "note": "SPEC CAP-4. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Shipped & archived' + muted lede, .table sorted by shipped desc: Shipped (Mon D) / ID (mono 12px) / What went out / Type / Effort / Commit (mono). Tab label carries the count. Read-only projection over state the desk core already builds.",
       "created": "2026-07-25T13:18:00Z",
@@ -129,11 +129,11 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/put-optimistic-concurrency",
       "commit": null,
-      "note": "REPRODUCED by adversarial review against a live server: desk GETs at T0, Claude Code appends a card via mutate() at T1 (correctly locked, committed), desk PUTs its T0 snapshot at T2 — PUT 200 and Claude’s card is GONE. The lock worked perfectly and the data was still destroyed, because replace() never re-reads under the lock: its base document came from an unlocked GET seconds earlier. This is the primary remaining loss path. It is also a CONTRADICTION between two live contracts. spec-mcp-tracker-server.md Always says two processes must never start a mutation from the same base document; spec-shipward-desk-core.md accepts no optimistic concurrency on PUT, last write wins, as a documented assumption. NEEDS ALBERTO: either add optimistic concurrency (If-Match on a version or etag, 409 on conflict, UI re-reads and retries) which is an Ask First change to the HTTP surface, or narrow the stage-A Always to say the lock protects mutate() callers only and PUT stays last-write-wins by design. Referenced from a comment in tracker-store.mjs replace().",
+      "note": "REPRODUCED by adversarial review against a live server: desk GETs at T0, Claude Code appends a card via mutate() at T1 (correctly locked, committed), desk PUTs its T0 snapshot at T2 — PUT 200 and Claude’s card is GONE. The lock worked perfectly and the data was still destroyed, because replace() never re-reads under the lock: its base document came from an unlocked GET seconds earlier. This is the primary remaining loss path. It is also a CONTRADICTION between two live contracts. spec-mcp-tracker-server.md Always says two processes must never start a mutation from the same base document; spec-shipward-desk-core.md accepts no optimistic concurrency on PUT, last write wins, as a documented assumption. NEEDS ALBERTO: either add optimistic concurrency (If-Match on a version or etag, 409 on conflict, UI re-reads and retries) which is an Ask First change to the HTTP surface, or narrow the stage-A Always to say the lock protects mutate() callers only and PUT stays last-write-wins by design. Referenced from a comment in tracker-store.mjs replace(). || DECIDED by Alberto: add optimistic concurrency. GET returns an ETag (content hash); PUT requires If-Match and answers 409 with the current document when it does not match; the UI re-applies its mutation to the fresh document and retries once. This is the authorised Ask First change to the HTTP surface. [committed by Claude at T1] || SHIPPED: GET returns an ETag (sha256 of the file bytes, 16 hex chars, quoted). PUT requires If-Match — 428 without it — and the store compares it INSIDE the lock against what is on disk. Mismatch answers 409 carrying the document that actually won plus its ETag, so the client can re-apply rather than guess. The UI recovers automatically: commit() takes a mutation, not a snapshot, so on 409 it re-applies the same intent to the winning document and retries once; a second conflict adopts the winner and says so. VERIFIED end to end against the live server by replaying the exact scenario the review used to destroy data: desk GETs at T0, Claude commits via mutate() at T1, desk PUTs its T0 snapshot at T2 — now HTTP 409 and Claude’s write SURVIVES. In the browser: drag sends a well-formed If-Match; a forced stale etag produced 409 then 200 with the external write intact and no error shown. 45 tests pass. The old \"concurrent writes never corrupt the file\" test was rewritten — it asserted six concurrent PUTs from one base all succeed, which was the bug; it now asserts exactly one wins and the rest get 409.",
       "created": "2026-07-25T15:25:44.607Z",
       "pushed": null,
       "shipped": null
@@ -156,6 +156,30 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-25T16:05:07.948Z",
+      "p": "shipward",
+      "msg": "SW-008 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T16:04:33.907Z",
+      "p": "shipward",
+      "msg": "SW-003 sent back to Backlog",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-25T16:04:15.190Z",
+      "p": "shipward",
+      "msg": "SW-003 handed to Claude Code — queued",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-25T16:00:25.458Z",
+      "p": "shipward",
+      "msg": "SW-008 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-25T15:25:44.607Z",
       "p": "shipward",

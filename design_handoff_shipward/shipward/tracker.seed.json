@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "activeProject": "myapp",
+  "projects": [
+    {
+      "id": "myapp",
+      "name": "My App",
+      "tag": "rename me",
+      "prefix": "MA"
+    }
+  ],
+  "cards": [],
+  "feed": []
+}

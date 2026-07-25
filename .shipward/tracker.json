@@ -1,0 +1,72 @@
+{
+  "version": 1,
+  "activeProject": "shipward",
+  "projects": [
+    {
+      "id": "shipward",
+      "name": "Shipward",
+      "tag": "the solo shipping desk",
+      "prefix": "SW"
+    }
+  ],
+  "cards": [
+    {
+      "id": "SW-001",
+      "p": "shipward",
+      "title": "Build the Shipward tracker app (server + UI)",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "L",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/shipward-tracker-app",
+      "commit": null,
+      "note": "Built via bmad-quick-dev against _bmad-output/specs/spec-shipward/SPEC.md. Recreate the hi-fi prototype at design_handoff_shipward/design-reference/Shipward-Modernist.dc.html as a static no-build web app in shipward/public, served by shipward/serve.mjs (~60 lines, zero deps, port 4747): GET /api/tracker reads .shipward/tracker.json, PUT /api/tracker does an atomic write (tmp + rename). UI polls GET ~3s so Claude Code's direct file edits appear live. Four views: Board (4 columns + drag & drop), Archive, Raw data, Card dialog. Tokens in design_handoff_shipward/design-reference/assets/modernist-scoped.css — strip the #sw-1a scoping prefix. Radius 0 everywhere. .shipward/schema.json is normative. Full spec: design_handoff_shipward/README.md.",
+      "created": "2026-07-25T12:29:17Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-002",
+      "p": "shipward",
+      "title": "Distill the design handoff into a SPEC contract",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "M",
+      "status": "review",
+      "claude": "done",
+      "branch": null,
+      "commit": null,
+      "note": "Ran bmad-spec on design_handoff_shipward/. Output: _bmad-output/specs/spec-shipward/ — SPEC.md (10 capabilities), companions data-contract.md + interaction-rules.md, adopted companions README.md + CLAUDE.md, sources tracker.seed.json + seed.js. Both self-validate passes PASS. Decision: README adopted rather than transcribed, so the token table and screen specs stay single-sourced. Four open questions left for Alberto — MCP tag has no MCP behind it, card-delete contradicts CLAUDE.md 'never delete', shipped-this-month field precedence, projects[] editability. Skill was invoked by loading SKILL.md directly: the session skill registry is rooted at /Users/alberto/projects, so project-local .claude/skills are not callable via the Skill tool.",
+      "created": "2026-07-25T12:47:00Z",
+      "pushed": null,
+      "shipped": null
+    }
+  ],
+  "feed": [
+    {
+      "t": "2026-07-25T13:04:00Z",
+      "p": "shipward",
+      "msg": "SW-001 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T12:52:00Z",
+      "p": "shipward",
+      "msg": "SW-002 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T12:47:00Z",
+      "p": "shipward",
+      "msg": "You added SW-002 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T12:29:17Z",
+      "p": "shipward",
+      "msg": "You added SW-001 to Backlog — it's on the list",
+      "by": "claude"
+    }
+  ]
+}

@@ -77,21 +77,71 @@
     {
       "id": "SW-005",
       "p": "shipward",
-      "title": "MCP server so Claude Code reaches the tracker over MCP",
+      "title": "MCP server so Claude Code reaches the tracker over MCP (stage B)",
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "claude",
-      "claude": "working",
-      "branch": "feat/mcp-tracker-server",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
       "commit": null,
-      "note": "Alberto answered 'I want the MCP' at the quick-dev step-01 checkpoint, overriding the decorative-tag default. Real MCP server exposing the tracker as tools, so Claude Code reads/writes cards over MCP instead of editing tracker.json directly, and the header's MCP CONNECTED tag reflects a real connection. CONSEQUENCES: invalidates the SPEC non-goal 'No MCP server is built' (needs a bmad-spec re-derive) and implies rewriting CLAUDE.md, whose protocol currently instructs direct file edits. Independent of the desk core — a second client onto the same tracker.json. Until this lands, the header tag renders per the prototype but is wired to nothing.",
+      "note": "SCOPE NARROWED to stage B at the step-02 token check (~2757 tokens vs a 1600 ceiling). Stage A shipped as SW-006. Remaining: shipward/mcp.mjs — zero-dep stdio JSON-RPC 2.0, protocol 2025-11-25, five verb tools (standup, log, start, done, sync) importing the rules from public/lib.js so the UI and Claude cannot drift; .mcp.json registration; mcp.test.mjs over a real pipe. Writes go through tracker-store.mjs, which is now cross-process safe. NO @modelcontextprotocol/sdk — zero-dep is an Always constraint; hand-roll the protocol.",
       "created": "2026-07-25T13:18:00Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-006",
+      "p": "shipward",
+      "title": "Cross-process safe tracker writes — shared store + lock",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "M",
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/mcp-tracker-server",
+      "commit": "b390868",
+      "note": "Stage A of SW-005. Extracted read/validate/atomic-write into shipward/tracker-store.mjs behind an O_EXCL advisory lock spanning the whole read-modify-write; serve.mjs is now a client and its in-process promise chain is gone. That chain only protected same-process writes — the MCP server and Claude Code direct edits both sit outside it. Lock records pid+timestamp, aged out after 5s so a crashed holder cannot deadlock the desk. 34 tests pass: store.test.mjs spawns real child processes (12 concurrent writers all land, stale locks broken, fresh locks waited for not stolen, invalid mutations write nothing and still release); desk-core suite passes unchanged as the regression gate.",
+      "created": "2026-07-25T15:06:49.615Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-007",
+      "p": "shipward",
+      "title": "Prefer MCP in CLAUDE.md and make the header tag live",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "Stage C of SW-005, depends on SW-005 stage B. Rewrite CLAUDE.md so the protocol prefers the MCP tools with direct file edits as the documented fallback (Alberto authorised this Ask First change at the SW-005 step-01 checkpoint). Drive the header MCP CONNECTED tag from an mcp.lastSeen heartbeat, stale after 150s, with a muted non-blinking disconnected variant. schema.json sets no additionalProperties, so the mcp key needs no schema change — verified. KNOWN TRADEOFF: a 60s heartbeat makes the committed tracker.json dirty in git about once a minute; the alternative is a .shipward/mcp-status.json sidecar.",
+      "created": "2026-07-25T15:06:49.615Z",
       "pushed": null,
       "shipped": null
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-25T15:06:49.615Z",
+      "p": "shipward",
+      "msg": "SW-006 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:06:49.615Z",
+      "p": "shipward",
+      "msg": "You added SW-007 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:06:49.615Z",
+      "p": "shipward",
+      "msg": "SW-005 sent back to Backlog",
+      "by": "claude"
+    },
     {
       "t": "2026-07-25T15:02:00Z",
       "p": "shipward",

@@ -17,10 +17,10 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/shipward-tracker-app",
-      "commit": null,
+      "commit": "b0f75b3",
       "note": "SCOPE NARROWED at the quick-dev step-01 checkpoint to the desk core: CAP-1,2,3,6,7,8,9 — serve.mjs, board with drag & drop, card dialog, activity strip, 3s live poll. Archive (SW-003), Raw data (SW-004) and the MCP server (SW-005) split out as separate cards. Built via bmad-quick-dev against _bmad-output/specs/spec-shipward/SPEC.md. Recreate the hi-fi prototype at design_handoff_shipward/design-reference/Shipward-Modernist.dc.html as a static no-build web app in shipward/public, served by shipward/serve.mjs (~60 lines, zero deps, port 4747): GET /api/tracker reads .shipward/tracker.json, PUT /api/tracker does an atomic write (tmp + rename). UI polls GET ~3s so Claude Code's direct file edits appear live. Four views: Board (4 columns + drag & drop), Archive, Raw data, Card dialog. Tokens in design_handoff_shipward/design-reference/assets/modernist-scoped.css — strip the #sw-1a scoping prefix. Radius 0 everywhere. .shipward/schema.json is normative. Full spec: design_handoff_shipward/README.md.",
       "created": "2026-07-25T12:29:17Z",
       "pushed": null,
@@ -92,6 +92,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-25T14:41:00Z",
+      "p": "shipward",
+      "msg": "SW-001 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-25T13:18:00Z",
       "p": "shipward",

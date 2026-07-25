@@ -39,3 +39,11 @@
 - source_spec: `_bmad-output/implementation-artifacts/spec-shipward-desk-core.md`
   summary: SPEC.md is stale — it still asserts the non-goal "No MCP server is built" and still lists four Open Questions that are all resolved.
   evidence: Blind Hunter. The resolutions live in .memlog.md and in SW-005's note; canonical SPEC.md contradicts shipped behaviour. Fix is a bmad-spec re-derive, which is that skill's job as sole writer of the spec.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-mcp-tracker-server.md`
+  summary: Stage B — the MCP server itself: shipward/mcp.mjs (zero-dep stdio JSON-RPC 2.0, protocol 2025-11-25), the five verb tools (standup, log, start, done, sync), .mcp.json registration, and mcp.test.mjs driving it over a real pipe.
+  evidence: Split from SW-005 at the step-02 token check (~2757 tokens against a 1600 ceiling). Depends on stage A: the server is a second writing process, and writing before the cross-process lock exists reintroduces the corruption the desk-core review reproduced.
+
+- source_spec: `_bmad-output/implementation-artifacts/spec-mcp-tracker-server.md`
+  summary: Stage C — make MCP the default path: rewrite CLAUDE.md to prefer the tools with direct file edits as fallback, and drive the header's MCP CONNECTED tag from an mcp.lastSeen heartbeat instead of a constant.
+  evidence: Split from SW-005 at the step-02 token check. Depends on stage B existing to heartbeat and to be preferred. CLAUDE.md is an Ask First item; Alberto authorised the rewrite at the SW-005 step-01 checkpoint. Carries a known tradeoff: a 60s heartbeat makes the committed tracker.json dirty in git roughly once a minute, versus a .shipward/mcp-status.json sidecar that keeps it clean.

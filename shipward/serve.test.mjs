@@ -31,14 +31,10 @@ before(async () => {
   await mkdir(join(sandbox, 'shipward'));
   tracker = join(sandbox, '.shipward', 'tracker.json');
   await writeFile(tracker, JSON.stringify(seed(), null, 2) + '\n');
-  await cp(join(HERE, 'serve.mjs'), join(sandbox, 'shipward', 'serve.mjs'));
+  await cp(join(HERE, 'tracker-store.mjs'), join(sandbox, 'shipward', 'tracker-store.mjs'));
   await cp(join(HERE, 'public'), join(sandbox, 'shipward', 'public'), { recursive: true });
 
-  proc = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], {
-    stdio: 'ignore', env: { ...process.env, PORT: String(PORT) },
-  });
-  // serve.mjs hard-codes 4747; rewrite the port for the sandbox copy instead.
-  proc.kill();
+  // serve.mjs hard-codes 4747; rewrite the port for the sandbox copy.
   const src = (await readFile(join(HERE, 'serve.mjs'), 'utf8')).replace('const PORT = 4747;', `const PORT = ${PORT};`);
   await writeFile(join(sandbox, 'shipward', 'serve.mjs'), src);
   proc = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], { stdio: 'ignore' });
@@ -125,6 +121,13 @@ test('GET refuses to serve a tracker that is not a tracker', async () => {
   await writeFile(tracker, 'definitely not json');
   assert.equal((await fetch(`${base}/api/tracker`)).status, 500);
   await writeFile(tracker, JSON.stringify(seed(), null, 2) + '\n');
+});
+
+test('GET answers 404 when the tracker is missing', async () => {
+  const { rename: mv } = await import('node:fs/promises');
+  await mv(tracker, `${tracker}.hidden`);
+  assert.equal((await fetch(`${base}/api/tracker`)).status, 404);
+  await mv(`${tracker}.hidden`, tracker);
 });
 
 test('unsupported methods are refused', async () => {

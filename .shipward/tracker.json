@@ -79,11 +79,11 @@
       "p": "shipward",
       "title": "MCP server so Claude Code reaches the tracker over MCP",
       "type": "feature",
-      "pri": "P2",
+      "pri": "P1",
       "effort": "L",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/mcp-tracker-server",
       "commit": null,
       "note": "Alberto answered 'I want the MCP' at the quick-dev step-01 checkpoint, overriding the decorative-tag default. Real MCP server exposing the tracker as tools, so Claude Code reads/writes cards over MCP instead of editing tracker.json directly, and the header's MCP CONNECTED tag reflects a real connection. CONSEQUENCES: invalidates the SPEC non-goal 'No MCP server is built' (needs a bmad-spec re-derive) and implies rewriting CLAUDE.md, whose protocol currently instructs direct file edits. Independent of the desk core — a second client onto the same tracker.json. Until this lands, the header tag renders per the prototype but is wired to nothing.",
       "created": "2026-07-25T13:18:00Z",
@@ -92,6 +92,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-25T15:02:00Z",
+      "p": "shipward",
+      "msg": "SW-005 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-25T14:41:00Z",
       "p": "shipward",

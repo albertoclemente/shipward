@@ -17,11 +17,11 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/memory-view",
-      "commit": null,
-      "note": "EXPLORATION, not a commitment: the memory-first angle from the 2026-07-27 divergence exercise. EVIDENCE THAT MOTIVATED IT, measured on the real tracker: notes are 22355 of 33836 file bytes = 66% of the tracker, and the UI renders them in a textarea inside a dialog behind a click, while a status field nobody rereads gets a whole column. The notes have also grown a grammar with nothing in the schema asking for one — SHIPPED x6, VERIFIED x5, REPRODUCED x3, DECIDED x2, TRADEOFF x2, plus ROOT CAUSE / GOTCHA / LESSON / NEEDS ALBERTO / SUPERSEDED / LEFT STALE and 17 other markers across 23 distinct kinds — and 33 distinct file paths already embedded in prose as untyped text. DESIGN: no schema change. A derived view parses the existing prose, classifies each ' || '-separated segment by marker lexicon, and groups by KIND rather than by card, because what a new session needs is 'every decision taken here' and 'what is still open', not 'SW-010's note'. Classification is a lens, shown as detected, never rewriting the note. Ships as a tab, NOT the default view, so it has to earn the home screen the way the Raw data view failed to.",
+      "commit": "0a090f6",
+      "note": "EXPLORATION, not a commitment: the memory-first angle from the 2026-07-27 divergence exercise. EVIDENCE THAT MOTIVATED IT, measured on the real tracker: notes are 22355 of 33836 file bytes = 66% of the tracker, and the UI renders them in a textarea inside a dialog behind a click, while a status field nobody rereads gets a whole column. The notes have also grown a grammar with nothing in the schema asking for one — SHIPPED x6, VERIFIED x5, REPRODUCED x3, DECIDED x2, TRADEOFF x2, plus ROOT CAUSE / GOTCHA / LESSON / NEEDS ALBERTO / SUPERSEDED / LEFT STALE and 17 other markers across 23 distinct kinds — and 33 distinct file paths already embedded in prose as untyped text. DESIGN: no schema change. A derived view parses the existing prose, classifies each ' || '-separated segment by marker lexicon, and groups by KIND rather than by card, because what a new session needs is 'every decision taken here' and 'what is still open', not 'SW-010's note'. Classification is a lens, shown as detected, never rewriting the note. Ships as a tab, NOT the default view, so it has to earn the home screen the way the Raw data view failed to. || BUILT as a tab, not the default. public/memory-lib.js parses the existing prose; no schema change. THE FINDING THAT MATTERED MOST was not the classifier but SUPERSESSION: openness is a property of the card's latest state, not of the segment that raised it. SW-008's note opens 'NEEDS ALBERTO' and two segments later says 'DECIDED' then 'SHIPPED' — counting that as open would send a fresh session to re-ask an answered question. An open item settled later on the same card is dimmed and labelled 'answered later on this card', not hidden, because 'this got resolved here' is itself worth reading. Took the open count 5 to 2. THREE HONEST LIMITS OF PARSING PROSE, all reproduced on real data: (1) MENTION VS USE — SW-013's own brief lists the marker vocabulary and so classified itself as open; a heuristic cannot tell naming a marker from using one. (2) CROSS-CARD RESOLUTION is invisible — SW-011's 'LEFT STALE: SPEC CAP-5' was closed by SW-012, and only within-card supersession is detectable. (3) THE SEPARATOR IS UNESCAPED — this very note's mention of the segment separator splits the note in half, visible in the UI as a sentence cut off at 'classifies each'. All three vanish if note becomes structured entries {t, kind, text, resolves} rather than prose with a delimiter; that is the real fork in the road and it is Alberto's call, not mine. 96 tests pass, 15 of them new. VERIFIED in the browser on real data: 26 entries across 5 groups, file filter 26->7 for lib.js, search 'mtime' -> 2 entries with SW-010 first, focus retained while typing, group headline and lede and tab all agreeing on 2.",
       "created": "2026-07-27T15:48:59.429Z",
       "pushed": null,
       "shipped": null
@@ -220,6 +220,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:55:48.397Z",
+      "p": "shipward",
+      "msg": "SW-013 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:48:59.686Z",
       "p": "shipward",
@@ -474,7 +480,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T15:48:59.666Z",
-    "pid": 47863
+    "lastSeen": "2026-07-27T15:55:48.368Z",
+    "pid": 49321
   }
 }

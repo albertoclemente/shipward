@@ -296,3 +296,68 @@ textarea.input { min-height: 90px; resize: vertical; }
    ignore the one that means something. */
 .tag-off { border: 1px solid var(--color-neutral-400); color: var(--color-neutral-600); }
 .mcp-dot.is-off { background: var(--color-neutral-500); animation: none; }
+
+/* ── memory view ─────────────────────────────────────────── */
+.mem-controls { display: flex; gap: var(--space-2); margin: var(--space-4) 0 var(--space-3); }
+.mem-search { max-width: 420px; }
+.mem-clear { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+
+.mem-files { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: var(--space-6); }
+.mem-files-label { font-size: 11px; margin-right: 2px; }
+.mem-file {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px; color: var(--color-neutral-700);
+  background: transparent; border: 1px solid var(--color-neutral-300);
+  padding: 3px 8px; cursor: pointer;
+}
+.mem-file:hover { border-color: var(--color-neutral-500); color: var(--color-text); }
+.mem-file.is-on { border-color: var(--color-accent); color: var(--color-accent-700); background: var(--color-accent-100); }
+.mem-file-n { font-weight: 700; color: var(--color-neutral-500); }
+.mem-file.is-on .mem-file-n { color: var(--color-accent-700); }
+
+.mem-group { margin-bottom: var(--space-8); }
+.mem-group-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding-bottom: var(--space-2); margin-bottom: var(--space-3);
+  border-bottom: 2px solid var(--color-divider);
+}
+.mem-group-label { margin: 0; }
+.mem-group-n { font-family: var(--font-heading); font-weight: 800; font-size: 20px; line-height: 1; }
+.mem-group-hint { font-size: 11px; margin-left: auto; text-align: right; }
+
+.mem-entry {
+  padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+  border: 1px solid var(--color-neutral-300); border-left-width: 3px;
+  background: var(--color-surface); margin-bottom: var(--space-2);
+}
+/* The left edge carries the kind, so a scan down the page reads as a shape
+   before it reads as words. */
+.kind-open { border-left-color: var(--color-accent); }
+.kind-finding { border-left-color: var(--color-accent-700); }
+.kind-decision { border-left-color: var(--color-neutral-800); }
+.kind-evidence { border-left-color: var(--color-neutral-500); }
+.kind-outcome { border-left-color: var(--color-neutral-400); }
+.kind-brief { border-left-color: var(--color-neutral-300); }
+.mem-entry.is-superseded { opacity: 0.55; }
+
+.mem-entry-top { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+.mem-entry-card {
+  font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--color-accent-700);
+  background: transparent; border: none; padding: 0; cursor: pointer; font-family: inherit;
+}
+.mem-entry-card:hover { text-decoration: underline; }
+.mem-entry-title { font-family: var(--font-heading); font-weight: 600; font-size: 13px; }
+.mem-entry-flag {
+  font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--color-neutral-600); border: 1px solid var(--color-neutral-400); padding: 1px 6px;
+}
+.mem-entry-date { font-size: 11px; margin-left: auto; flex: none; }
+.mem-entry-text { margin: 0; font-size: 13.5px; line-height: 1.6; max-width: 92ch; }
+.mem-entry-refs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: var(--space-2); }
+.mem-ref {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--color-neutral-600);
+  background: transparent; border: none; border-bottom: 1px dotted var(--color-neutral-400);
+  padding: 0; cursor: pointer;
+}
+.mem-ref:hover { color: var(--color-accent-700); border-bottom-color: var(--color-accent); }
+.mem-group-settled { font-size: 11px; }

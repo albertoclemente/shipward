@@ -5,6 +5,9 @@ import {
   feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed,
   archiveRows, archiveLede, addMsg, editMsg, deleteMsg, mcpStatus,
 } from './lib.js';
+import {
+  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen,
+} from './memory-lib.js';
 
 const POLL_MS = 3000;
 const root = document.getElementById('app');
@@ -15,6 +18,8 @@ const state = {
   editing: null,    // card id | 'new' | null
   dragOver: null,
   dragging: null,
+  memoryQuery: '',   // memory view: free-text filter
+  memoryFile: null,  // memory view: narrow to one file's accumulated knowledge
   etag: null,      // from the last GET; PUT must match it
   offline: false,
   error: null,      // server said no, as opposed to server is gone
@@ -198,6 +203,7 @@ function render() {
   const stats = deriveStats(doc.cards, project.id);
 
   const view = state.view === 'archive' ? renderArchive(doc, project)
+    : state.view === 'memory' ? renderMemory(doc, project)
     : renderBoard(doc, project);
 
   root.replaceChildren(
@@ -259,8 +265,10 @@ function renderActivity(feed, stats, project) {
 
 function renderTabs(doc, project) {
   const archived = cardsOf(doc.cards, project.id).filter((c) => c.status === 'shipped').length;
+  const open = stillOpen(memoryEntries(doc.cards, project.id)).length;
   const tabs = [
     ['board', 'Board'],
+    ['memory', `Memory${open ? ` · ${open} open` : ''}`],
     ['archive', `Archive · ${archived}`],
   ];
   return el('div', { class: 'tabs' }, tabs.map(([key, label]) =>
@@ -302,6 +310,127 @@ function renderArchive(doc, project) {
         : el('div', { class: 'text-muted view-empty',
             text: 'Nothing archived yet. Push something, then file it here.' }),
     ),
+  );
+}
+
+// What Claude Code knows about this repo, which is two thirds of the tracker by
+// weight and was previously visible only inside a dialog, in a textarea.
+function renderMemory(doc, project) {
+  const all = memoryEntries(doc.cards, project.id);
+  const files = fileIndex(all);
+  const scoped = state.memoryFile
+    ? all.filter((e) => e.refs.some((r) => r.split('/').pop() === state.memoryFile))
+    : all;
+  const shown = searchEntries(scoped, state.memoryQuery);
+
+  return el('main', { class: 'view-wrap' },
+    el('div', { class: 'view-body' },
+      el('h3', { class: 'view-title', text: `What Claude Code knows about ${project.name}` }),
+      el('p', { class: 'text-muted view-lede', text: memoryLede(all) }),
+
+      el('div', { class: 'mem-controls' },
+        el('input', {
+          class: 'input mem-search', type: 'search', placeholder: 'Search the memory…',
+          value: state.memoryQuery,
+          // `input`, not a re-render per keystroke through commit(): this
+          // filters a local projection and never touches the tracker.
+          oninput: (e) => { state.memoryQuery = e.target.value; renderMemoryOnly(); },
+        }),
+        state.memoryFile
+          ? el('button', {
+              class: 'btn btn-secondary mem-clear',
+              text: `${state.memoryFile} ✕`,
+              title: 'Show every file again',
+              onclick: () => { state.memoryFile = null; render(); },
+            })
+          : null,
+      ),
+
+      files.length
+        ? el('div', { class: 'mem-files' },
+            el('span', { class: 'text-muted mem-files-label', text: 'Most written about:' }),
+            files.slice(0, 8).map((f) =>
+              el('button', {
+                class: `mem-file${state.memoryFile === f.file ? ' is-on' : ''}`,
+                title: `${f.entries.length} entries across ${f.cards.join(', ')}`,
+                onclick: () => { state.memoryFile = state.memoryFile === f.file ? null : f.file; render(); },
+              },
+                f.file,
+                el('span', { class: 'mem-file-n', text: String(f.entries.length) }),
+              )),
+          )
+        : null,
+
+      shown.length
+        ? groupByKind(shown).map(renderMemoryGroup)
+        : el('div', { class: 'text-muted view-empty',
+            text: all.length
+              ? 'Nothing in the memory matches that.'
+              : 'Claude Code has not written anything down yet. Notes accumulate on cards as it works.' }),
+    ),
+  );
+}
+
+// Re-render only this view, so typing in the search box does not rebuild the
+// header and lose focus on every keystroke.
+function renderMemoryOnly() {
+  const doc = state.doc;
+  if (!doc || state.view !== 'memory') return render();
+  const project = activeProject(doc);
+  const current = document.querySelector('.view-wrap');
+  const next = renderMemory(doc, project);
+  const focused = document.activeElement?.classList.contains('mem-search');
+  const caret = focused ? document.activeElement.selectionStart : null;
+  current?.replaceWith(next);
+  if (focused) {
+    const box = next.querySelector('.mem-search');
+    box?.focus();
+    if (caret != null) box?.setSelectionRange(caret, caret);
+  }
+}
+
+function renderMemoryGroup(group) {
+  // The headline number must mean the same thing here, in the lede and on the
+  // tab. Counting superseded items as open made one section claim 5 while the
+  // other two said 2.
+  const settled = group.entries.filter((e) => e.superseded).length;
+  const live = group.entries.length - settled;
+  return el('section', { class: 'mem-group' },
+    el('div', { class: 'mem-group-head' },
+      el('h6', { class: 'mem-group-label', text: group.label }),
+      el('span', { class: 'mem-group-n', text: String(live) }),
+      settled
+        ? el('span', { class: 'text-muted mem-group-settled', text: `+${settled} answered later` })
+        : null,
+      el('span', { class: 'text-muted mem-group-hint', text: group.hint }),
+    ),
+    group.entries.map(renderMemoryEntry),
+  );
+}
+
+function renderMemoryEntry(e) {
+  return el('article', { class: `mem-entry kind-${e.kind}${e.superseded ? ' is-superseded' : ''}` },
+    el('div', { class: 'mem-entry-top' },
+      el('button', {
+        class: 'mem-entry-card', text: e.card,
+        title: 'Open the card',
+        onclick: () => openDialog(e.card),
+      }),
+      el('span', { class: 'mem-entry-title', text: e.title }),
+      e.superseded
+        // Say why it is dimmed. An unexplained grey block reads as broken.
+        ? el('span', { class: 'mem-entry-flag', text: 'answered later on this card' })
+        : null,
+      el('span', { class: 'text-muted mem-entry-date', text: fmtDate(e.at) }),
+    ),
+    el('p', { class: 'mem-entry-text', text: e.text }),
+    e.refs.length
+      ? el('div', { class: 'mem-entry-refs' }, e.refs.map((r) =>
+          el('button', {
+            class: 'mem-ref', text: r,
+            onclick: () => { state.memoryFile = r.split('/').pop(); state.memoryQuery = ''; render(); },
+          })))
+      : null,
   );
 }
 

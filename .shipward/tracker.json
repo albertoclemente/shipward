@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-013",
+      "p": "shipward",
+      "title": "Memory view — render what Claude knows, not just what is in flight",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/memory-view",
+      "commit": null,
+      "note": "EXPLORATION, not a commitment: the memory-first angle from the 2026-07-27 divergence exercise. EVIDENCE THAT MOTIVATED IT, measured on the real tracker: notes are 22355 of 33836 file bytes = 66% of the tracker, and the UI renders them in a textarea inside a dialog behind a click, while a status field nobody rereads gets a whole column. The notes have also grown a grammar with nothing in the schema asking for one — SHIPPED x6, VERIFIED x5, REPRODUCED x3, DECIDED x2, TRADEOFF x2, plus ROOT CAUSE / GOTCHA / LESSON / NEEDS ALBERTO / SUPERSEDED / LEFT STALE and 17 other markers across 23 distinct kinds — and 33 distinct file paths already embedded in prose as untyped text. DESIGN: no schema change. A derived view parses the existing prose, classifies each ' || '-separated segment by marker lexicon, and groups by KIND rather than by card, because what a new session needs is 'every decision taken here' and 'what is still open', not 'SW-010's note'. Classification is a lens, shown as detected, never rewriting the note. Ships as a tab, NOT the default view, so it has to earn the home screen the way the Raw data view failed to.",
+      "created": "2026-07-27T15:48:59.429Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-012",
       "p": "shipward",
       "title": "Update the SPEC to match what was built",
@@ -204,6 +220,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:48:59.686Z",
+      "p": "shipward",
+      "msg": "SW-013 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:48:59.429Z",
+      "p": "shipward",
+      "msg": "You added SW-013 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:45:14.620Z",
       "p": "shipward",
@@ -446,7 +474,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T15:45:14.596Z",
-    "pid": 46971
+    "lastSeen": "2026-07-27T15:48:59.666Z",
+    "pid": 47863
   }
 }

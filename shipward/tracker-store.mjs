@@ -35,10 +35,25 @@ const DIR = dirname(TRACKER);
 const BASE = basename(TRACKER);
 
 const LOCK_HEARTBEAT_MS = 1000;   // holder refreshes its mtime this often
-const LOCK_STALE_MS = 30000;      // backstop: a heartbeating holder never reaches this
+// A holder whose pid is dead only has to be quiet for this long. It used to be
+// 30s, which meant one crash cost every waiter half a minute and two crashes
+// inside a single waiter's deadline was a guaranteed failure — measured, 2 of 4
+// clean writers hard-failed. The pid check has already proven the holder gone;
+// the grace only has to cover a check that raced with a publish.
+const DEAD_GRACE_MS = 2000;
 const ORPHAN_GRACE_MS = 2000;     // a lock with no readable holder behind it
+// The backstop for a holder that is alive but has stopped heartbeating: wedged,
+// suspended, or a pid that now belongs to something else entirely. Liveness
+// used to make a lock unbreakable FOREVER — a lock 24 hours old held by pid 1
+// never became breakable, and the lock lives in the working directory, so it
+// survives a reboot after which that pid is very likely someone else's.
+const LOCK_ABANDONED_MS = 300000;
+// An mtime slightly ahead of Date.now() means brand new (see isStale). An mtime
+// an hour ahead means a clock that disagrees, and treating that as new made the
+// lock immortal — one backwards NTP step would freeze every existing lock.
+const FUTURE_SKEW_MS = 5000;
 const LOCK_RETRY_MS = 15;
-const LOCK_TIMEOUT_MS = 60000;    // must exceed LOCK_STALE_MS, or breaking becomes the common path
+const LOCK_TIMEOUT_MS = 60000;
 
 export const FEED_CAP = 200;
 
@@ -167,20 +182,24 @@ async function inspect() {
 // heartbeating for the full grace period.
 function isStale(snap) {
   if (!snap) return false;                             // nothing there to break
-  if (snap.holder && alive(snap.holder.pid)) return false;   // slow but alive is not stale
+  const age = Date.now() - snap.mtimeMs;
   // A future mtime means brand new, not broken. st.mtimeMs keeps sub-millisecond
   // precision while Date.now() truncates to whole milliseconds, so a lock created
   // moments ago reads as up to ~1ms ahead — measured on 54% of fresh locks. The
   // old `age < 0 → stale` rule therefore condemned most newborn locks outright.
-  const age = Date.now() - snap.mtimeMs;
+  // Beyond a few seconds ahead it is not precision, it is a broken clock, and
+  // an unbounded allowance made those locks immortal.
+  if (age < -FUTURE_SKEW_MS) return true;
   if (age < 0) return false;
+  // A living holder heartbeats every second, so its mtime is always fresh.
+  // Liveness on its own is not proof of progress — it is proof of a pid.
+  if (snap.holder && alive(snap.holder.pid)) return age > LOCK_ABANDONED_MS;
   // No readable holder behind it: a dangling symlink, a foreign file, or a
   // corpse. Nothing will ever heartbeat it, so the long grace buys nothing —
   // and it can no longer be one of our own live locks, because publish() links
   // a fully written scratch into place and inspect() reads body and mtime from
   // that one inode. A short grace still covers an unlucky moment.
-  if (!snap.holder) return age > ORPHAN_GRACE_MS;
-  return age > LOCK_STALE_MS;
+  return age > (snap.holder ? DEAD_GRACE_MS : ORPHAN_GRACE_MS);
 }
 
 // Steal a dead lock in ONE atomic step. Renaming a path succeeds for exactly
@@ -192,6 +211,14 @@ function isStale(snap) {
 // may already be someone else's fresh lock, so the grave is checked afterwards
 // and an innocent lock is put back.
 async function breakLock(snap) {
+  // Re-read immediately before the rename and abort if the lock is no longer
+  // the one we condemned. rename() moves whatever is at the path NOW, and the
+  // check used to happen only afterwards — by which point a third process could
+  // have published there and the link-back would delete its lock instead.
+  if (snap) {
+    const now = await inspect();
+    if (!now || now.ino !== snap.ino) return false;
+  }
   const grave = `${LOCK}.dead.${randomUUID()}`;
   try {
     await rename(LOCK, grave);
@@ -202,7 +229,14 @@ async function breakLock(snap) {
   if (graved && snap && graved.ino !== snap.ino) {
     // Not the corpse we condemned. Put it back if the path is still free; if
     // someone has already published there, drop ours rather than clobber theirs.
-    try { await link(grave, LOCK); } catch { /* path retaken — leave it alone */ }
+    try {
+      await link(grave, LOCK);
+    } catch {
+      // We took a live holder's only lock and cannot give it back. It will
+      // discover this at commit and refuse to write, but say so loudly: this
+      // path should now be unreachable.
+      process.stderr.write('shipward: broke a lock that was not the one judged stale\n');
+    }
     await unlink(grave).catch(() => {});
     return false;
   }
@@ -248,7 +282,10 @@ async function acquire() {
       // Every path below reaches the deadline check and the sleep. Two of them
       // used to `continue` past both and spin at 100% CPU.
       if (Date.now() > deadline) throw new Error(`timed out waiting for the tracker lock at ${LOCK}`);
-      await sleep(LOCK_RETRY_MS);
+      // Jittered, because a fixed poll is not a queue: under load the same
+      // process lost the race over and over — every one of 17 timed-out writes
+      // in a 2100-write run belonged to a single starved writer.
+      await sleep(LOCK_RETRY_MS + Math.floor(Math.random() * LOCK_RETRY_MS));
     }
   }
 }
@@ -256,7 +293,16 @@ async function acquire() {
 async function release(token) {
   const holder = await readHolder();
   if (holder?.token !== token) return;   // ours was already broken; do not delete a live holder's
-  await unlink(LOCK).catch(() => {});
+  // A swallowed error here leaked a lock carrying a LIVE pid, which nothing
+  // would then break — one transient EACCES wedged a long-running server for
+  // the rest of its life. Retry, and if it still will not go, say so.
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { await unlink(LOCK); return; } catch (err) {
+      if (err.code === 'ENOENT') return;
+      await sleep(LOCK_RETRY_MS);
+    }
+  }
+  process.stderr.write(`shipward: could not release the tracker lock at ${LOCK} — remove it by hand if writes hang\n`);
 }
 
 // Thrown when a holder discovers, just before committing, that the lock it took
@@ -270,8 +316,17 @@ export class LockLostError extends Error {
 // known way to lose a lock has been closed, so this should never fire — it is
 // here so that if one is ever reopened, the symptom is an error rather than a
 // vanished card.
+// This process's own token while it holds the lock. A nested mutate() used to
+// wait on a lock it already owned and fail 60 seconds later with a timeout that
+// blamed contention.
+let heldToken = null;
+
 export async function withLock(fn) {
+  if (heldToken) {
+    throw new Error('the tracker lock is already held by this process — a nested mutate() would deadlock against itself');
+  }
   const token = await acquire();
+  heldToken = token;
   const held = async () => {
     const holder = await readHolder();
     if (holder?.token !== token) {
@@ -281,15 +336,21 @@ export async function withLock(fn) {
   // Keep our mtime fresh so a long mutation is never mistaken for a corpse.
   // utimes, not writeFile: rewriting the body truncates it, and a waiter that
   // read during that window saw an invalid lock and broke a live holder's.
-  const beat = setInterval(() => {
+  const beat = setInterval(async () => {
+    // Only ever refresh OUR lock. Touching the path meant a holder whose lock
+    // had been broken kept someone else's corpse looking alive indefinitely,
+    // and the next writer timed out against a dead holder it could not break.
+    const holder = await readHolder();
+    if (holder?.token !== token) return;
     const now = new Date();
-    utimes(LOCK, now, now).catch(() => {});
+    await utimes(LOCK, now, now).catch(() => {});
   }, LOCK_HEARTBEAT_MS);
   beat.unref?.();
   try {
     return await fn(held);
   } finally {
     clearInterval(beat);
+    heldToken = null;
     await release(token);
   }
 }
@@ -300,12 +361,21 @@ export async function withLock(fn) {
 // atomic-write temp out from under it — its rename then failed ENOENT mid-write.
 const TMP_RE = new RegExp(`^${escapeRe(BASE)}\\.(\\d+)\\.[0-9a-f-]+\\.tmp$`);
 const SCRATCH_RE = new RegExp(`^${escapeRe(BASE)}\\.lock\\.(\\d+)\\.[0-9a-f-]+$`);
+// A grave carries no pid — it is the corpse of a lock, not of a process — so it
+// is collected on age instead. Nothing matched it before and they accumulated.
+const GRAVE_RE = new RegExp(`^${escapeRe(BASE)}\\.lock\\.dead\\.[0-9a-f-]+$`);
+const GRAVE_MAX_AGE_MS = 60000;
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 async function sweepTmp() {
   try {
     for (const f of await readdir(DIR)) {
+      if (GRAVE_RE.test(f)) {
+        const age = await lstat(join(DIR, f)).then((st) => Date.now() - st.mtimeMs).catch(() => 0);
+        if (age > GRAVE_MAX_AGE_MS) await unlink(join(DIR, f)).catch(() => {});
+        continue;
+      }
       const m = TMP_RE.exec(f) || SCRATCH_RE.exec(f);
       if (!m || alive(Number(m[1]))) continue;
       await unlink(join(DIR, f)).catch(() => {});
@@ -337,7 +407,7 @@ export async function readRaw() {
 export const read = async () => (await readRaw()).doc;
 export const serialize = (doc) => JSON.stringify(doc, null, 2) + '\n';
 
-async function atomicWrite(doc) {
+async function atomicWrite(doc, held) {
   const body = serialize(doc);
   const tmp = join(DIR, `${BASE}.${process.pid}.${randomUUID()}.tmp`);
   // Preserve the tracker's mode: rename swaps in a new inode, so a file the
@@ -352,6 +422,12 @@ async function atomicWrite(doc) {
       await fh.close().catch(() => {});
     }
     if (mode != null) await chmod(tmp, mode);
+    // The last instant before the write becomes visible. Checking ownership
+    // before all of this left a window as wide as the commit itself — measured
+    // p50 5.17ms, max 16.17ms on a realistic tracker, the same order as the
+    // retry poll. A card vanished inside it with no error raised anywhere.
+    // Nothing is published if we no longer hold the lock.
+    if (held) await held();
     await rename(tmp, TRACKER);
   } catch (err) {
     await unlink(tmp).catch(() => {});
@@ -381,8 +457,7 @@ export async function mutate(fn) {
     const out = normalize(next);
     const bad = validate(out);
     if (bad) throw new ValidationError(`refusing to write an invalid tracker document: ${bad}`);
-    await held();
-    const body = await atomicWrite(out);
+    const body = await atomicWrite(out, held);
     return { doc: out, body, changed: true, etag: etagOf(body) };
   });
 }
@@ -409,8 +484,7 @@ export async function replace(doc, ifMatch) {
         );
       }
     }
-    await held();
-    const body = await atomicWrite(out);
+    const body = await atomicWrite(out, held);
     return { doc: out, body, changed: true, etag: etagOf(body) };
   });
 }

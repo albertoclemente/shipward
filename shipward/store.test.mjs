@@ -307,3 +307,76 @@ test('read rejects a missing or corrupt tracker distinguishably', async () => {
     /not found/,
   );
 });
+
+
+/* -- after the lock edge-case review (SW-019) --------------- */
+
+test('a lock held by a live pid is breakable once it stops heartbeating', async () => {
+  // Liveness made a lock unbreakable FOREVER: one 24 hours old held by pid 1
+  // never became breakable, and the lock lives in the working directory, so it
+  // survives a reboot after which that pid belongs to something else.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: process.pid, token: 'stale-but-alive', at: 0 }));
+  const { utimes } = await import('node:fs/promises');
+  const old = new Date(Date.now() - 6 * 60 * 1000);          // past LOCK_ABANDONED_MS
+  await utimes(lock, old, old);
+
+  await appendInChild(1);                                     // must not hang
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).cards.length, 1);
+});
+
+test('a lock dated far in the future is not immortal', async () => {
+  // "age < 0 means new" had no upper bound, so one backwards clock step froze
+  // every existing lock permanently.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
+  const { utimes } = await import('node:fs/promises');
+  const future = new Date(Date.now() + 60 * 60 * 1000);
+  await utimes(lock, future, future);
+
+  await appendInChild(1);
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).cards.length, 1);
+});
+
+test('a dead holder costs seconds, not half a minute', async () => {
+  // 30s per crash meant two crashes inside one waiter's deadline was a
+  // guaranteed failure: 2 of 4 clean writers hard-failed.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
+  const { utimes } = await import('node:fs/promises');
+  const old = new Date(Date.now() - 5000);
+  await utimes(lock, old, old);
+
+  const started = Date.now();
+  await appendInChild(1);
+  const waited = Date.now() - started;
+  assert.ok(waited < 20000, `waited ${waited}ms on a provably dead holder`);
+});
+
+test('a nested mutate fails immediately instead of deadlocking for a minute', async () => {
+  const nested = run(process.execPath, ['--input-type=module', '-e',
+    `import { mutate } from ${JSON.stringify(STORE)};
+     await mutate(async (doc) => { await mutate((d) => d); return doc; });`,
+  ], { env: { ...process.env, SHIPWARD_TRACKER: tracker } });
+
+  const started = Date.now();
+  await assert.rejects(nested, /already held by this process/);
+  assert.ok(Date.now() - started < 20000, 'it used to wait the full lock timeout');
+});
+
+test('a grave left by a killed breaker is eventually collected', async () => {
+  // Graves matched neither sweep pattern, so they accumulated forever.
+  const grave = `${tracker}.lock.dead.abcdef01-2345-6789-abcd-ef0123456789`;
+  await writeFile(grave, 'corpse');
+  const { utimes } = await import('node:fs/promises');
+  const old = new Date(Date.now() - 120000);
+  await utimes(grave, old, old);
+
+  // Force a break, which is what runs the sweep.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
+  await utimes(lock, old, old);
+  await appendInChild(1);
+
+  await assert.rejects(stat(grave), 'the grave should have been swept');
+});

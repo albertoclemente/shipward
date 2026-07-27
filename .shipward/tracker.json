@@ -11,17 +11,33 @@
   ],
   "cards": [
     {
+      "id": "SW-019",
+      "p": "shipward",
+      "title": "Tracker lock: the layer under the SW-010 fix",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "L",
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/memory-lib-hardening",
+      "commit": null,
+      "note": "Edge Case Hunter over tracker-store.mjs. FIRST, THE FIX HOLDS: 1600/1600 writes landed with 0 lost, and 2083/2100 on a harder run where ~4 losses were expected at the old rate. The one-observation inspect() and link-a-complete-scratch publish() genuinely closed SW-010. TEN FINDINGS UNDER IT. F1 lost-write, SILENT: held() is checked before atomicWrite, but the commit is open+write+fsync+chmod+rename — measured p50 5.17ms and max 16.17ms on a realistic 43KB tracker, the same order as LOCK_RETRY_MS, not microseconds. A card vanished with no error raised anywhere. F2 corruption: breakLock renames the lock to a grave BEFORE checking the inode, so a third process can publish into the freed path and the link-back then unlinks that innocent holder lock; F2 is F1 trigger. F3 permanent deadlock: alive(pid) makes a lock unbreakable FOREVER — a lock 24h old held by pid 1 timed out at 60s and never becomes breakable. The lock lives in the repo working directory so it survives a reboot, after which the pid is very likely someone else. F4 permanent deadlock: release() swallows unlink errors, so one transient EACCES leaks a lock carrying a LIVE pid and wedges that daemon for its whole lifetime. F5 permanent deadlock: age<0 means NEW with no upper bound, so an mtime one hour in the future is immortal and any backwards clock step immortalizes every existing lock. F6: the heartbeat utimes a PATH, so a dispossessed holder keeps a corpse fresh forever and a third writer fails at 60s. F7: a provably dead holder still costs 30s, and LOCK_TIMEOUT is only 2x LOCK_STALE, so two crashes inside one waiter deadline is a guaranteed failure — 2 of 4 clean writers hard-failed. F8: no fairness, 17 of 2100 writes timed out and ALL 17 were the same starved process. F9: withLock is not re-entrant, a nested mutate is a silent 60s hang. F10: graves are never swept, neither sweep regex matches .lock.dead.<uuid>. NEGATIVE RESULTS WORTH KEEPING: 4000 create/delete cycles produced 4000 distinct inodes on APFS so the F2 guard is sound here, but ext4/HFS+ recycle aggressively and it would false-negative there; publish() partial writes are not reproducible; link() on FAT/network mounts is untested and would fail with a raw errno and no diagnosis.",
+      "created": "2026-07-27T18:31:21.568Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-018",
       "p": "shipward",
       "title": "Status line and hooks: terminal injection, truncation, and a hang",
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/memory-lib-hardening",
-      "commit": null,
-      "note": "The Blind Hunter BROKE the invariant I claimed for the status line, on its first try. FINDING 1, worst of the day: status.mjs interpolates card text straight into stdout with nothing stripped, so tracker data becomes terminal control. Proven with real output — a title containing \\u001b]0;PWNED\\u0007 rewrites the terminal/tab title, \\u001b[2J\\u001b[H clears the screen, \\u001b[?1049h switches to the alternate screen buffer, a bare \\r overwrites the line just drawn, and a newline turns a one-line status line into three. TITLE_BUDGET is no mitigation: the clear-screen payload is 7 characters. Worse, the card ID is never clipped at all and status.mjs never calls validate(), so ID_RE does not apply to it. U+202E RTL override passes through too. CLAUDE.md blesses hand-editing and log() takes free text, so this is data the tool invites. FINDING 2: emit() in the hooks writes then calls process.exit(0), which drops whatever has not flushed — a hard cliff at exactly 65536 bytes on a pipe. One card with a 70KiB title makes every hook emit unparseable truncated JSON, and past ~1000 cards the write is lost entirely so the STOP HOOK SILENTLY STOPS BLOCKING. It fails open, which is the wrong direction. FINDING 3: the stdin read has no timeout, so a pipe held open hangs the hook until the runtime kills it — on UserPromptSubmit that is a stall every single turn; 600MiB of stdin was also buffered in full. FINDING 4: the PreToolUse matcher includes NotebookEdit but the handler reads tool_input.file_path, and NotebookEdit passes notebook_path, so it can never warn. Also: clip() splits emoji into lone surrogates; openItems() does an uncapped memory scan on every render (390ms at 1000 cards); and activeLine() injects card text into the model context every turn with no framing that it is data.",
+      "commit": "6180905",
+      "note": "The Blind Hunter BROKE the invariant I claimed for the status line, on its first try. FINDING 1, worst of the day: status.mjs interpolates card text straight into stdout with nothing stripped, so tracker data becomes terminal control. Proven with real output — a title containing \\u001b]0;PWNED\\u0007 rewrites the terminal/tab title, \\u001b[2J\\u001b[H clears the screen, \\u001b[?1049h switches to the alternate screen buffer, a bare \\r overwrites the line just drawn, and a newline turns a one-line status line into three. TITLE_BUDGET is no mitigation: the clear-screen payload is 7 characters. Worse, the card ID is never clipped at all and status.mjs never calls validate(), so ID_RE does not apply to it. U+202E RTL override passes through too. CLAUDE.md blesses hand-editing and log() takes free text, so this is data the tool invites. FINDING 2: emit() in the hooks writes then calls process.exit(0), which drops whatever has not flushed — a hard cliff at exactly 65536 bytes on a pipe. One card with a 70KiB title makes every hook emit unparseable truncated JSON, and past ~1000 cards the write is lost entirely so the STOP HOOK SILENTLY STOPS BLOCKING. It fails open, which is the wrong direction. FINDING 3: the stdin read has no timeout, so a pipe held open hangs the hook until the runtime kills it — on UserPromptSubmit that is a stall every single turn; 600MiB of stdin was also buffered in full. FINDING 4: the PreToolUse matcher includes NotebookEdit but the handler reads tool_input.file_path, and NotebookEdit passes notebook_path, so it can never warn. Also: clip() splits emoji into lone surrogates; openItems() does an uncapped memory scan on every render (390ms at 1000 cards); and activeLine() injects card text into the model context every turn with no framing that it is data. || FIXED. Every value that reaches the terminal is scrubbed of C0, DEL, C1, the bidi overrides and the line separators, and the card ID is now bounded like the title — it was neither clipped nor validated, since status.mjs never calls validate(). Hook output is bounded BEFORE the write and drained before exit: over the bound it says less correctly instead of more corruptly, and the Stop hook can no longer fall silent, which was how it failed OPEN. GOTCHA WORTH KEEPING: my first stdin-timeout fix used AbortSignal.timeout and did nothing — a for-await blocked on the next chunk never reaches a condition it could check; the stream has to be DESTROYED on a deadline. The regression test caught that, which is the only reason I know. SECOND GOTCHA, on the nose: the tool refused to run my own command for containing raw control characters while I was writing the tests for control characters — the payloads are now built from String.fromCharCode so no literal control byte exists in the repo. Also fixed: NotebookEdit was in the PreToolUse matcher but the handler only read tool_input.file_path while NotebookEdit passes notebook_path, so it could never warn; the open-item scan is skipped past 400 cards (390ms at 1000, 1.6s at 5000) rather than stalling the render; clips no longer split an emoji into a lone surrogate; and activeLine now labels card text as tracker data, because a card can be logged from an issue body and its title reached the model context unframed on every turn. 155 tests pass; 8 new, each verified to fail against the pre-fix code.",
       "created": "2026-07-27T18:16:18.639Z",
       "pushed": null,
       "shipped": null
@@ -33,11 +49,11 @@
       "type": "bug",
       "pri": "P1",
       "effort": "L",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/memory-lib-hardening",
-      "commit": null,
-      "note": "Edge Case Hunter returned 15 CONFIRMED findings against public/memory-lib.js, every one reproduced with a script. THREE ARE SERIOUS. (1) resolves() matches RESOLUTION markers by substring with no polarity check, so 'Not yet fixed — parked until he answers' marks an open item SUPERSEDED: the card says the question is open and the module reports zero open, dropping it from stillOpen, standup, recall and the status line. The module's stated purpose, inverted. (2) A non-string note throws — validate() in tracker-store.mjs never checks `note`, and CLAUDE.md explicitly calls hand-editing supported, so note:12345 passes readRaw and then kills standup, the memory view and both MCP tools; status.mjs swallows it and prints '◇ no card', which is a lie. (3) PATH_RE backtracks quadratically: 24k chars took 2.9s, 120k did not finish in 120 SECONDS. Reachable by pasting a data URI or base64 blob into a note, and it runs on the browser main thread and in every standup. The rest: markerIndex desyncs when toUpperCase changes string length (ß, ﬁ) and files an open item under 'What shipped'; markers match inside URLs and filenames, so a link to a repo called todo-list becomes a permanent open item; ⚠ without the variation selector never matches ⚠️; hits() is a bare endsWith so the 1-char token 't' matches commit(), reachable because tokensFor feeds recall every declared name; recall returns NOTHING when every token is generic even with file given — the exact failure the code comments claim was fixed, only fixed on the path where the basename is in tokens; basename indexing conflates two different index.js; and a batch of library-level throws and NaN/limit/surrogate boundary bugs.",
+      "commit": "534c06a",
+      "note": "Edge Case Hunter returned 15 CONFIRMED findings against public/memory-lib.js, every one reproduced with a script. THREE ARE SERIOUS. (1) resolves() matches RESOLUTION markers by substring with no polarity check, so 'Not yet fixed — parked until he answers' marks an open item SUPERSEDED: the card says the question is open and the module reports zero open, dropping it from stillOpen, standup, recall and the status line. The module's stated purpose, inverted. (2) A non-string note throws — validate() in tracker-store.mjs never checks `note`, and CLAUDE.md explicitly calls hand-editing supported, so note:12345 passes readRaw and then kills standup, the memory view and both MCP tools; status.mjs swallows it and prints '◇ no card', which is a lie. (3) PATH_RE backtracks quadratically: 24k chars took 2.9s, 120k did not finish in 120 SECONDS. Reachable by pasting a data URI or base64 blob into a note, and it runs on the browser main thread and in every standup. The rest: markerIndex desyncs when toUpperCase changes string length (ß, ﬁ) and files an open item under 'What shipped'; markers match inside URLs and filenames, so a link to a repo called todo-list becomes a permanent open item; ⚠ without the variation selector never matches ⚠️; hits() is a bare endsWith so the 1-char token 't' matches commit(), reachable because tokensFor feeds recall every declared name; recall returns NOTHING when every token is generic even with file given — the exact failure the code comments claim was fixed, only fixed on the path where the basename is in tokens; basename indexing conflates two different index.js; and a batch of library-level throws and NaN/limit/surrogate boundary bugs. || See the commit — 15 findings fixed, each with a regression test verified to fail against the pre-fix module first.",
       "created": "2026-07-27T17:59:45.296Z",
       "pushed": null,
       "shipped": null
@@ -300,6 +316,30 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T18:31:44.694Z",
+      "p": "shipward",
+      "msg": "SW-019 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:31:21.568Z",
+      "p": "shipward",
+      "msg": "You added SW-019 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:23:44.926Z",
+      "p": "shipward",
+      "msg": "SW-017 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:23:44.544Z",
+      "p": "shipward",
+      "msg": "SW-018 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T18:16:20.635Z",
       "p": "shipward",
@@ -650,7 +690,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T18:16:20.086Z",
-    "pid": 72901
+    "lastSeen": "2026-07-27T18:31:44.662Z",
+    "pid": 77851
   }
 }

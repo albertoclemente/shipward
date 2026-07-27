@@ -17,13 +17,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/shipward-hooks",
       "commit": "180fde5",
-      "note": "WHY, with evidence from this very session: CLAUDE.md, the MCP instructions field and the tool descriptions are three layers of ADVICE and nothing checks. Proof they are not enough — I built the entire MCP server for SW-005 without ever calling start; the card sat in Backlog while 500 lines were written against it, and I only noticed by running standup for an unrelated reason. If the author of the protocol, holding it in active context, drifts inside one session, advice is not a mechanism. FOUR HOOKS: SessionStart injects a standup so a session begins already knowing; UserPromptSubmit injects one line naming the active card EVERY TURN, which is the actual continuous part because drift cannot accumulate; PreToolUse on Edit/Write warns when source is about to change with no card in claude/working — WARNS, never blocks, because a hook that gets disabled protects nothing; Stop refuses to end while a card is still working with no done. DESIGN RULES: a hook must never be able to break a session, so every one exits 0 silently on any error; the Stop hook honours stop_hook_active so it cannot loop; and the standup text is extracted into a shared module so the hook and the MCP tool cannot drift apart. KNOWN LIMIT stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note — done with 'fixed it' satisfies every one of them and teaches the next session nothing. || SHIPPED. .claude/settings.json wires four hooks to .claude/hooks/shipward.mjs: SessionStart injects a standup unasked; UserPromptSubmit injects one line naming the active card EVERY turn (the continuous part — drift cannot accumulate); PreToolUse on Edit/Write/NotebookEdit warns when source changes with no card in claude/working; Stop refuses to end while a card is still working with no done. TWO RULES THE HOOK FILE MUST NEVER BREAK, both covered by tests: (1) a hook can never break a session — every path exits 0 and any failure (missing tracker, unparseable tracker, unknown subcommand) exits silently, because a broken hook that bricks the project is worse than no hook; (2) pre-edit WARNS and never denies — permissionDecision is always 'allow' — because a hook that gets in the way gets switched off and a switched-off hook protects nothing. Stop honours stop_hook_active or it would refuse the session forever. pre-edit exempts .shipward/, .claude/, _bmad-output/, .git/ and CLAUDE.md/README.md: touching those proves nothing about the protocol, so nagging is pure noise. REFACTOR THAT CAME WITH IT: standupText/line/stamp/PERISHABLE moved out of mcp.mjs into shipward/standup.mjs so the SessionStart hook and the MCP tool render from ONE implementation — two renderings of the same board would tell a session two different stories. 123 tests pass, 11 new, spawning the real script the way the runtime does (payload on stdin, JSON on stdout). MEASURED COST: ~90ms per prompt hook, dominated by node startup rather than reading the tracker; paid on every turn. NOT YET VERIFIED IN THE RUNTIME — the hooks are unit-tested against the documented wire shapes but have never actually fired inside Claude Code. That needs a session rooted at shipward_app plus hook approval. KNOWN LIMIT, stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note; done with 'fixed it' satisfies all four and teaches the next session nothing.",
+      "note": "WHY, with evidence from this very session: CLAUDE.md, the MCP instructions field and the tool descriptions are three layers of ADVICE and nothing checks. Proof they are not enough — I built the entire MCP server for SW-005 without ever calling start; the card sat in Backlog while 500 lines were written against it, and I only noticed by running standup for an unrelated reason. If the author of the protocol, holding it in active context, drifts inside one session, advice is not a mechanism. FOUR HOOKS: SessionStart injects a standup so a session begins already knowing; UserPromptSubmit injects one line naming the active card EVERY TURN, which is the actual continuous part because drift cannot accumulate; PreToolUse on Edit/Write warns when source is about to change with no card in claude/working — WARNS, never blocks, because a hook that gets disabled protects nothing; Stop refuses to end while a card is still working with no done. DESIGN RULES: a hook must never be able to break a session, so every one exits 0 silently on any error; the Stop hook honours stop_hook_active so it cannot loop; and the standup text is extracted into a shared module so the hook and the MCP tool cannot drift apart. KNOWN LIMIT stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note — done with 'fixed it' satisfies every one of them and teaches the next session nothing. || SHIPPED. .claude/settings.json wires four hooks to .claude/hooks/shipward.mjs: SessionStart injects a standup unasked; UserPromptSubmit injects one line naming the active card EVERY turn (the continuous part — drift cannot accumulate); PreToolUse on Edit/Write/NotebookEdit warns when source changes with no card in claude/working; Stop refuses to end while a card is still working with no done. TWO RULES THE HOOK FILE MUST NEVER BREAK, both covered by tests: (1) a hook can never break a session — every path exits 0 and any failure (missing tracker, unparseable tracker, unknown subcommand) exits silently, because a broken hook that bricks the project is worse than no hook; (2) pre-edit WARNS and never denies — permissionDecision is always 'allow' — because a hook that gets in the way gets switched off and a switched-off hook protects nothing. Stop honours stop_hook_active or it would refuse the session forever. pre-edit exempts .shipward/, .claude/, _bmad-output/, .git/ and CLAUDE.md/README.md: touching those proves nothing about the protocol, so nagging is pure noise. REFACTOR THAT CAME WITH IT: standupText/line/stamp/PERISHABLE moved out of mcp.mjs into shipward/standup.mjs so the SessionStart hook and the MCP tool render from ONE implementation — two renderings of the same board would tell a session two different stories. 123 tests pass, 11 new, spawning the real script the way the runtime does (payload on stdin, JSON on stdout). MEASURED COST: ~90ms per prompt hook, dominated by node startup rather than reading the tracker; paid on every turn. NOT YET VERIFIED IN THE RUNTIME — the hooks are unit-tested against the documented wire shapes but have never actually fired inside Claude Code. That needs a session rooted at shipward_app plus hook approval. KNOWN LIMIT, stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note; done with 'fixed it' satisfies all four and teaches the next session nothing. || NOT YET PROVEN IN THE RUNTIME even though it is now on main: the hooks are unit-tested against the documented wire shapes but have never fired inside Claude Code. First session rooted at shipward_app will need to approve them.",
       "created": "2026-07-27T16:18:46.568Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -33,13 +33,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/memory-recall",
       "commit": "c8ba627",
       "note": "THE GAP, measured: the tracker holds 27 memory entries / 4044 words, and standup returns 0 of them. The only path back is start, one card at a time, so Claude retrieves memory about the ticket it is opening and never about the code it is about to touch. From the agent's side this store is write-only. FIX: (1) standup gains a bounded memory section — decisions not to reverse, and still-open items, each with its card id and date; (2) a new recall tool takes file / kind / query and returns the entries attached, ranked by what it would cost to miss. DESIGN RULES: every entry arrives with its date and card so a session can judge rather than believe; evidence is labelled as a claim about a PAST state, because 'tests pass' rots (45 was true this morning, it is 96 now); nothing is silently truncated — recall says what it dropped and how to get it. Standup stays readable: entries are clipped with the card id kept so the full text is one recall away. || SHIPPED. standup now carries a bounded memory section (still-open items + decisions not to reverse, each stamped with card and date, clipped so the full text is one recall away) and a new recall({file|kind|query}) tool retrieves the rest, ranked by what it would cost to miss, always reporting what it dropped. TWO THINGS THAT ONLY SHOWED UP ON REAL DATA: (1) BRIDGING FILE TO PROSE — SW-010's note, the most valuable in this repo, names NO file at all; it names isStale(), breakLock(), sweepTmp(), because that is how you write down what went wrong. recall({file}) therefore reads the file off disk and asks about every name declared inside it, not just the filename. Before the bridge, recall({file:'tracker-store'}) returned one irrelevant hit; after, six with both SW-010 findings ranked first. (2) DROPPING GENERIC NAMES — tracker-store.mjs declares 73 names and most are now()/read()/line(), so matching any of them returned the whole tracker and the top hits were unrelated. Tokens appearing across more than a quarter of the memory are now dropped before scoring, and entries rank by how many distinct names they match. GOTCHA IN THAT FIX: the share filter then ate EVERY token on a small corpus, because with two entries one hit is already 50 percent — recall returned nothing at all. Nothing counts as generic until it has turned up at least 4 times; regression test covers the young-repo case. Evidence entries are labelled 'as of then, not a claim about now' at the point of use, because '45 tests pass' was true this morning and is 112 now. Excerpts lead with the marker that classified them rather than the first 200 characters, which were usually provenance preamble. CLAUDE.md gains step 0: recall before editing an unfamiliar file. 112 tests pass, 16 new.",
       "created": "2026-07-27T16:01:56.626Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -49,13 +49,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/memory-view",
       "commit": "0a090f6",
       "note": "EXPLORATION, not a commitment: the memory-first angle from the 2026-07-27 divergence exercise. EVIDENCE THAT MOTIVATED IT, measured on the real tracker: notes are 22355 of 33836 file bytes = 66% of the tracker, and the UI renders them in a textarea inside a dialog behind a click, while a status field nobody rereads gets a whole column. The notes have also grown a grammar with nothing in the schema asking for one — SHIPPED x6, VERIFIED x5, REPRODUCED x3, DECIDED x2, TRADEOFF x2, plus ROOT CAUSE / GOTCHA / LESSON / NEEDS ALBERTO / SUPERSEDED / LEFT STALE and 17 other markers across 23 distinct kinds — and 33 distinct file paths already embedded in prose as untyped text. DESIGN: no schema change. A derived view parses the existing prose, classifies each ' || '-separated segment by marker lexicon, and groups by KIND rather than by card, because what a new session needs is 'every decision taken here' and 'what is still open', not 'SW-010's note'. Classification is a lens, shown as detected, never rewriting the note. Ships as a tab, NOT the default view, so it has to earn the home screen the way the Raw data view failed to. || BUILT as a tab, not the default. public/memory-lib.js parses the existing prose; no schema change. THE FINDING THAT MATTERED MOST was not the classifier but SUPERSESSION: openness is a property of the card's latest state, not of the segment that raised it. SW-008's note opens 'NEEDS ALBERTO' and two segments later says 'DECIDED' then 'SHIPPED' — counting that as open would send a fresh session to re-ask an answered question. An open item settled later on the same card is dimmed and labelled 'answered later on this card', not hidden, because 'this got resolved here' is itself worth reading. Took the open count 5 to 2. THREE HONEST LIMITS OF PARSING PROSE, all reproduced on real data: (1) MENTION VS USE — SW-013's own brief lists the marker vocabulary and so classified itself as open; a heuristic cannot tell naming a marker from using one. (2) CROSS-CARD RESOLUTION is invisible — SW-011's 'LEFT STALE: SPEC CAP-5' was closed by SW-012, and only within-card supersession is detectable. (3) THE SEPARATOR IS UNESCAPED — this very note's mention of the segment separator splits the note in half, visible in the UI as a sentence cut off at 'classifies each'. All three vanish if note becomes structured entries {t, kind, text, resolves} rather than prose with a delimiter; that is the real fork in the road and it is Alberto's call, not mine. 96 tests pass, 15 of them new. VERIFIED in the browser on real data: 26 entries across 5 groups, file filter 26->7 for lib.js, search 'mtime' -> 2 entries with SW-010 first, focus retained while typing, group headline and lede and tab all agreeing on 2.",
       "created": "2026-07-27T15:48:59.429Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -65,13 +65,13 @@
       "type": "chore",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/spec-catch-up",
       "commit": "0edc2f6",
       "note": "The SPEC contract has drifted from the product across a day of building. Known drift: (1) non-goal 'No MCP server is built' is false — SW-005 shipped one; (2) CAP-5 Raw data describes a view removed in SW-011; (3) all four Open Questions were answered at checkpoints but never written back; (4) constraint 'last write wins' is false — SW-008 added If-Match/ETag optimistic concurrency with 428/409; (5) assumption 'No optimistic concurrency on PUT' likewise; (6) CAP-9 and interaction-rules Live reload still name the raw view; (7) ephemeral UI state still lists view raw and copied; (8) data-contract has no mcp heartbeat key and still says 'Last write wins'; (9) constraint says the server is ~60 lines, which stopped being true. ALSO RATIFY: two additions I made to interaction-rules.md mid-implementation without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both document behaviour the prototype and the code already implement, and Alberto is being told rather than asked-after-the-fact this time. || DONE. Nine false statements corrected. SPEC.md: CAP-5 WITHDRAWN not deleted (renumbering would silently change what CAP-6..CAP-10 mean in the cards and artifacts citing them); CAP-11 MCP server and CAP-12 honest MCP tag added; CAP-9 and Live reload stop naming the raw view; non-goal 'No MCP server is built' becomes 'No MCP SDK, stdio only'; the '~60 lines' server figure dropped; constraints gained the single-store cross-process lock, the one-module rule for shared logic, and the If-Match/ETag contract; the 'last write wins' assumption RETIRED WITH ITS REASON KEPT ON THE RECORD rather than deleted, because a future reader needs to know an audit trail of a destroyed card was once thought sufficient; all four Open Questions moved to Resolved decisions with their answers. data-contract.md: mcp heartbeat documented including the git-dirtiness tradeoff, feed cap stated as truncating not rejecting, stat precedence resolved to shipped ?? pushed and pinned to UTC, MCP status derivation added, write rules rewritten. interaction-rules.md: ephemeral state now matches the real state object, sequential polling recorded, offline vs error kept distinct. RATIFIED AND NAMED IN THE MEMLOG: the two additions I made to interaction-rules.md during SW-001 without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both only document behaviour the prototype's moveMsg/applyTransition and the shipped code already implement. The process failure was mine; a SPEC companion is Ask First. LESSON ON THE RECORD: spec drift is cheap to create and expensive to find — re-derive at the end of any day that ships more than two cards.",
       "created": "2026-07-27T15:42:05.896Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -81,13 +81,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/remove-raw-data",
       "commit": "1a6d32a",
       "note": "Alberto's call 2026-07-27: the point of Shipward is watching Claude Code work, and Raw data is the view that earns its place least — useful once to prove the board is only a view of the file, rarely after. Board stays (it is the point), Archive stays. SUPERSEDES SW-004, which is in Review claiming the raw view shipped. Remove: renderRaw/copyRaw/copyTimer and the copy icon from app.js, the raw tab entry and view dispatch, rawJson/rawCard from public/lib.js, the three rawJson tests, and .view-body-raw/.view-lede-raw/.raw-pre from app.css. NOTE FOR ALBERTO: this makes SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md stale — not editing those without a ratified decision, since the SPEC is the contract. || REMOVED. app.js loses renderRaw/copyRaw/copyTimer, the copy icon, the copied/copyFailed state flags, the raw tab entry and its dispatch branch; lib.js loses rawJson/rawCard; three tests and three CSS rules go with them. render() already falls back to the board for an unrecognised view, so nothing can land on a view that no longer exists. 81 tests pass. VERIFIED in the browser against the real tracker: two tabs (Board, Archive), Archive still renders its table, zero stray pre elements or Copy buttons, no console errors. GOTCHA WORTH REMEMBERING: my first pass sliced app.css between two markers and silently deleted 70 lines — the whole board/column/card block sat between the raw rules and the end of the file. The screenshot caught it; the tests did not, because CSS has no tests. Reverted and removed the exact block verbatim instead. Slice-between-markers is not safe on a file you did not just write. LEFT STALE FOR ALBERTO: SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md still describe a view that no longer exists — not editing the SPEC without a ratified decision.",
       "created": "2026-07-27T15:35:16.401Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -97,12 +97,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/live-lock-broken",
       "commit": "988f8be",
       "created": "2026-07-27T14:50:54.528Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null,
       "note": "REPRODUCED while fixing SW-009. The 12-writer store test fails about 1 run in 6 under full-suite load: 11 of 12 cards land, every child exits 0, nothing is logged. A high-cycle harness (6 processes x 150 mutations) loses ~1 write per 900 reliably. ROOT CAUSE: isStale() judges the lock from TWO separate observations of the path — readHolder() then lstat() — and the lock can be replaced between them. When readHolder() hits the lock in its momentary absence (normal, between one holder release and the next publish) it returns null, and lstat() then measures a DIFFERENT, brand-new lock. That new lock trips `if (age < 0) return true` — the line commented \"clock skew: as broken as too old\". Measured: st.mtimeMs carries sub-millisecond precision while Date.now() truncates to whole ms, so a freshly created lock reads as up to 0.62ms in the FUTURE in 1085 of 2000 observations. Over half of all new locks are therefore condemned the instant that race is hit. Trace confirms the full chain: break-won by a waiter, then 6ms later the true holder gets release-skip (its lock is gone) and its atomic-write chmod fails ENOENT because breakLock -> sweepTmp deleted the live holder’s in-flight .tmp. Two writers in the critical section, one write silently overwritten. THREE DEFECTS: (1) isStale reads stat and content from different observations; (2) age < 0 is treated as death when it actually means brand new; (3) sweepTmp unlinks temp and lock-scratch files belonging to LIVE processes. || FIXED. inspect() now reads mtime, inode and holder from ONE open handle, so a stat and a read can never land on two different locks. A future mtime means new, not dead (the old 'age < 0 = as broken as too old' line was the trigger). breakLock() compares the grave's inode against the snapshot it judged and puts an innocent lock back. sweepTmp() only collects files whose pid is dead. withLock() hands callers a held() guard checked immediately before the commit, so a lost lock raises LockLostError instead of overwriting whoever holds it now. EVIDENCE: before, ~1 write lost per 900 under sustained contention (2 of 4 trials) and the 12-writer test failed ~1 run in 6 under full-suite load; after, 12960 contended writes across 14 trials with zero lost and six consecutive clean suite runs. 49 tests pass. Three new regression tests were each run against the PREVIOUS store and all three fail there: future-dated lock read as a corpse, sweep eating a live process's in-flight temp, and a mid-write lock loss writing anyway."
     },
@@ -113,13 +113,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/shipward-tracker-app",
       "commit": "b0f75b3",
       "note": "SCOPE NARROWED at the quick-dev step-01 checkpoint to the desk core: CAP-1,2,3,6,7,8,9 — serve.mjs, board with drag & drop, card dialog, activity strip, 3s live poll. Archive (SW-003), Raw data (SW-004) and the MCP server (SW-005) split out as separate cards. Built via bmad-quick-dev against _bmad-output/specs/spec-shipward/SPEC.md. Recreate the hi-fi prototype at design_handoff_shipward/design-reference/Shipward-Modernist.dc.html as a static no-build web app in shipward/public, served by shipward/serve.mjs (~60 lines, zero deps, port 4747): GET /api/tracker reads .shipward/tracker.json, PUT /api/tracker does an atomic write (tmp + rename). UI polls GET ~3s so Claude Code's direct file edits appear live. Four views: Board (4 columns + drag & drop), Archive, Raw data, Card dialog. Tokens in design_handoff_shipward/design-reference/assets/modernist-scoped.css — strip the #sw-1a scoping prefix. Radius 0 everywhere. .shipward/schema.json is normative. Full spec: design_handoff_shipward/README.md.",
       "created": "2026-07-25T12:29:17Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.432Z",
       "shipped": null
     },
     {
@@ -129,13 +129,13 @@
       "type": "chore",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": null,
       "commit": null,
-      "note": "Ran bmad-spec on design_handoff_shipward/. Output: _bmad-output/specs/spec-shipward/ — SPEC.md (10 capabilities), companions data-contract.md + interaction-rules.md, adopted companions README.md + CLAUDE.md, sources tracker.seed.json + seed.js. Both self-validate passes PASS. Decision: README adopted rather than transcribed, so the token table and screen specs stay single-sourced. Four open questions left for Alberto — MCP tag has no MCP behind it, card-delete contradicts CLAUDE.md 'never delete', shipped-this-month field precedence, projects[] editability. Skill was invoked by loading SKILL.md directly: the session skill registry is rooted at /Users/alberto/projects, so project-local .claude/skills are not callable via the Skill tool.",
+      "note": "Ran bmad-spec on design_handoff_shipward/. Output: _bmad-output/specs/spec-shipward/ — SPEC.md (10 capabilities), companions data-contract.md + interaction-rules.md, adopted companions README.md + CLAUDE.md, sources tracker.seed.json + seed.js. Both self-validate passes PASS. Decision: README adopted rather than transcribed, so the token table and screen specs stay single-sourced. Four open questions left for Alberto — MCP tag has no MCP behind it, card-delete contradicts CLAUDE.md 'never delete', shipped-this-month field precedence, projects[] editability. Skill was invoked by loading SKILL.md directly: the session skill registry is rooted at /Users/alberto/projects, so project-local .claude/skills are not callable via the Skill tool. || Merged to main 2026-07-27 in the bd75f11 fast-forward. No commit of its own: this card produced the SPEC under _bmad-output/, which landed inside the desk-core commit.",
       "created": "2026-07-25T12:47:00Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -145,13 +145,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/archive-view-shipped",
       "commit": "dba5128",
       "note": "SPEC CAP-4. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Shipped & archived' + muted lede, .table sorted by shipped desc: Shipped (Mon D) / ID (mono 12px) / What went out / Type / Effort / Commit (mono). Tab label carries the count. Read-only projection over state the desk core already builds. || SHIPPED: archiveRows() and archiveLede() live in public/lib.js so the projection is unit-tested rather than eyeballed; app.js renders the table and the tabs are live (Board/Archive switch, aria-current set). Sorted by shipped desc; an entry with a missing or unparseable shipped date sinks to the bottom rather than scrambling the order, because Claude Code hand-writes this file; a card with no sha gets an em dash; the lede reads '1 entry' not '1 entries'. .table ported from modernist-scoped.css with the #sw-1a prefix stripped. VERIFIED in the browser against a seeded sandbox tracker (never the real one): three shipped cards render newest-first with the undated one last, header row matches the contract, the board is replaced, tab count reads 'Archive · 3'. 53 tests pass.",
       "created": "2026-07-25T13:18:00Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -161,13 +161,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/raw-data-view",
       "commit": "b61fd61",
-      "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped. || SHIPPED: rawJson() in public/lib.js writes the twelve contract keys explicitly so the field order is the contract in one visible place, not an emergent property of a key loop. pri is emitted as priority; p is dropped (the view is already project-scoped); note is dropped too — it is not in the contract's list and it is Claude's working context, not board data. Nulls are kept rather than the keys omitted, so a machine reading it gets a stable shape. Copy JSON flips to 'Copied — feed it to a machine' for 2s, but ONLY when the clipboard write actually resolves; a denied write says 'Could not copy — select it instead' instead of claiming success. The flag lives in state because the 3s poll re-renders underneath the timer. VERIFIED in the browser: tab switches, pre renders 4 cards at mono 12px with max-height 560px, key order matches the contract exactly, the failure label appeared under the headless profile's denied clipboard and reverted after 2s, and with writeText stubbed the success label appeared and the copied text was byte-identical to the pre. 56 tests pass. || SUPERSEDED 2026-07-27 by SW-011 — Alberto removed the Raw data view. This card's work is no longer in the product; the commit b61fd61 stays in history. Keeping the card rather than deleting it: ids are never reused, and the reasoning above is still the record of why the projection was shaped the way it was.",
+      "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped. || SHIPPED: rawJson() in public/lib.js writes the twelve contract keys explicitly so the field order is the contract in one visible place, not an emergent property of a key loop. pri is emitted as priority; p is dropped (the view is already project-scoped); note is dropped too — it is not in the contract's list and it is Claude's working context, not board data. Nulls are kept rather than the keys omitted, so a machine reading it gets a stable shape. Copy JSON flips to 'Copied — feed it to a machine' for 2s, but ONLY when the clipboard write actually resolves; a denied write says 'Could not copy — select it instead' instead of claiming success. The flag lives in state because the 3s poll re-renders underneath the timer. VERIFIED in the browser: tab switches, pre renders 4 cards at mono 12px with max-height 560px, key order matches the contract exactly, the failure label appeared under the headless profile's denied clipboard and reverted after 2s, and with writeText stubbed the success label appeared and the copied text was byte-identical to the pre. 56 tests pass. || SUPERSEDED 2026-07-27 by SW-011 — Alberto removed the Raw data view. This card's work is no longer in the product; the commit b61fd61 stays in history. Keeping the card rather than deleting it: ids are never reused, and the reasoning above is still the record of why the projection was shaped the way it was. || Merged to main, but the code it added was already removed by SW-011. What is in main is its removal; b61fd61 stays in history.",
       "created": "2026-07-25T13:18:00Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -177,13 +177,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/mcp-server-stage-b",
       "commit": "ed72dcf",
       "note": "SCOPE NARROWED to stage B at the step-02 token check (~2757 tokens vs a 1600 ceiling). Stage A shipped as SW-006. Remaining: shipward/mcp.mjs — zero-dep stdio JSON-RPC 2.0, protocol 2025-11-25, five verb tools (standup, log, start, done, sync) importing the rules from public/lib.js so the UI and Claude cannot drift; .mcp.json registration; mcp.test.mjs over a real pipe. Writes go through tracker-store.mjs, which is now cross-process safe. NO @modelcontextprotocol/sdk — zero-dep is an Always constraint; hand-roll the protocol. || SHIPPED stage B. shipward/mcp.mjs is newline-delimited JSON-RPC 2.0 over stdio, protocol 2025-11-25, zero deps, no SDK. Five tools mirror the five slash commands (standup/log/start/done/sync); each does the tracker half and leaves git plus the work itself to Claude. All rules — id allocation, branch naming, status transitions, feed copy — are imported from public/lib.js so the desk and Claude cannot drift; addMsg/editMsg/deleteMsg were moved into lib.js for that and app.js now calls them. .mcp.json registers it as the shipward server. DESIGN CALLS: an unknown tool name returns a readable errored RESULT rather than -32601, because it is the model mistake to correct not a protocol failure; an unknown card id lists what IS startable; start is idempotent so a re-run after a crash re-reports context instead of refusing; done APPENDS to the note rather than replacing it; sync applies every update and creation in ONE locked write with ONE feed entry. BUG FOUND BY SMOKE-TESTING THE REAL BINARY: stdin end called process.exit immediately and killed a call still in flight — losing a write that had taken the tracker lock and never answering. Every test held stdin open so none of them saw it; now the queue drains first, and the regression test was verified to fail against the old code. 24 MCP tests over a real pipe (split frames, two messages in one chunk, notifications, malformed input, batch refusal, stdout purity); 80 tests in total. This card was itself started and finished THROUGH the MCP server.",
       "created": "2026-07-25T13:18:00Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -193,13 +193,13 @@
       "type": "chore",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/mcp-tracker-server",
       "commit": "b390868",
       "note": "Stage A of SW-005. Extracted read/validate/atomic-write into shipward/tracker-store.mjs behind an O_EXCL advisory lock spanning the whole read-modify-write; serve.mjs is now a client and its in-process promise chain is gone. That chain only protected same-process writes — the MCP server and Claude Code direct edits both sit outside it. Lock records pid+timestamp, aged out after 5s so a crashed holder cannot deadlock the desk. 34 tests pass: store.test.mjs spawns real child processes (12 concurrent writers all land, stale locks broken, fresh locks waited for not stolen, invalid mutations write nothing and still release); desk-core suite passes unchanged as the regression gate. ⚠️ PULLED BACK FROM REVIEW 2026-07-25: adversarial review REPRODUCED five failures — the lock does not hold. (1) Contended stale-break: 4 processes vs one stale lock, 9/25 trials LOST WRITES, because detect-and-break is three non-atomic steps and each breaker unlinks the previous winner’s fresh lock. (2) A 6s mutation gets its lock stolen at 5s; both processes exit 0 and one write vanishes silently. (3) A dangling symlink at the lock path spins acquire() forever at 100% CPU — two of three loop paths skip the deadline check. (4) replace() (every card drag) never re-reads under the lock, so a desk PUT erased a Claude write that had committed correctly. (5) rename resets file mode 600→644. Also: feed at exactly 200 makes validate() reject every subsequent write and freezes the tracker; lost in-process FIFO ordering; GET re-serializes instead of returning raw bytes. 34 tests passed throughout — none of them covered contention. || REWORKED after review: the lock was redesigned, not patched. Publish via write-scratch-then-link(): link is atomic AND never leaves an empty lock visible, which open(wx) did — under contention a process starved between create and stamp, waiters read a bodyless lock and broke a LIVE holder’s. Break a dead lock by rename (one atomic step) so two breakers cannot both win and delete each other’s fresh lock. Ownership token: a holder only ever releases the lock it took. Liveness (process.kill(pid,0)) over age, plus a utimes heartbeat — utimes not writeFile, because rewriting the body truncates it and reopens the same window. Every retry path now checks the deadline and sleeps (two used to spin at 100% CPU). Also: feed cap truncates instead of rejecting (rejection froze the tracker permanently at 200 entries); file mode preserved across rename; fsync before rename; read() distinguishes ENOENT from EACCES; GET returns raw bytes not a re-serialization; in-process FIFO queue restored in front of the lock; err.name instead of instanceof; orphan tmp and lock-scratch files swept on break. 41 tests pass. Stress: 25 trials x 4 contended writers against a stale lock = 0 lost writes, 0 leftovers (was 9/25 losing writes). 12-writer repro 12/12 across three runs.",
       "created": "2026-07-25T15:06:49.615Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -209,13 +209,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/prefer-mcp-claude-md",
       "commit": "4deef72",
       "note": "Stage C of SW-005, depends on SW-005 stage B. Rewrite CLAUDE.md so the protocol prefers the MCP tools with direct file edits as the documented fallback (Alberto authorised this Ask First change at the SW-005 step-01 checkpoint). Drive the header MCP CONNECTED tag from an mcp.lastSeen heartbeat, stale after 150s, with a muted non-blinking disconnected variant. schema.json sets no additionalProperties, so the mcp key needs no schema change — verified. KNOWN TRADEOFF: a 60s heartbeat makes the committed tracker.json dirty in git about once a minute; the alternative is a .shipward/mcp-status.json sidecar. || SHIPPED stage C. CLAUDE.md now leads with the five MCP tools and keeps direct file edits as the documented fallback for when no server is connected, with the rules stated once so they apply to both routes. The MCP CONNECTED tag was HARDCODED — lit whether or not anything was listening, which made it decoration on a product whose premise is that Claude really is on the other end. It now reads doc.mcp.lastSeen via mcpStatus() in lib.js, stamped by the MCP server every 60s, dark after 150s (MCP_STALE_MS). Offline is muted with no animation: a blinking light that means nothing trains you to ignore the one that means something. A future-dated heartbeat reads as live rather than infinitely stale — a disagreeing clock is not a dead server. TRADEOFF TAKEN AS DECIDED: the heartbeat lives in tracker.json, so a committed tracker goes dirty in git about once a minute during a session; the .shipward/mcp-status.json sidecar alternative was rejected because one occasionally dirty file beats two files that can disagree. The heartbeat is best-effort and never fails a session. VERIFIED end to end: with no mcp key the tag read MCP OFFLINE, muted, animation none; starting a real mcp.mjs against that tracker flipped it to MCP CONNECTED, accent colour, swm-blink, title 'last seen just now', within one 3s poll. Test note: the server writes on startup, so the read-only assertions now compare board state with the mcp key stripped rather than raw bytes. 84 tests pass.",
       "created": "2026-07-25T15:06:49.615Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -225,13 +225,13 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/put-optimistic-concurrency",
-      "commit": null,
-      "note": "REPRODUCED by adversarial review against a live server: desk GETs at T0, Claude Code appends a card via mutate() at T1 (correctly locked, committed), desk PUTs its T0 snapshot at T2 — PUT 200 and Claude’s card is GONE. The lock worked perfectly and the data was still destroyed, because replace() never re-reads under the lock: its base document came from an unlocked GET seconds earlier. This is the primary remaining loss path. It is also a CONTRADICTION between two live contracts. spec-mcp-tracker-server.md Always says two processes must never start a mutation from the same base document; spec-shipward-desk-core.md accepts no optimistic concurrency on PUT, last write wins, as a documented assumption. NEEDS ALBERTO: either add optimistic concurrency (If-Match on a version or etag, 409 on conflict, UI re-reads and retries) which is an Ask First change to the HTTP surface, or narrow the stage-A Always to say the lock protects mutate() callers only and PUT stays last-write-wins by design. Referenced from a comment in tracker-store.mjs replace(). || DECIDED by Alberto: add optimistic concurrency. GET returns an ETag (content hash); PUT requires If-Match and answers 409 with the current document when it does not match; the UI re-applies its mutation to the fresh document and retries once. This is the authorised Ask First change to the HTTP surface. [committed by Claude at T1] || SHIPPED: GET returns an ETag (sha256 of the file bytes, 16 hex chars, quoted). PUT requires If-Match — 428 without it — and the store compares it INSIDE the lock against what is on disk. Mismatch answers 409 carrying the document that actually won plus its ETag, so the client can re-apply rather than guess. The UI recovers automatically: commit() takes a mutation, not a snapshot, so on 409 it re-applies the same intent to the winning document and retries once; a second conflict adopts the winner and says so. VERIFIED end to end against the live server by replaying the exact scenario the review used to destroy data: desk GETs at T0, Claude commits via mutate() at T1, desk PUTs its T0 snapshot at T2 — now HTTP 409 and Claude’s write SURVIVES. In the browser: drag sends a well-formed If-Match; a forced stale etag produced 409 then 200 with the external write intact and no error shown. 45 tests pass. The old \"concurrent writes never corrupt the file\" test was rewritten — it asserted six concurrent PUTs from one base all succeed, which was the bug; it now asserts exactly one wins and the rest get 409.",
+      "commit": "649ca73",
+      "note": "REPRODUCED by adversarial review against a live server: desk GETs at T0, Claude Code appends a card via mutate() at T1 (correctly locked, committed), desk PUTs its T0 snapshot at T2 — PUT 200 and Claude’s card is GONE. The lock worked perfectly and the data was still destroyed, because replace() never re-reads under the lock: its base document came from an unlocked GET seconds earlier. This is the primary remaining loss path. It is also a CONTRADICTION between two live contracts. spec-mcp-tracker-server.md Always says two processes must never start a mutation from the same base document; spec-shipward-desk-core.md accepts no optimistic concurrency on PUT, last write wins, as a documented assumption. NEEDS ALBERTO: either add optimistic concurrency (If-Match on a version or etag, 409 on conflict, UI re-reads and retries) which is an Ask First change to the HTTP surface, or narrow the stage-A Always to say the lock protects mutate() callers only and PUT stays last-write-wins by design. Referenced from a comment in tracker-store.mjs replace(). || DECIDED by Alberto: add optimistic concurrency. GET returns an ETag (content hash); PUT requires If-Match and answers 409 with the current document when it does not match; the UI re-applies its mutation to the fresh document and retries once. This is the authorised Ask First change to the HTTP surface. [committed by Claude at T1] || SHIPPED: GET returns an ETag (sha256 of the file bytes, 16 hex chars, quoted). PUT requires If-Match — 428 without it — and the store compares it INSIDE the lock against what is on disk. Mismatch answers 409 carrying the document that actually won plus its ETag, so the client can re-apply rather than guess. The UI recovers automatically: commit() takes a mutation, not a snapshot, so on 409 it re-applies the same intent to the winning document and retries once; a second conflict adopts the winner and says so. VERIFIED end to end against the live server by replaying the exact scenario the review used to destroy data: desk GETs at T0, Claude commits via mutate() at T1, desk PUTs its T0 snapshot at T2 — now HTTP 409 and Claude’s write SURVIVES. In the browser: drag sends a well-formed If-Match; a forced stale etag produced 409 then 200 with the external write intact and no error shown. 45 tests pass. The old \"concurrent writes never corrupt the file\" test was rewritten — it asserted six concurrent PUTs from one base all succeed, which was the bug; it now asserts exactly one wins and the rest get 409. || Commit backfilled during the merge sync — the card had carried a null sha since it was closed.",
       "created": "2026-07-25T15:25:44.607Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     },
     {
@@ -241,17 +241,23 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/test-port-zero",
       "commit": "8bf611f",
       "note": "The sandbox server in serve.test.mjs hard-codes port 4749. A leftover server from an earlier or parallel run holds the port, the new server fails to bind, and the tests silently assert against the STALE server — observed here as three phantom failures (GET returning 200 for a missing tracker). Fix: bind port 0, read the assigned port back from the server, pass it to the tests. The sandbox server should also log bind failures rather than dying silently. || SHIPPED: serve.mjs now reads SHIPWARD_PORT (default 4747) and logs the port it actually bound; the test spawns it with SHIPWARD_PORT=0 and parses the port back out of stdout, so the suite no longer rewrites serve.mjs source to patch the constant. A bind failure logs to stderr and exits 1 — covered by a test that starts a second server on the taken port and asserts exit 1 plus 'already in use'. 46 tests pass. FOUND WHILE DOING THIS: the 12-writer store test failed intermittently (~1 run in 6 under full-suite load, 11/12 cards). Not flaky — a real silent lost write. Root cause traced and filed as SW-010.",
       "created": "2026-07-25T15:25:44.607Z",
-      "pushed": null,
+      "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": null
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T16:29:20.433Z",
+      "p": "shipward",
+      "msg": "Synced with git — all 15 review cards merged to main as bd75f11 — fast-forward, no merge commits, 123 tests green on main",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T16:22:45.656Z",
       "p": "shipward",
@@ -548,7 +554,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T16:22:45.641Z",
-    "pid": 55502
+    "lastSeen": "2026-07-27T16:29:20.358Z",
+    "pid": 56843
   }
 }

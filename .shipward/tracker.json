@@ -17,11 +17,11 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/remove-raw-data",
-      "commit": null,
-      "note": "Alberto's call 2026-07-27: the point of Shipward is watching Claude Code work, and Raw data is the view that earns its place least — useful once to prove the board is only a view of the file, rarely after. Board stays (it is the point), Archive stays. SUPERSEDES SW-004, which is in Review claiming the raw view shipped. Remove: renderRaw/copyRaw/copyTimer and the copy icon from app.js, the raw tab entry and view dispatch, rawJson/rawCard from public/lib.js, the three rawJson tests, and .view-body-raw/.view-lede-raw/.raw-pre from app.css. NOTE FOR ALBERTO: this makes SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md stale — not editing those without a ratified decision, since the SPEC is the contract.",
+      "commit": "1a6d32a",
+      "note": "Alberto's call 2026-07-27: the point of Shipward is watching Claude Code work, and Raw data is the view that earns its place least — useful once to prove the board is only a view of the file, rarely after. Board stays (it is the point), Archive stays. SUPERSEDES SW-004, which is in Review claiming the raw view shipped. Remove: renderRaw/copyRaw/copyTimer and the copy icon from app.js, the raw tab entry and view dispatch, rawJson/rawCard from public/lib.js, the three rawJson tests, and .view-body-raw/.view-lede-raw/.raw-pre from app.css. NOTE FOR ALBERTO: this makes SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md stale — not editing those without a ratified decision, since the SPEC is the contract. || REMOVED. app.js loses renderRaw/copyRaw/copyTimer, the copy icon, the copied/copyFailed state flags, the raw tab entry and its dispatch branch; lib.js loses rawJson/rawCard; three tests and three CSS rules go with them. render() already falls back to the board for an unrecognised view, so nothing can land on a view that no longer exists. 81 tests pass. VERIFIED in the browser against the real tracker: two tabs (Board, Archive), Archive still renders its table, zero stray pre elements or Copy buttons, no console errors. GOTCHA WORTH REMEMBERING: my first pass sliced app.css between two markers and silently deleted 70 lines — the whole board/column/card block sat between the raw rules and the end of the file. The screenshot caught it; the tests did not, because CSS has no tests. Reverted and removed the exact block verbatim instead. Slice-between-markers is not safe on a file you did not just write. LEFT STALE FOR ALBERTO: SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md still describe a view that no longer exists — not editing the SPEC without a ratified decision.",
       "created": "2026-07-27T15:35:16.401Z",
       "pushed": null,
       "shipped": null
@@ -101,7 +101,7 @@
       "claude": "done",
       "branch": "feat/raw-data-view",
       "commit": "b61fd61",
-      "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped. || SHIPPED: rawJson() in public/lib.js writes the twelve contract keys explicitly so the field order is the contract in one visible place, not an emergent property of a key loop. pri is emitted as priority; p is dropped (the view is already project-scoped); note is dropped too — it is not in the contract's list and it is Claude's working context, not board data. Nulls are kept rather than the keys omitted, so a machine reading it gets a stable shape. Copy JSON flips to 'Copied — feed it to a machine' for 2s, but ONLY when the clipboard write actually resolves; a denied write says 'Could not copy — select it instead' instead of claiming success. The flag lives in state because the 3s poll re-renders underneath the timer. VERIFIED in the browser: tab switches, pre renders 4 cards at mono 12px with max-height 560px, key order matches the contract exactly, the failure label appeared under the headless profile's denied clipboard and reverted after 2s, and with writeText stubbed the success label appeared and the copied text was byte-identical to the pre. 56 tests pass.",
+      "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped. || SHIPPED: rawJson() in public/lib.js writes the twelve contract keys explicitly so the field order is the contract in one visible place, not an emergent property of a key loop. pri is emitted as priority; p is dropped (the view is already project-scoped); note is dropped too — it is not in the contract's list and it is Claude's working context, not board data. Nulls are kept rather than the keys omitted, so a machine reading it gets a stable shape. Copy JSON flips to 'Copied — feed it to a machine' for 2s, but ONLY when the clipboard write actually resolves; a denied write says 'Could not copy — select it instead' instead of claiming success. The flag lives in state because the 3s poll re-renders underneath the timer. VERIFIED in the browser: tab switches, pre renders 4 cards at mono 12px with max-height 560px, key order matches the contract exactly, the failure label appeared under the headless profile's denied clipboard and reverted after 2s, and with writeText stubbed the success label appeared and the copied text was byte-identical to the pre. 56 tests pass. || SUPERSEDED 2026-07-27 by SW-011 — Alberto removed the Raw data view. This card's work is no longer in the product; the commit b61fd61 stays in history. Keeping the card rather than deleting it: ids are never reused, and the reasoning above is still the record of why the projection was shaped the way it was.",
       "created": "2026-07-25T13:18:00Z",
       "pushed": null,
       "shipped": null
@@ -188,6 +188,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:38:03.950Z",
+      "p": "shipward",
+      "msg": "SW-004 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:37:52.975Z",
+      "p": "shipward",
+      "msg": "SW-011 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:35:24.769Z",
       "p": "shipward",
@@ -400,7 +412,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T15:35:24.748Z",
-    "pid": 44982
+    "lastSeen": "2026-07-27T15:38:03.933Z",
+    "pid": 45570
   }
 }

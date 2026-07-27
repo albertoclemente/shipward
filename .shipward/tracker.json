@@ -17,11 +17,11 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/ambient-statusline",
-      "commit": null,
-      "note": "The ambient angle from the 2026-07-27 divergence exercise. THE OBSERVATION THAT MADE IT WORTH BUILDING: the UserPromptSubmit hook is already an ambient surface and is the highest-frequency Shipward surface that exists — it fires on every single prompt, while the board gets opened a few times a day. You do not want to LOOK AT the board, you want to know without looking. A Claude Code statusLine is the terminal-native version of that: always visible, nothing to open, no window to arrange. SCOPE: shipward/status.mjs prints one line — the active card, what is waiting on the human, and how many memory items are still open — wired into .claude/settings.json as statusLine, and runnable standalone so it also works in a tmux or shell prompt. CONSTRAINT THAT SHAPES THE WHOLE THING: it is re-rendered constantly, so it must be FAST and must never break a terminal. That rules out importing tracker-store.mjs (crypto, full schema validation) — a plain readFileSync and JSON.parse is the whole data path — and it means every error prints nothing and exits 0.",
+      "commit": "72e8294",
+      "note": "The ambient angle from the 2026-07-27 divergence exercise. THE OBSERVATION THAT MADE IT WORTH BUILDING: the UserPromptSubmit hook is already an ambient surface and is the highest-frequency Shipward surface that exists — it fires on every single prompt, while the board gets opened a few times a day. You do not want to LOOK AT the board, you want to know without looking. A Claude Code statusLine is the terminal-native version of that: always visible, nothing to open, no window to arrange. SCOPE: shipward/status.mjs prints one line — the active card, what is waiting on the human, and how many memory items are still open — wired into .claude/settings.json as statusLine, and runnable standalone so it also works in a tmux or shell prompt. CONSTRAINT THAT SHAPES THE WHOLE THING: it is re-rendered constantly, so it must be FAST and must never break a terminal. That rules out importing tracker-store.mjs (crypto, full schema validation) — a plain readFileSync and JSON.parse is the whole data path — and it means every error prints nothing and exits 0. || SHIPPED. shipward/status.mjs prints one line — card in flight, what is waiting, how many memory items are still open — wired as statusLine in .claude/settings.json and runnable standalone for a shell prompt or tmux. MEASURED, because 'fast' was the whole constraint: 121ms per render, of which 107ms is bare Node startup; the script itself costs 14ms and 10 of those are the memory pass. That is why it does NOT import tracker-store.mjs — hashing, full schema validation and crypto are pointless for a read-only glance; readFileSync plus JSON.parse is the entire data path. MEASUREMENT GOTCHA: a shell for-loop first reported 1.1s per render, which sent me looking for a blocking call that did not exist. Timing ten spawns from inside node gave 121ms. Do not trust a shell loop for sub-second benchmarks. DESIGN CALLS: the mark carries the state without colour (filled diamond in flight, hollow idle) so a terminal that drops colour still reads; counts render only when non-zero, because a line that always says '0 review · 0 backlog' is furniture and furniture stops being read; only the title is ever clipped, never the id or the counts; NO_COLOR is honoured. HARMLESS RULE, tested by spawning: a missing tracker, an unparseable tracker and a document with no projects each print NOTHING and exit 0 — a status line that throws leaves a broken terminal and no explanation. 133 tests pass, 10 new. WHY THIS ANGLE: the UserPromptSubmit hook was already an ambient surface and the highest-frequency one in the product; this is the same idea given a permanent place. NOT YET SEEN IN THE RUNTIME — like the hooks, it needs a session rooted at shipward_app to render for real.",
       "created": "2026-07-27T17:26:07.950Z",
       "pushed": null,
       "shipped": null
@@ -268,6 +268,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T17:29:57.293Z",
+      "p": "shipward",
+      "msg": "SW-016 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T17:26:08.253Z",
       "p": "shipward",
@@ -582,7 +588,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T17:26:08.235Z",
-    "pid": 62548
+    "lastSeen": "2026-07-27T17:29:57.278Z",
+    "pid": 63527
   }
 }

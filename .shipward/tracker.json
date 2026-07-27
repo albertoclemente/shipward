@@ -17,11 +17,11 @@
       "type": "bug",
       "pri": "P1",
       "effort": "L",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/memory-lib-hardening",
-      "commit": null,
-      "note": "Edge Case Hunter over tracker-store.mjs. FIRST, THE FIX HOLDS: 1600/1600 writes landed with 0 lost, and 2083/2100 on a harder run where ~4 losses were expected at the old rate. The one-observation inspect() and link-a-complete-scratch publish() genuinely closed SW-010. TEN FINDINGS UNDER IT. F1 lost-write, SILENT: held() is checked before atomicWrite, but the commit is open+write+fsync+chmod+rename — measured p50 5.17ms and max 16.17ms on a realistic 43KB tracker, the same order as LOCK_RETRY_MS, not microseconds. A card vanished with no error raised anywhere. F2 corruption: breakLock renames the lock to a grave BEFORE checking the inode, so a third process can publish into the freed path and the link-back then unlinks that innocent holder lock; F2 is F1 trigger. F3 permanent deadlock: alive(pid) makes a lock unbreakable FOREVER — a lock 24h old held by pid 1 timed out at 60s and never becomes breakable. The lock lives in the repo working directory so it survives a reboot, after which the pid is very likely someone else. F4 permanent deadlock: release() swallows unlink errors, so one transient EACCES leaks a lock carrying a LIVE pid and wedges that daemon for its whole lifetime. F5 permanent deadlock: age<0 means NEW with no upper bound, so an mtime one hour in the future is immortal and any backwards clock step immortalizes every existing lock. F6: the heartbeat utimes a PATH, so a dispossessed holder keeps a corpse fresh forever and a third writer fails at 60s. F7: a provably dead holder still costs 30s, and LOCK_TIMEOUT is only 2x LOCK_STALE, so two crashes inside one waiter deadline is a guaranteed failure — 2 of 4 clean writers hard-failed. F8: no fairness, 17 of 2100 writes timed out and ALL 17 were the same starved process. F9: withLock is not re-entrant, a nested mutate is a silent 60s hang. F10: graves are never swept, neither sweep regex matches .lock.dead.<uuid>. NEGATIVE RESULTS WORTH KEEPING: 4000 create/delete cycles produced 4000 distinct inodes on APFS so the F2 guard is sound here, but ext4/HFS+ recycle aggressively and it would false-negative there; publish() partial writes are not reproducible; link() on FAT/network mounts is untested and would fail with a raw errno and no diagnosis.",
+      "commit": "01d13a8",
+      "note": "Edge Case Hunter over tracker-store.mjs. FIRST, THE FIX HOLDS: 1600/1600 writes landed with 0 lost, and 2083/2100 on a harder run where ~4 losses were expected at the old rate. The one-observation inspect() and link-a-complete-scratch publish() genuinely closed SW-010. TEN FINDINGS UNDER IT. F1 lost-write, SILENT: held() is checked before atomicWrite, but the commit is open+write+fsync+chmod+rename — measured p50 5.17ms and max 16.17ms on a realistic 43KB tracker, the same order as LOCK_RETRY_MS, not microseconds. A card vanished with no error raised anywhere. F2 corruption: breakLock renames the lock to a grave BEFORE checking the inode, so a third process can publish into the freed path and the link-back then unlinks that innocent holder lock; F2 is F1 trigger. F3 permanent deadlock: alive(pid) makes a lock unbreakable FOREVER — a lock 24h old held by pid 1 timed out at 60s and never becomes breakable. The lock lives in the repo working directory so it survives a reboot, after which the pid is very likely someone else. F4 permanent deadlock: release() swallows unlink errors, so one transient EACCES leaks a lock carrying a LIVE pid and wedges that daemon for its whole lifetime. F5 permanent deadlock: age<0 means NEW with no upper bound, so an mtime one hour in the future is immortal and any backwards clock step immortalizes every existing lock. F6: the heartbeat utimes a PATH, so a dispossessed holder keeps a corpse fresh forever and a third writer fails at 60s. F7: a provably dead holder still costs 30s, and LOCK_TIMEOUT is only 2x LOCK_STALE, so two crashes inside one waiter deadline is a guaranteed failure — 2 of 4 clean writers hard-failed. F8: no fairness, 17 of 2100 writes timed out and ALL 17 were the same starved process. F9: withLock is not re-entrant, a nested mutate is a silent 60s hang. F10: graves are never swept, neither sweep regex matches .lock.dead.<uuid>. NEGATIVE RESULTS WORTH KEEPING: 4000 create/delete cycles produced 4000 distinct inodes on APFS so the F2 guard is sound here, but ext4/HFS+ recycle aggressively and it would false-negative there; publish() partial writes are not reproducible; link() on FAT/network mounts is untested and would fail with a raw errno and no diagnosis. || FIXED, 9 of 10. THE PRINCIPLE THAT CHANGED: liveness is a hint, the heartbeat is the evidence. A living holder refreshes its mtime every second, so silence past LOCK_ABANDONED_MS (5 min) is abandonment whatever the pid says — that single reframing closed F3 (a live pid made a lock unbreakable FOREVER, and the lock survives a reboot after which the pid is someone else's) without reopening SW-010's slow-but-alive bug. F1, the silent lost write: held() now runs at the last instant before rename rather than before a 5-16ms commit, so nothing is published by a holder that no longer holds. F5: a future mtime is bounded at 5s — beyond that it is a broken clock, not sub-millisecond precision, and unbounded it made locks immortal. F7: a provably dead holder costs 2s not 30, because the pid check already proved it gone; at the old grace two crashes inside one waiter deadline was a guaranteed failure. F4: release retries and then warns loudly instead of swallowing. F2: breakLock re-reads and aborts if the lock is no longer the inode it condemned. F6: the heartbeat verifies the token before touching, so a dispossessed holder can no longer keep a corpse fresh. F9: a nested mutate throws immediately. F10: graves are swept on age. F8 partially — jittered backoff spreads the cost but is still not a queue; a true FIFO would need a ticket file and that is a bigger change than the starvation warrants. NEGATIVE RESULT WORTH KEEPING: the inode guard is sound on APFS (4000 create/delete cycles, 4000 distinct inodes) but ext4 and HFS+ recycle aggressively and it would false-negative there; link() on FAT or a network mount is untested and would fail with a raw errno and no diagnosis. 160 tests pass, 5 new. Contention stress re-run clean at 2700 writes with 0 lost.",
       "created": "2026-07-27T18:31:21.568Z",
       "pushed": null,
       "shipped": null
@@ -316,6 +316,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T18:35:34.356Z",
+      "p": "shipward",
+      "msg": "SW-019 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T18:31:44.694Z",
       "p": "shipward",
@@ -690,7 +696,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T18:31:44.662Z",
-    "pid": 77851
+    "lastSeen": "2026-07-27T18:35:34.338Z",
+    "pid": 78532
   }
 }

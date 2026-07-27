@@ -129,11 +129,11 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/prefer-mcp-claude-md",
-      "commit": null,
-      "note": "Stage C of SW-005, depends on SW-005 stage B. Rewrite CLAUDE.md so the protocol prefers the MCP tools with direct file edits as the documented fallback (Alberto authorised this Ask First change at the SW-005 step-01 checkpoint). Drive the header MCP CONNECTED tag from an mcp.lastSeen heartbeat, stale after 150s, with a muted non-blinking disconnected variant. schema.json sets no additionalProperties, so the mcp key needs no schema change — verified. KNOWN TRADEOFF: a 60s heartbeat makes the committed tracker.json dirty in git about once a minute; the alternative is a .shipward/mcp-status.json sidecar.",
+      "commit": "4deef72",
+      "note": "Stage C of SW-005, depends on SW-005 stage B. Rewrite CLAUDE.md so the protocol prefers the MCP tools with direct file edits as the documented fallback (Alberto authorised this Ask First change at the SW-005 step-01 checkpoint). Drive the header MCP CONNECTED tag from an mcp.lastSeen heartbeat, stale after 150s, with a muted non-blinking disconnected variant. schema.json sets no additionalProperties, so the mcp key needs no schema change — verified. KNOWN TRADEOFF: a 60s heartbeat makes the committed tracker.json dirty in git about once a minute; the alternative is a .shipward/mcp-status.json sidecar. || SHIPPED stage C. CLAUDE.md now leads with the five MCP tools and keeps direct file edits as the documented fallback for when no server is connected, with the rules stated once so they apply to both routes. The MCP CONNECTED tag was HARDCODED — lit whether or not anything was listening, which made it decoration on a product whose premise is that Claude really is on the other end. It now reads doc.mcp.lastSeen via mcpStatus() in lib.js, stamped by the MCP server every 60s, dark after 150s (MCP_STALE_MS). Offline is muted with no animation: a blinking light that means nothing trains you to ignore the one that means something. A future-dated heartbeat reads as live rather than infinitely stale — a disagreeing clock is not a dead server. TRADEOFF TAKEN AS DECIDED: the heartbeat lives in tracker.json, so a committed tracker goes dirty in git about once a minute during a session; the .shipward/mcp-status.json sidecar alternative was rejected because one occasionally dirty file beats two files that can disagree. The heartbeat is best-effort and never fails a session. VERIFIED end to end: with no mcp key the tag read MCP OFFLINE, muted, animation none; starting a real mcp.mjs against that tracker flipped it to MCP CONNECTED, accent colour, swm-blink, title 'last seen just now', within one 3s poll. Test note: the server writes on startup, so the read-only assertions now compare board state with the mcp key stripped rather than raw bytes. 84 tests pass.",
       "created": "2026-07-25T15:06:49.615Z",
       "pushed": null,
       "shipped": null
@@ -172,6 +172,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:28:59.597Z",
+      "p": "shipward",
+      "msg": "SW-007 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:25:10.652Z",
       "p": "shipward",
@@ -364,5 +370,9 @@
       "msg": "You added SW-001 to Backlog — it's on the list",
       "by": "claude"
     }
-  ]
+  ],
+  "mcp": {
+    "lastSeen": "2026-07-27T15:29:06.910Z",
+    "pid": 43999
+  }
 }

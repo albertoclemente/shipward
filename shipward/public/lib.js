@@ -154,6 +154,30 @@ export function archiveLede(projectName, count) {
   return `Everything ${projectName} has pushed to production — ${entries} and counting. Look how far it's come.`;
 }
 
+// The raw view is a projection, not a dump: the field order is fixed by
+// data-contract.md, `pri` is emitted as `priority`, and `p` is dropped because
+// the view is already scoped to one project. `note` is not in the contract's
+// list either — it is Claude's working context, not board data.
+// Keys are written explicitly rather than picked in a loop so that the order is
+// the contract, visible in one place, instead of an emergent property.
+const rawCard = (c) => ({
+  id: c.id,
+  title: c.title,
+  type: c.type,
+  priority: c.pri,
+  effort: c.effort,
+  status: c.status,
+  claude: c.claude,
+  branch: c.branch,
+  commit: c.commit,
+  created: c.created,
+  pushed: c.pushed,
+  shipped: c.shipped,
+});
+
+export const rawJson = (cards, projectId) =>
+  JSON.stringify(cardsOf(cards, projectId).map(rawCard), null, 2);
+
 // Sort rather than trusting position: the file is newest-first by convention,
 // but Claude Code writes it directly and an appended entry would otherwise
 // surface an ancient message as the latest activity.

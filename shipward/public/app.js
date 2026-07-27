@@ -3,7 +3,7 @@
 import {
   COLUMNS, fmtDate, relTime, nextId, moveMsg, applyTransition,
   feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed,
-  archiveRows, archiveLede,
+  archiveRows, archiveLede, rawJson,
 } from './lib.js';
 
 const POLL_MS = 3000;
@@ -15,6 +15,8 @@ const state = {
   editing: null,    // card id | 'new' | null
   dragOver: null,
   dragging: null,
+  copied: false,    // raw view: the Copy JSON label flips for 2s
+  copyFailed: false,
   etag: null,      // from the last GET; PUT must match it
   offline: false,
   error: null,      // server said no, as opposed to server is gone
@@ -42,6 +44,7 @@ const ICON = {
   terminal: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-700)" stroke-width="2.2" style="flex:none"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>',
   branch: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>',
   archive: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="5"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>',
+  copy: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="14" height="14" x="8" y="8"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
 };
 const icon = (name, cls) => el('span', { class: cls, html: ICON[name] });
 
@@ -198,6 +201,7 @@ function render() {
   const stats = deriveStats(doc.cards, project.id);
 
   const view = state.view === 'archive' ? renderArchive(doc, project)
+    : state.view === 'raw' ? renderRaw(doc, project)
     : renderBoard(doc, project);
 
   root.replaceChildren(
@@ -294,6 +298,49 @@ function renderArchive(doc, project) {
           )
         : el('div', { class: 'text-muted view-empty',
             text: 'Nothing archived yet. Push something, then file it here.' }),
+    ),
+  );
+}
+
+// The 2s label flip is a timer, and the 3s poll re-renders underneath it, so
+// the flag lives in state rather than on the button element.
+let copyTimer = null;
+
+async function copyRaw(text) {
+  clearTimeout(copyTimer);
+  try {
+    await navigator.clipboard.writeText(text);
+    state.copied = true;
+    state.copyFailed = false;
+  } catch {
+    // Denied permission, or an insecure origin. Say so — a button that claims
+    // it copied when it did not is worse than one that admits it failed.
+    state.copied = false;
+    state.copyFailed = true;
+  }
+  render();
+  copyTimer = setTimeout(() => {
+    state.copied = false;
+    state.copyFailed = false;
+    render();
+  }, 2000);
+}
+
+function renderRaw(doc, project) {
+  const json = rawJson(doc.cards, project.id);
+  const label = state.copyFailed ? 'Could not copy — select it instead'
+    : state.copied ? 'Copied — feed it to a machine'
+    : 'Copy JSON';
+  return el('main', { class: 'view-wrap' },
+    el('div', { class: 'view-body view-body-raw' },
+      el('h3', { class: 'view-title', text: 'Raw board data' }),
+      el('p', { class: 'text-muted view-lede view-lede-raw',
+        text: 'The exact schema Claude Code reads and writes over MCP — stable ids, four statuses, ISO timestamps. What you see on the board is only ever a view of this.' }),
+      el('button', {
+        class: 'btn btn-secondary', onclick: () => copyRaw(json),
+        'aria-live': 'polite',
+      }, icon('copy'), label),
+      el('pre', { class: 'raw-pre', text: json }),
     ),
   );
 }

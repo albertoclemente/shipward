@@ -230,6 +230,15 @@ textarea.input { min-height: 90px; resize: vertical; }
 .cell-mono { font-family: var(--font-mono); font-size: 12px; }
 .cell-what { font-family: var(--font-heading); font-weight: 600; }
 
+.view-body-raw { max-width: 880px; }
+.view-lede-raw { max-width: 62ch; }
+.raw-pre {
+  background: var(--color-surface); border: 1px solid var(--color-divider);
+  padding: var(--space-4); margin: var(--space-3) 0 0;
+  font-family: var(--font-mono); font-size: 12px; line-height: 1.55;
+  overflow: auto; max-height: 560px;
+}
+
 .board-wrap { flex: 1; padding: var(--space-4); }
 .board {
   display: grid; grid-template-columns: repeat(4, 1fr);

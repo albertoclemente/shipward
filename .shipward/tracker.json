@@ -65,11 +65,11 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/archive-view-shipped",
-      "commit": null,
-      "note": "SPEC CAP-4. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Shipped & archived' + muted lede, .table sorted by shipped desc: Shipped (Mon D) / ID (mono 12px) / What went out / Type / Effort / Commit (mono). Tab label carries the count. Read-only projection over state the desk core already builds.",
+      "commit": "dba5128",
+      "note": "SPEC CAP-4. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Shipped & archived' + muted lede, .table sorted by shipped desc: Shipped (Mon D) / ID (mono 12px) / What went out / Type / Effort / Commit (mono). Tab label carries the count. Read-only projection over state the desk core already builds. || SHIPPED: archiveRows() and archiveLede() live in public/lib.js so the projection is unit-tested rather than eyeballed; app.js renders the table and the tabs are live (Board/Archive switch, aria-current set). Sorted by shipped desc; an entry with a missing or unparseable shipped date sinks to the bottom rather than scrambling the order, because Claude Code hand-writes this file; a card with no sha gets an em dash; the lede reads '1 entry' not '1 entries'. .table ported from modernist-scoped.css with the #sw-1a prefix stripped. VERIFIED in the browser against a seeded sandbox tracker (never the real one): three shipped cards render newest-first with the undated one last, header row matches the contract, the board is replaced, tab count reads 'Archive · 3'. 53 tests pass.",
       "created": "2026-07-25T13:18:00Z",
       "pushed": null,
       "shipped": null
@@ -81,9 +81,9 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/raw-data-view",
       "commit": null,
       "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped.",
       "created": "2026-07-25T13:18:00Z",
@@ -172,6 +172,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:09:04.383Z",
+      "p": "shipward",
+      "msg": "SW-004 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:09:00.383Z",
+      "p": "shipward",
+      "msg": "SW-003 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:04:45.788Z",
       "p": "shipward",

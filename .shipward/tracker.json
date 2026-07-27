@@ -17,11 +17,11 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/shipward-hooks",
-      "commit": null,
-      "note": "WHY, with evidence from this very session: CLAUDE.md, the MCP instructions field and the tool descriptions are three layers of ADVICE and nothing checks. Proof they are not enough — I built the entire MCP server for SW-005 without ever calling start; the card sat in Backlog while 500 lines were written against it, and I only noticed by running standup for an unrelated reason. If the author of the protocol, holding it in active context, drifts inside one session, advice is not a mechanism. FOUR HOOKS: SessionStart injects a standup so a session begins already knowing; UserPromptSubmit injects one line naming the active card EVERY TURN, which is the actual continuous part because drift cannot accumulate; PreToolUse on Edit/Write warns when source is about to change with no card in claude/working — WARNS, never blocks, because a hook that gets disabled protects nothing; Stop refuses to end while a card is still working with no done. DESIGN RULES: a hook must never be able to break a session, so every one exits 0 silently on any error; the Stop hook honours stop_hook_active so it cannot loop; and the standup text is extracted into a shared module so the hook and the MCP tool cannot drift apart. KNOWN LIMIT stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note — done with 'fixed it' satisfies every one of them and teaches the next session nothing.",
+      "commit": "180fde5",
+      "note": "WHY, with evidence from this very session: CLAUDE.md, the MCP instructions field and the tool descriptions are three layers of ADVICE and nothing checks. Proof they are not enough — I built the entire MCP server for SW-005 without ever calling start; the card sat in Backlog while 500 lines were written against it, and I only noticed by running standup for an unrelated reason. If the author of the protocol, holding it in active context, drifts inside one session, advice is not a mechanism. FOUR HOOKS: SessionStart injects a standup so a session begins already knowing; UserPromptSubmit injects one line naming the active card EVERY TURN, which is the actual continuous part because drift cannot accumulate; PreToolUse on Edit/Write warns when source is about to change with no card in claude/working — WARNS, never blocks, because a hook that gets disabled protects nothing; Stop refuses to end while a card is still working with no done. DESIGN RULES: a hook must never be able to break a session, so every one exits 0 silently on any error; the Stop hook honours stop_hook_active so it cannot loop; and the standup text is extracted into a shared module so the hook and the MCP tool cannot drift apart. KNOWN LIMIT stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note — done with 'fixed it' satisfies every one of them and teaches the next session nothing. || SHIPPED. .claude/settings.json wires four hooks to .claude/hooks/shipward.mjs: SessionStart injects a standup unasked; UserPromptSubmit injects one line naming the active card EVERY turn (the continuous part — drift cannot accumulate); PreToolUse on Edit/Write/NotebookEdit warns when source changes with no card in claude/working; Stop refuses to end while a card is still working with no done. TWO RULES THE HOOK FILE MUST NEVER BREAK, both covered by tests: (1) a hook can never break a session — every path exits 0 and any failure (missing tracker, unparseable tracker, unknown subcommand) exits silently, because a broken hook that bricks the project is worse than no hook; (2) pre-edit WARNS and never denies — permissionDecision is always 'allow' — because a hook that gets in the way gets switched off and a switched-off hook protects nothing. Stop honours stop_hook_active or it would refuse the session forever. pre-edit exempts .shipward/, .claude/, _bmad-output/, .git/ and CLAUDE.md/README.md: touching those proves nothing about the protocol, so nagging is pure noise. REFACTOR THAT CAME WITH IT: standupText/line/stamp/PERISHABLE moved out of mcp.mjs into shipward/standup.mjs so the SessionStart hook and the MCP tool render from ONE implementation — two renderings of the same board would tell a session two different stories. 123 tests pass, 11 new, spawning the real script the way the runtime does (payload on stdin, JSON on stdout). MEASURED COST: ~90ms per prompt hook, dominated by node startup rather than reading the tracker; paid on every turn. NOT YET VERIFIED IN THE RUNTIME — the hooks are unit-tested against the documented wire shapes but have never actually fired inside Claude Code. That needs a session rooted at shipward_app plus hook approval. KNOWN LIMIT, stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note; done with 'fixed it' satisfies all four and teaches the next session nothing.",
       "created": "2026-07-27T16:18:46.568Z",
       "pushed": null,
       "shipped": null
@@ -252,6 +252,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T16:22:45.656Z",
+      "p": "shipward",
+      "msg": "SW-015 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T16:18:51.337Z",
       "p": "shipward",
@@ -542,7 +548,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T16:18:51.321Z",
-    "pid": 54578
+    "lastSeen": "2026-07-27T16:22:45.641Z",
+    "pid": 55502
   }
 }

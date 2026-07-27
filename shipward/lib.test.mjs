@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   fmtDate, relTime, autoBranch, nextId, moveMsg, applyTransition,
   feedAdd, deriveColumns, deriveStats, latestFeed, FEED_CAP,
-  archiveRows, archiveLede, rawJson, mcpStatus, MCP_STALE_MS,
+  archiveRows, archiveLede, mcpStatus, MCP_STALE_MS,
 } from './public/lib.js';
 
 const card = (over = {}) => ({
@@ -216,41 +216,6 @@ test('the archive lede counts one entry as an entry', () => {
   assert.match(archiveLede('Shipward', 1), /— 1 entry and counting/);
   assert.match(archiveLede('Shipward', 0), /— 0 entries and counting/);
   assert.match(archiveLede('Brewnote', 12), /^Everything Brewnote has pushed to production — 12 entries and counting\./);
-});
-
-test('raw JSON emits the contract field order, renames pri, and drops p and note', () => {
-  const cards = [
-    card({ id: 'SW-001', pri: 'P1', note: 'context Claude keeps', branch: 'feat/x', commit: 'abc1234' }),
-    card({ id: 'BW-001', p: 'brewnote' }),
-  ];
-  const out = rawJson(cards, 'shipward');
-  const parsed = JSON.parse(out);
-
-  assert.equal(parsed.length, 1, 'scoped to the active project');
-  assert.deepEqual(Object.keys(parsed[0]), [
-    'id', 'title', 'type', 'priority', 'effort', 'status',
-    'claude', 'branch', 'commit', 'created', 'pushed', 'shipped',
-  ]);
-  assert.equal(parsed[0].priority, 'P1', 'pri is emitted as priority');
-  assert.equal('pri' in parsed[0], false);
-  assert.equal('p' in parsed[0], false, 'the view is already project-scoped');
-  assert.equal('note' in parsed[0], false, 'note is Claude context, not board data');
-  assert.equal(out, JSON.stringify(parsed, null, 2), 'pretty-printed with 2 spaces');
-});
-
-test('raw JSON keeps nulls rather than dropping the keys', () => {
-  // A machine reading this needs the shape to be stable, so an unset field is
-  // an explicit null, not an absent key.
-  const [only] = JSON.parse(rawJson([card({ id: 'SW-001' })], 'shipward'));
-  assert.equal(only.claude, null);
-  assert.equal(only.branch, null);
-  assert.equal(only.commit, null);
-  assert.equal(only.pushed, null);
-  assert.equal(only.shipped, null);
-});
-
-test('raw JSON of an empty project is an empty array, not a crash', () => {
-  assert.equal(rawJson([], 'shipward'), '[]');
 });
 
 test('the MCP tag is lit only while a server is actually heartbeating', () => {

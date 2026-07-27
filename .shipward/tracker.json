@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-011",
+      "p": "shipward",
+      "title": "Remove the Raw data view",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "chore/remove-raw-data",
+      "commit": null,
+      "note": "Alberto's call 2026-07-27: the point of Shipward is watching Claude Code work, and Raw data is the view that earns its place least — useful once to prove the board is only a view of the file, rarely after. Board stays (it is the point), Archive stays. SUPERSEDES SW-004, which is in Review claiming the raw view shipped. Remove: renderRaw/copyRaw/copyTimer and the copy icon from app.js, the raw tab entry and view dispatch, rawJson/rawCard from public/lib.js, the three rawJson tests, and .view-body-raw/.view-lede-raw/.raw-pre from app.css. NOTE FOR ALBERTO: this makes SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md stale — not editing those without a ratified decision, since the SPEC is the contract.",
+      "created": "2026-07-27T15:35:16.401Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-010",
       "p": "shipward",
       "title": "A live lock is broken as stale — silent lost write",
@@ -172,6 +188,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:35:24.769Z",
+      "p": "shipward",
+      "msg": "SW-011 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:35:16.401Z",
+      "p": "shipward",
+      "msg": "You added SW-011 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:28:59.597Z",
       "p": "shipward",
@@ -372,7 +400,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T15:29:06.910Z",
-    "pid": 43999
+    "lastSeen": "2026-07-27T15:35:24.748Z",
+    "pid": 44982
   }
 }

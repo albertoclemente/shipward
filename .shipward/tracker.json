@@ -17,11 +17,11 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/memory-recall",
-      "commit": null,
-      "note": "THE GAP, measured: the tracker holds 27 memory entries / 4044 words, and standup returns 0 of them. The only path back is start, one card at a time, so Claude retrieves memory about the ticket it is opening and never about the code it is about to touch. From the agent's side this store is write-only. FIX: (1) standup gains a bounded memory section — decisions not to reverse, and still-open items, each with its card id and date; (2) a new recall tool takes file / kind / query and returns the entries attached, ranked by what it would cost to miss. DESIGN RULES: every entry arrives with its date and card so a session can judge rather than believe; evidence is labelled as a claim about a PAST state, because 'tests pass' rots (45 was true this morning, it is 96 now); nothing is silently truncated — recall says what it dropped and how to get it. Standup stays readable: entries are clipped with the card id kept so the full text is one recall away.",
+      "commit": "c8ba627",
+      "note": "THE GAP, measured: the tracker holds 27 memory entries / 4044 words, and standup returns 0 of them. The only path back is start, one card at a time, so Claude retrieves memory about the ticket it is opening and never about the code it is about to touch. From the agent's side this store is write-only. FIX: (1) standup gains a bounded memory section — decisions not to reverse, and still-open items, each with its card id and date; (2) a new recall tool takes file / kind / query and returns the entries attached, ranked by what it would cost to miss. DESIGN RULES: every entry arrives with its date and card so a session can judge rather than believe; evidence is labelled as a claim about a PAST state, because 'tests pass' rots (45 was true this morning, it is 96 now); nothing is silently truncated — recall says what it dropped and how to get it. Standup stays readable: entries are clipped with the card id kept so the full text is one recall away. || SHIPPED. standup now carries a bounded memory section (still-open items + decisions not to reverse, each stamped with card and date, clipped so the full text is one recall away) and a new recall({file|kind|query}) tool retrieves the rest, ranked by what it would cost to miss, always reporting what it dropped. TWO THINGS THAT ONLY SHOWED UP ON REAL DATA: (1) BRIDGING FILE TO PROSE — SW-010's note, the most valuable in this repo, names NO file at all; it names isStale(), breakLock(), sweepTmp(), because that is how you write down what went wrong. recall({file}) therefore reads the file off disk and asks about every name declared inside it, not just the filename. Before the bridge, recall({file:'tracker-store'}) returned one irrelevant hit; after, six with both SW-010 findings ranked first. (2) DROPPING GENERIC NAMES — tracker-store.mjs declares 73 names and most are now()/read()/line(), so matching any of them returned the whole tracker and the top hits were unrelated. Tokens appearing across more than a quarter of the memory are now dropped before scoring, and entries rank by how many distinct names they match. GOTCHA IN THAT FIX: the share filter then ate EVERY token on a small corpus, because with two entries one hit is already 50 percent — recall returned nothing at all. Nothing counts as generic until it has turned up at least 4 times; regression test covers the young-repo case. Evidence entries are labelled 'as of then, not a claim about now' at the point of use, because '45 tests pass' was true this morning and is 112 now. Excerpts lead with the marker that classified them rather than the first 200 characters, which were usually provenance preamble. CLAUDE.md gains step 0: recall before editing an unfamiliar file. 112 tests pass, 16 new.",
       "created": "2026-07-27T16:01:56.626Z",
       "pushed": null,
       "shipped": null
@@ -236,6 +236,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T16:09:27.605Z",
+      "p": "shipward",
+      "msg": "SW-014 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T16:02:06.211Z",
       "p": "shipward",
@@ -508,7 +514,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T16:07:21.715Z",
-    "pid": 51530
+    "lastSeen": "2026-07-27T16:09:27.557Z",
+    "pid": 52209
   }
 }

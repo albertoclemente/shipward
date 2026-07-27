@@ -5,7 +5,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  classify, refs, memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP,
+  classify, refs, symbols, mentionsAny, distinctiveTokens, recall, excerpt,
+  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP,
 } from './public/memory-lib.js';
 
 const card = (over = {}) => ({
@@ -157,4 +158,86 @@ test('superseded open items sink within their group rather than vanishing', () =
   assert.equal(group.entries.length, 2, 'both are shown — "this got answered here" is worth reading');
   assert.equal(group.entries[0].superseded, false, 'the live one leads');
   assert.equal(group.entries[1].superseded, true);
+});
+
+test('symbols are pulled out of prose alongside file paths', () => {
+  const text = 'isStale() judged the lock from two observations; breakLock() then renamed it. See sweepTmp().';
+  assert.deepEqual(symbols(text).sort(), ['breakLock', 'isStale', 'sweepTmp']);
+  assert.deepEqual(refs(text), [], 'this note names no files at all — which is the point');
+});
+
+test('an entry is reachable by the functions it names, not only by filename', () => {
+  // Verbatim problem from SW-010: the most valuable note in the repo names no
+  // file, so indexing paths alone made it unreachable from the file it is about.
+  const [entry] = memoryEntries([card({ note: 'ROOT CAUSE: isStale() read stat and content separately.' })], 'shipward');
+  assert.equal(mentionsAny(entry, ['tracker-store.mjs']), false, 'the note never says the filename');
+  assert.equal(mentionsAny(entry, ['isStale']), true, 'but it does say the function');
+});
+
+test('generic names are dropped before scoring, the filename never is', () => {
+  // A file declares dozens of names; now() appears everywhere and says nothing
+  // about which entries are relevant.
+  // now() has to have turned up at least GENERIC_MIN_HITS times before the
+  // frequency filter is allowed to call it generic.
+  const entries = memoryEntries([
+    card({ id: 'SW-001', note: 'used now() here' }),
+    card({ id: 'SW-002', note: 'also now() here' }),
+    card({ id: 'SW-003', note: 'now() again' }),
+    card({ id: 'SW-004', note: 'and now() once more' }),
+    card({ id: 'SW-005', note: 'ROOT CAUSE: isStale() and breakLock() disagreed' }),
+  ], 'shipward');
+
+  const kept = distinctiveTokens(entries, ['now', 'isStale', 'breakLock', 'tracker-store.mjs'], ['tracker-store.mjs']);
+  assert.equal(kept.includes('now'), false, 'a token in most entries carries no information');
+  assert.ok(kept.includes('isstale') && kept.includes('breaklock'));
+  assert.ok(kept.includes('tracker-store.mjs'), 'the filename is kept even though nothing matches it');
+});
+
+test('recall ranks an entry naming several of a file\'s functions above one naming a helper', () => {
+  const entries = memoryEntries([
+    card({ id: 'SW-001', note: 'in passing we called inspect()' }),
+    card({ id: 'SW-002', note: 'ROOT CAUSE: isStale(), breakLock() and sweepTmp() disagreed', created: '2026-07-20T00:00:00Z' }),
+  ], 'shipward');
+  const hit = recall(entries, { tokens: ['isStale', 'breakLock', 'sweepTmp', 'inspect'], limit: 5 });
+  assert.equal(hit.entries[0].card, 'SW-002', 'three matches beat one, and beat being newer');
+  assert.equal(hit.total, 2);
+});
+
+test('recall hides superseded items and reports what it dropped', () => {
+  const settled = card({ id: 'SW-001', note: `NEEDS ALBERTO: pick one${SEGMENT_SEP}DECIDED: picked` });
+  const many = Array.from({ length: 5 }, (_, i) =>
+    card({ id: `SW-10${i}`, note: `REPRODUCED: failure ${i}` }));
+  const entries = memoryEntries([settled, ...many], 'shipward');
+
+  assert.equal(recall(entries, { kind: 'open' }).total, 0, 'an answered question is not recalled as open');
+  const hit = recall(entries, { kind: 'finding', limit: 2 });
+  assert.equal(hit.entries.length, 2);
+  assert.equal(hit.total, 5);
+  assert.equal(hit.dropped, 3, 'a silent truncation would read as "that is everything"');
+});
+
+test('the excerpt leads with the point, not the preamble', () => {
+  const [e] = memoryEntries([card({
+    note: 'Stage C of SW-005, depends on stage B. Rewrite the docs. KNOWN TRADEOFF: the heartbeat dirties git every minute.',
+  })], 'shipward');
+  const out = excerpt(e, 200);
+  assert.match(out, /^…KNOWN TRADEOFF/, 'starts at the marker, and says text was skipped');
+  assert.doesNotMatch(out, /Stage C/);
+});
+
+test('an excerpt that starts at the beginning carries no ellipsis', () => {
+  const [e] = memoryEntries([card({ note: 'DECIDED: keep it simple.' })], 'shipward');
+  assert.equal(excerpt(e, 200), 'DECIDED: keep it simple.');
+});
+
+test('on a young repo nothing is generic yet', () => {
+  // REGRESSION: the frequency filter used share alone, so with two entries a
+  // token appearing in one was 50% and got dropped as "generic" — every token
+  // was eaten and recall returned nothing at all.
+  const entries = memoryEntries([
+    card({ id: 'SW-001', note: 'ROOT CAUSE: isStale() misjudged it' }),
+    card({ id: 'SW-002', note: 'unrelated work' }),
+  ], 'shipward');
+  assert.deepEqual(distinctiveTokens(entries, ['isStale']), ['isstale']);
+  assert.equal(recall(entries, { tokens: ['isStale'] }).total, 1);
 });

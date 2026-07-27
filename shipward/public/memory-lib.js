@@ -61,12 +61,47 @@ export const ALL_KINDS = [...KINDS, BRIEF];
 
 // Markers are written in caps by convention, but a note is prose and the
 // convention is not enforced, so match case-insensitively on a word boundary.
-const matches = (text, marker) => {
-  const i = text.toUpperCase().indexOf(marker.toUpperCase());
-  if (i === -1) return false;
-  const before = text[i - 1];
-  return before === undefined || !/[A-Za-z]/.test(before);
-};
+function markerIndex(text, marker) {
+  const hay = text.toUpperCase();
+  const needle = marker.toUpperCase();
+  let i = hay.indexOf(needle);
+  while (i !== -1) {
+    const before = text[i - 1];
+    if (before === undefined || !/[A-Za-z]/.test(before)) return i;
+    i = hay.indexOf(needle, i + 1);
+  }
+  return -1;
+}
+
+const matches = (text, marker) => markerIndex(text, marker) !== -1;
+
+// Where the point of this entry starts. A note often opens with provenance
+// ("Stage C of SW-005, depends on…") and reaches the decision three sentences
+// later, so a clip taken from character zero shows the preamble and hides the
+// thing worth reading.
+export function pointIndex(text, kindKey) {
+  const kind = KINDS.find((k) => k.key === kindKey);
+  if (!kind) return 0;
+  let best = -1;
+  for (const m of kind.markers) {
+    const i = markerIndex(text, m);
+    if (i !== -1 && (best === -1 || i < best)) best = i;
+  }
+  if (best <= 0) return 0;
+  // Back up to the start of that sentence so the clip does not begin mid-thought.
+  const stop = Math.max(text.lastIndexOf('. ', best), text.lastIndexOf('? ', best), text.lastIndexOf('! ', best));
+  return stop === -1 ? best : stop + 2;
+}
+
+// A clip that leads with the point, marked with a leading ellipsis when it
+// starts partway in so the reader knows text was skipped rather than absent.
+export function excerpt(entry, max = 240) {
+  const from = pointIndex(entry.text, entry.kind);
+  const body = entry.text.slice(from);
+  const head = from > 0 ? '…' : '';
+  if (head.length + body.length <= max) return head + body;
+  return `${head}${body.slice(0, max - head.length - 1).trimEnd()}…`;
+}
 
 export function classify(text, isFirst = false) {
   for (const kind of KINDS) {
@@ -102,6 +137,67 @@ export function refs(text) {
   return [...seen];
 }
 
+// Function names as they appear in prose. This matters more than it looks: the
+// single most valuable note in this repo — the one about live locks being
+// broken — names no file at all. It talks about isStale(), breakLock() and
+// sweepTmp(), because that is how you naturally write down what went wrong.
+// Indexing only paths made that note unreachable from the file it is about.
+const SYMBOL_RE = /\b([A-Za-z_$][\w$]*)\(\)/g;
+
+export function symbols(text) {
+  const seen = new Set();
+  for (const [, name] of text.matchAll(SYMBOL_RE)) seen.add(name);
+  return [...seen];
+}
+
+const namesIn = (entry) => [
+  ...entry.syms.map((s) => s.toLowerCase()),
+  ...entry.refs.map((r) => r.toLowerCase().split('/').pop()),
+];
+
+const hits = (entry, token) => {
+  const names = namesIn(entry);
+  return names.includes(token) || names.some((n) => n.includes(token) && n.endsWith(token));
+};
+
+// True if the entry names any of these tokens — a file, a function, whatever
+// the caller knows the code by.
+export function mentionsAny(entry, tokens) {
+  const want = tokens.map((t) => String(t).toLowerCase()).filter(Boolean);
+  return want.some((t) => hits(entry, t));
+}
+
+// A file declares dozens of names and most of them are generic — now(), read(),
+// line() — so matching on any of them returns the whole tracker. A token that
+// appears across most of the memory carries no information about which entries
+// are relevant, so it is dropped before scoring. Crude inverse document
+// frequency, and it is the difference between recall being useful and being
+// noise a session learns to skip.
+const GENERIC_SHARE = 0.25;
+// A share means nothing on a young repo: with four entries, a token in one of
+// them is already 25%. Nothing is called generic until it has actually turned
+// up several times — otherwise the filter eats every token and recall returns
+// nothing at all, which is exactly what it did the first time it ran.
+const GENERIC_MIN_HITS = 4;
+
+export function distinctiveTokens(entries, tokens, keep = []) {
+  if (!entries.length) return tokens;
+  const always = new Set(keep.map((t) => String(t).toLowerCase()));
+  return tokens
+    .map((t) => String(t).toLowerCase())
+    .filter(Boolean)
+    .filter((t) => {
+      if (always.has(t)) return true;
+      const count = entries.filter((e) => hits(e, t)).length;
+      if (!count) return false;
+      return !(count >= GENERIC_MIN_HITS && count / entries.length > GENERIC_SHARE);
+    });
+}
+
+// How many distinct tokens an entry names. More matches is stronger evidence
+// that the entry is really about this code rather than mentioning it in passing.
+export const tokenScore = (entry, tokens) => tokens.filter((t) => hits(entry, t)).length;
+
 // One entry per note segment, newest card first. `at` is the best timestamp the
 // card can offer — a segment is not individually dated, and inventing a date
 // would be worse than admitting the note only knows the card's own clock.
@@ -126,6 +222,7 @@ export function memoryEntries(cards, projectId) {
         superseded: kind === 'open' && segments.slice(i + 1).some(resolves),
         text,
         refs: refs(text),
+        syms: symbols(text),
       });
     });
   }
@@ -167,6 +264,57 @@ export function fileIndex(entries) {
   return [...byPath.values()]
     .map((r) => ({ ...r, cards: [...r.cards] }))
     .sort((a, b) => b.entries.length - a.entries.length || a.file.localeCompare(b.file));
+}
+
+// Does this entry's prose mention that file? Basenames, because the notes write
+// the same file as "shipward/serve.mjs" and "serve.mjs"; a substring match on
+// top so "tracker-store" finds "tracker-store.mjs" without the extension.
+export function mentionsFile(entry, file) {
+  const want = file.trim().toLowerCase().split('/').pop();
+  if (!want) return false;
+  return entry.refs.some((r) => {
+    const name = r.toLowerCase().split('/').pop();
+    return name === want || name.includes(want);
+  });
+}
+
+// Retrieval, as opposed to display. The caller is a session about to do
+// something, so results are ranked by what it would cost to miss rather than by
+// date, and `dropped` is always reported — a silent truncation reads as "that
+// is everything" when it is not.
+export function recall(entries, { file, kind, query, tokens, limit = 10 } = {}) {
+  let out = entries;
+
+  // `tokens` is the caller saying "here is everything this code is known by" —
+  // the filename plus the names declared inside it. Matching on the filename
+  // alone missed notes that only ever named the functions.
+  let useful = [];
+  if (tokens?.length) {
+    // The filename is always kept: it is the most specific thing we were given.
+    useful = distinctiveTokens(entries, tokens, file ? [file.split('/').pop()] : []);
+    out = out.filter((e) => mentionsAny(e, useful));
+  } else if (file) {
+    out = out.filter((e) => mentionsFile(e, file));
+  }
+  if (kind) out = out.filter((e) => e.kind === kind);
+  if (query) out = searchEntries(out, query);
+  // Superseded open items are history, not something to act on.
+  out = out.filter((e) => !e.superseded);
+
+  const rank = (e) => ALL_KINDS.findIndex((k) => k.key === e.kind);
+  const ranked = out.slice().sort((a, b) =>
+    // For a code query, relevance leads: an entry naming four of this file's
+    // functions is about it; one naming a single generic helper is not.
+    (useful.length ? tokenScore(b, useful) - tokenScore(a, useful) : 0)
+    || rank(a) - rank(b)
+    || Date.parse(b.at) - Date.parse(a.at));
+
+  return {
+    total: ranked.length,
+    dropped: Math.max(0, ranked.length - limit),
+    matchedOn: useful,
+    entries: ranked.slice(0, limit),
+  };
 }
 
 export function searchEntries(entries, query) {

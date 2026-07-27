@@ -8,7 +8,8 @@ An MCP server exposes the tracker as five tools. **Prefer them** — they hold a
 
 | Tool | Use it to |
 |---|---|
-| `standup` | read the board: what you are on, what waits for review, top of backlog, what shipped this week |
+| `standup` | read the board **and the memory**: what you are on, what waits for review, top of backlog, what is still open, and the decisions not to reverse |
+| `recall` | search everything previously written down — by file, by kind, or by query |
 | `log` | add a backlog card the moment work is discovered or promised |
 | `start` | take a card — sets `claude`/`working`, names a branch, hands back the note |
 | `done` | hand a card back — `review` (or `pushed`), sets `commit`, appends to the note |
@@ -32,6 +33,7 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 
 ## Mandatory protocol
 
+0. **Before editing a file you have not touched this session:** call `recall({file: "…"})`. A finding is filed under the card that found it, not under the code it concerns, so the warning you need is never on the card you are working. Recalled entries carry the card and date they came from — judge them, do not simply believe them, and treat anything under **evidence** as a claim about a past state.
 1. **Session start:** call `standup`. Report in one line: what's in `claude`/`review`, top of `backlog`.
 2. **Before starting any task:** it must exist as a card. If the user asks for something not in the tracker, `log` it first (correct type/pri/effort, note with context), then `start` it — which sets `claude: "working"` and the branch. Check that branch out.
 3. **While working:** append decisions and gotchas to the card's `note`. Update `commit` with the latest short sha after each meaningful commit.

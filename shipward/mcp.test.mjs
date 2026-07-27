@@ -147,10 +147,10 @@ test('an older client is answered in its own protocol version', async () => {
   assert.equal(unknown.result.protocolVersion, PROTOCOL, 'an unknown version falls back to ours');
 });
 
-test('tools/list exposes the five verbs with usable schemas', async () => {
+test('tools/list exposes every verb with a usable schema', async () => {
   const { c } = await handshake();
   const { result } = await c.request('tools/list');
-  assert.deepEqual(result.tools.map((t) => t.name).sort(), ['done', 'log', 'standup', 'start', 'sync']);
+  assert.deepEqual(result.tools.map((t) => t.name).sort(), ['done', 'log', 'recall', 'standup', 'start', 'sync']);
   for (const t of result.tools) {
     assert.equal(t.inputSchema.type, 'object', `${t.name} needs an object schema`);
     assert.ok(t.description.length > 40, `${t.name} needs a description the model can act on`);
@@ -383,7 +383,7 @@ test('an unknown method gets -32601, an unknown tool gets a readable result', as
 
   const { text, isError } = await c.call('teleport', {});
   assert.equal(isError, true, 'a wrong tool name is the model\'s to fix, not a protocol failure');
-  assert.match(text, /Available: standup, log, start, done, sync/);
+  assert.match(text, /Available: standup, recall, log, start, done, sync/);
 });
 
 test('nothing but protocol frames reaches stdout', async () => {
@@ -392,7 +392,7 @@ test('nothing but protocol frames reaches stdout', async () => {
   await c.call('standup', {});
   await c.call('log', { title: 'noise check' });
   assert.equal(c.frames().length, 0, 'no unsolicited frames');
-  assert.match(c.stderr(), /ready — 5 tools/, 'the banner went to stderr');
+  assert.match(c.stderr(), /ready — 6 tools/, 'the banner went to stderr');
 });
 
 test('a tool call against a missing tracker says so instead of crashing', async () => {
@@ -433,4 +433,97 @@ test('a heartbeat never disturbs the board', async () => {
   const before = await board();
   await c.call('standup', {});
   assert.equal(await board(), before, 'cards and feed are untouched by the heartbeat');
+});
+
+test('standup carries the memory it used to return none of', async () => {
+  const d = seed();
+  d.cards[0].note = 'NEEDS ALBERTO: which store should this use?';
+  d.cards[1].note = 'DECIDED: zero dependencies, Node built-ins only, forever.';
+  d.cards[2].note = ['VERIFIED: 45 tests pass.', 'SHIPPED: it went out.'].join(' || ');
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('standup', {});
+
+  assert.match(text, /Still open, from the card notes \(1\)/);
+  assert.match(text, /which store should this use/);
+  assert.match(text, /Decisions not to reverse \(1\)/);
+  assert.match(text, /zero dependencies/);
+  assert.match(text, /\[TS-001 · \w{3} \d+\]/, 'every entry carries its card and date');
+  assert.match(text, /Memory: 4 entries/);
+  assert.match(text, /recall\(\{file:/, 'and points at how to get the rest');
+});
+
+test('standup stays quiet when there is no memory yet', async () => {
+  const { c } = await handshake();
+  const { text } = await c.call('standup', {});
+  assert.doesNotMatch(text, /Memory:/, 'an empty tracker gets no memory section at all');
+});
+
+test('recall reaches a note through the functions it names, not just the filename', async () => {
+  // The case this tool exists for. The note names no file — only a function
+  // that shipward/tracker-store.mjs actually declares, which is how the real
+  // SW-010 note is written.
+  const d = seed();
+  d.cards[0].note = 'ROOT CAUSE: sweepTmp() deleted a live process\'s in-flight temp file.';
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text, isError } = await c.call('recall', { file: 'tracker-store' });
+  assert.equal(isError, false);
+  assert.match(text, /sweepTmp/);
+  assert.match(text, /tracker-store\.mjs, plus the \d+ names it declares/,
+    'it says how it bridged from the file to the prose');
+});
+
+test('recall reports an empty result without implying nothing happened', async () => {
+  const { c } = await handshake();
+  const { text, isError } = await c.call('recall', { file: 'nothing-like-this.mjs' });
+  assert.equal(isError, false, 'no results is an answer, not a failure');
+  assert.match(text, /Nothing recalled/);
+  assert.match(text, /not found on disk/);
+  assert.match(text, /entries searched/, 'says which haystack was looked through');
+});
+
+test('recall labels evidence as perishable', async () => {
+  const d = seed();
+  d.cards[0].note = 'VERIFIED: 45 tests pass and the stress run was clean.';
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('recall', { kind: 'evidence' });
+  assert.match(text, /as of then, not a claim about now/,
+    'a measurement is a claim about a past state; 45 was true once and is not now');
+});
+
+test('recall refuses to guess, and names the kinds it knows', async () => {
+  const { c } = await handshake();
+  const blind = await c.call('recall', {});
+  assert.equal(blind.isError, true);
+  assert.match(blind.text, /needs something to go on/);
+
+  const wrong = await c.call('recall', { kind: 'vibes' });
+  assert.equal(wrong.isError, true);
+  assert.match(wrong.text, /open, finding, decision, evidence, outcome, brief/);
+});
+
+test('recall says what it dropped rather than truncating silently', async () => {
+  const d = seed();
+  d.cards.forEach((c2, i) => { c2.note = `REPRODUCED: failure number ${i}`; });
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('recall', { kind: 'finding', limit: 1 });
+  assert.match(text, /3 recalled .*, showing 1/);
+  assert.match(text, /…2 more not shown/);
+});
+
+test('recall writes nothing', async () => {
+  const d = seed();
+  d.cards[0].note = 'DECIDED: something';
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  const { c } = await handshake();
+  const before = await board();
+  await c.call('recall', { query: 'something' });
+  assert.equal(await board(), before);
 });

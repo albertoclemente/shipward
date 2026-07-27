@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-014",
+      "p": "shipward",
+      "title": "Close the memory loop — standup carries it, recall retrieves it",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/memory-recall",
+      "commit": null,
+      "note": "THE GAP, measured: the tracker holds 27 memory entries / 4044 words, and standup returns 0 of them. The only path back is start, one card at a time, so Claude retrieves memory about the ticket it is opening and never about the code it is about to touch. From the agent's side this store is write-only. FIX: (1) standup gains a bounded memory section — decisions not to reverse, and still-open items, each with its card id and date; (2) a new recall tool takes file / kind / query and returns the entries attached, ranked by what it would cost to miss. DESIGN RULES: every entry arrives with its date and card so a session can judge rather than believe; evidence is labelled as a claim about a PAST state, because 'tests pass' rots (45 was true this morning, it is 96 now); nothing is silently truncated — recall says what it dropped and how to get it. Standup stays readable: entries are clipped with the card id kept so the full text is one recall away.",
+      "created": "2026-07-27T16:01:56.626Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-013",
       "p": "shipward",
       "title": "Memory view — render what Claude knows, not just what is in flight",
@@ -220,6 +236,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T16:02:06.211Z",
+      "p": "shipward",
+      "msg": "SW-014 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:01:56.627Z",
+      "p": "shipward",
+      "msg": "You added SW-014 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:55:48.397Z",
       "p": "shipward",
@@ -480,7 +508,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T15:55:48.368Z",
-    "pid": 49321
+    "lastSeen": "2026-07-27T16:07:21.715Z",
+    "pid": 51530
   }
 }

@@ -14,10 +14,16 @@
 //
 // Writes go through tracker-store.mjs, which holds a cross-process lock. The
 // desk, this server and a direct file edit can all be writing at once.
+import { readFile, readdir } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readRaw, mutate, TRACKER } from './tracker-store.mjs';
 import {
   nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, cardsOf, fmtDate,
 } from './public/lib.js';
+import { memoryEntries, recall as recallEntries, stillOpen, excerpt, ALL_KINDS } from './public/memory-lib.js';
+
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
 const NAME = 'shipward';
 const VERSION = '1.0.0';
@@ -39,6 +45,12 @@ const nowIso = () => new Date().toISOString();
 // git quiet at the cost of a second file to keep in sync and a second thing to
 // explain. One file that is occasionally dirty beat two files that can disagree.
 const HEARTBEAT_MS = 60000;
+
+// How much memory standup carries unasked. Small enough that a session start
+// stays cheap, large enough that the things which change what you do next are
+// never behind a second call.
+const STANDUP_OPEN = 5;
+const STANDUP_DECISIONS = 6;
 
 async function beat() {
   try {
@@ -80,6 +92,23 @@ const findCard = (doc, id) => {
   );
 };
 
+/* ── memory formatting ───────────────────────────────────── */
+// Every recalled entry carries its card id and its date. A session is being
+// handed something it did not write and cannot verify; without a provenance
+// stamp it can only believe it, and confident wrong memory is worse than none.
+const stamp = (e) => `[${e.card} · ${fmtDate(e.at)}]`;
+
+// Evidence rots. "45 tests pass" was true the morning it was written and is
+// false now — it is 96. Say so at the point of use, not in a doc nobody reads.
+const PERISHABLE = 'as of then, not a claim about now';
+
+function line(e, { max = 0 } = {}) {
+  const caveat = e.kind === 'evidence' ? ` (${PERISHABLE})` : '';
+  // Clipped entries lead with the point, not the preamble — see excerpt().
+  const body = max ? excerpt(e, max) : e.text;
+  return `  ${stamp(e)}${caveat} ${body}`;
+}
+
 const PRI_ORDER = { P1: 0, P2: 1, P3: 2 };
 const byPriThenAge = (a, b) =>
   (PRI_ORDER[a.pri] ?? 9) - (PRI_ORDER[b.pri] ?? 9) || Date.parse(a.created) - Date.parse(b.created);
@@ -99,6 +128,28 @@ const TOOLS = [
       additionalProperties: false,
     },
     run: standup,
+  },
+  {
+    name: 'recall',
+    title: 'Recall what is known',
+    description:
+      'Search everything Claude Code has previously written down about this repo — decisions, reproduced bugs, gotchas, tradeoffs, open questions. Call this BEFORE editing an unfamiliar file: a finding is filed under the card that found it, not under the code it concerns, so the warning you need is never on the card you are working. Read-only. Every result carries the card and date it came from; judge it, do not simply believe it.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        file: str('A filename, with or without path or extension — e.g. "tracker-store.mjs" or "tracker-store". Returns what is known about it.'),
+        kind: {
+          type: 'string',
+          enum: ['open', 'finding', 'decision', 'evidence', 'outcome', 'brief'],
+          description: 'open = unresolved; finding = bugs and gotchas; decision = choices not to reverse; evidence = past verification, perishable.',
+        },
+        query: str('Free text matched against the notes, card ids and titles.'),
+        limit: { type: 'number', description: 'Max entries, default 10, capped at 50.' },
+        project: str('Project id or name. Defaults to the active project.'),
+      },
+      additionalProperties: false,
+    },
+    run: recall,
   },
   {
     name: 'log',
@@ -240,7 +291,96 @@ async function standup({ project: wanted }) {
   lines.push(`Shipped in the last 7 days (${recent.length})`);
   for (const c of recent) lines.push(`  ${c.id} ${fmtDate(c.shipped || c.pushed)} — ${c.title}`);
 
+  // The memory, which standup used to return none of. Bounded on purpose: the
+  // notes are ~4,000 words and growing, so this carries the two kinds that
+  // change what you do next — what is unresolved, and what must not be
+  // reversed — clipped, with the card id kept so the full text is one recall
+  // away. Everything else waits to be asked for.
+  const memory = memoryEntries(doc.cards, project.id);
+  if (memory.length) {
+    const open = stillOpen(memory);
+    if (open.length) {
+      lines.push('', `Still open, from the card notes (${open.length})`);
+      for (const e of open.slice(0, STANDUP_OPEN)) lines.push(line(e, { max: 240 }));
+      if (open.length > STANDUP_OPEN) lines.push(`  …and ${open.length - STANDUP_OPEN} more — recall({kind:"open"})`);
+    }
+    const decisions = recallEntries(memory, { kind: 'decision', limit: STANDUP_DECISIONS });
+    if (decisions.total) {
+      lines.push('', `Decisions not to reverse (${decisions.total})`);
+      for (const e of decisions.entries) lines.push(line(e, { max: 200 }));
+      if (decisions.dropped) lines.push(`  …and ${decisions.dropped} more — recall({kind:"decision"})`);
+    }
+    const words = memory.reduce((n, e) => n + e.text.split(/\s+/).length, 0);
+    lines.push('', `Memory: ${memory.length} entries, ~${words.toLocaleString('en-US')} words. `
+      + 'Call recall({file:"…"}) before editing a file — findings are filed by the card that found them, not by the code they concern.');
+  }
+
   return lines.join('\n');
+}
+
+// The bridge between "the file I am about to edit" and "what the notes call
+// it". SW-010's note — the most valuable one in this repo — names no file at
+// all; it names isStale(), breakLock(), sweepTmp(), because that is how you
+// write down what went wrong. So a file query reads the file and asks about
+// everything declared inside it too.
+const DECLARES = /(?:^|\n)\s*(?:export\s+)?(?:async\s+)?(?:function|class)\s+([A-Za-z_$][\w$]*)|(?:^|\n)\s*(?:export\s+)?(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=/g;
+const SEARCH_DIRS = ['shipward', 'shipward/public', '.'];
+
+async function tokensFor(file) {
+  const want = file.trim().toLowerCase().split('/').pop();
+  for (const dir of SEARCH_DIRS) {
+    let names;
+    try { names = await readdir(join(ROOT, dir)); } catch { continue; }
+    const hit = names.find((n) => n.toLowerCase() === want)
+      || names.find((n) => n.toLowerCase().startsWith(`${want}.`))
+      || names.find((n) => n.toLowerCase().includes(want) && /\.(mjs|js|css|json|md|html)$/.test(n));
+    if (!hit) continue;
+    try {
+      const src = await readFile(join(ROOT, dir, hit), 'utf8');
+      const declared = new Set();
+      for (const [, a, b] of src.matchAll(DECLARES)) declared.add(a || b);
+      return { resolved: `${dir === '.' ? '' : `${dir}/`}${hit}`, tokens: [want, hit, ...declared] };
+    } catch { /* unreadable — fall through to name-only */ }
+  }
+  return { resolved: null, tokens: [want] };
+}
+
+async function recall({ file, kind, query, limit = 10, project: wanted }) {
+  if (!file && !kind && !query) {
+    throw new ToolError('recall needs something to go on: a file, a kind (open|finding|decision|evidence|outcome|brief), or a query');
+  }
+  if (kind && !ALL_KINDS.some((k) => k.key === kind)) {
+    throw new ToolError(`no kind "${kind}" — have: ${ALL_KINDS.map((k) => k.key).join(', ')}`);
+  }
+  const { doc } = await readRaw();
+  const project = projectOf(doc, wanted);
+  const all = memoryEntries(doc.cards, project.id);
+  const bridge = file ? await tokensFor(file) : { resolved: null, tokens: null };
+  const hit = recallEntries(all, {
+    file, kind, query, tokens: bridge.tokens, limit: Math.max(1, Math.min(50, limit)),
+  });
+
+  const asked = [
+    file && `file ${file}${bridge.resolved ? ` (${bridge.resolved}, plus the ${bridge.tokens.length - 2} names it declares)` : ' (not found on disk — matching on the name only)'}`,
+    kind && `kind ${kind}`,
+    query && `"${query}"`,
+  ].filter(Boolean).join(', ');
+
+  if (!hit.total) {
+    // Say which haystack was searched. "Nothing" reads as "nothing happened
+    // here" when it may only mean the note names the code differently.
+    return `Nothing recalled for ${asked}. ${all.length} entries searched`
+      + (file ? '; notes name code however they like, so try recall({query:"…"}) with a concept.' : '.');
+  }
+
+  const lines = [`${hit.total} recalled for ${asked}${hit.dropped ? `, showing ${hit.entries.length}` : ''}:`, ''];
+  for (const e of hit.entries) {
+    lines.push(line(e));
+    if (e.refs.length) lines.push(`     files: ${e.refs.join(', ')}`);
+    lines.push('');
+  }
+  if (hit.dropped) lines.push(`…${hit.dropped} more not shown — raise limit to see them.`);
+  return lines.join('\n').trimEnd();
 }
 
 async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note, project: wanted }) {

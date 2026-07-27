@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-012",
+      "p": "shipward",
+      "title": "Update the SPEC to match what was built",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "chore/spec-catch-up",
+      "commit": null,
+      "note": "The SPEC contract has drifted from the product across a day of building. Known drift: (1) non-goal 'No MCP server is built' is false — SW-005 shipped one; (2) CAP-5 Raw data describes a view removed in SW-011; (3) all four Open Questions were answered at checkpoints but never written back; (4) constraint 'last write wins' is false — SW-008 added If-Match/ETag optimistic concurrency with 428/409; (5) assumption 'No optimistic concurrency on PUT' likewise; (6) CAP-9 and interaction-rules Live reload still name the raw view; (7) ephemeral UI state still lists view raw and copied; (8) data-contract has no mcp heartbeat key and still says 'Last write wins'; (9) constraint says the server is ~60 lines, which stopped being true. ALSO RATIFY: two additions I made to interaction-rules.md mid-implementation without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both document behaviour the prototype and the code already implement, and Alberto is being told rather than asked-after-the-fact this time.",
+      "created": "2026-07-27T15:42:05.896Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-011",
       "p": "shipward",
       "title": "Remove the Raw data view",
@@ -188,6 +204,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:42:06.203Z",
+      "p": "shipward",
+      "msg": "SW-012 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:42:05.896Z",
+      "p": "shipward",
+      "msg": "You added SW-012 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:38:03.950Z",
       "p": "shipward",
@@ -412,7 +440,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T15:38:03.933Z",
-    "pid": 45570
+    "lastSeen": "2026-07-27T15:42:06.188Z",
+    "pid": 46241
   }
 }

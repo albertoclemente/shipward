@@ -66,10 +66,14 @@ HTML5 drag and drop. The column under the pointer takes an `accent-100` backgrou
 
 ## Live reload
 
-The UI polls `GET /api/tracker` every ~3s. When the returned document differs from the rendered one, re-render the board, archive, raw view and activity strip, surfacing the newest feed line. This replaces the prototype's simulated Claude pickup — in production the movement comes from Claude Code editing the file on disk.
+The UI polls `GET /api/tracker` every ~3s. When the returned document differs from the rendered one, re-render the board, archive and activity strip, surfacing the newest feed line. This replaces the prototype's simulated Claude pickup — in production the movement comes from Claude Code, through the MCP server or by editing the file on disk.
+
+Polling is sequential, not interval-driven: a `GET` slower than the interval would otherwise overlap the next one and let an older document land after a newer one. A poll in flight when a write starts is discarded rather than applied.
 
 ## Ephemeral UI state
 
 Not persisted to `tracker.json`; lives only in memory:
 
-`{view: board|archive|raw, editing: cardId|'new'|null, dragOver: colKey|null, copied: bool}`
+`{view: board|archive, editing: cardId|'new'|null, dragOver: colKey|null, etag, offline: bool, error: string|null}`
+
+`etag` is the precondition for the next `PUT`; `offline` (the server is gone) and `error` (the server said no) are deliberately separate, because rendering them the same made a rejected write look like a lost one.

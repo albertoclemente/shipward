@@ -63,6 +63,12 @@ export function nextId(cards, prefix) {
   return `${prefix}-${String(max + 1).padStart(3, '0')}`;
 }
 
+// Feed copy lives here, not at the call sites: the board and the MCP server
+// both write these lines, and two copies of a string drift.
+export const addMsg = (id) => `You added ${id} to Backlog — it's on the list`;
+export const editMsg = (id, fields) => `${id} edited — ${fields}`;
+export const deleteMsg = (id) => `${id} deleted — one less thing`;
+
 export function moveMsg(id, status) {
   switch (status) {
     case 'claude': return `${id} handed to Claude Code — queued`;

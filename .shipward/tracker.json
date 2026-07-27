@@ -81,11 +81,11 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/raw-data-view",
-      "commit": null,
-      "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped.",
+      "commit": "b61fd61",
+      "note": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped. || SHIPPED: rawJson() in public/lib.js writes the twelve contract keys explicitly so the field order is the contract in one visible place, not an emergent property of a key loop. pri is emitted as priority; p is dropped (the view is already project-scoped); note is dropped too — it is not in the contract's list and it is Claude's working context, not board data. Nulls are kept rather than the keys omitted, so a machine reading it gets a stable shape. Copy JSON flips to 'Copied — feed it to a machine' for 2s, but ONLY when the clipboard write actually resolves; a denied write says 'Could not copy — select it instead' instead of claiming success. The flag lives in state because the 3s poll re-renders underneath the timer. VERIFIED in the browser: tab switches, pre renders 4 cards at mono 12px with max-height 560px, key order matches the contract exactly, the failure label appeared under the headless profile's denied clipboard and reverted after 2s, and with writeText stubbed the success label appeared and the copied text was byte-identical to the pre. 56 tests pass.",
       "created": "2026-07-25T13:18:00Z",
       "pushed": null,
       "shipped": null
@@ -97,9 +97,9 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/mcp-server-stage-b",
       "commit": null,
       "note": "SCOPE NARROWED to stage B at the step-02 token check (~2757 tokens vs a 1600 ceiling). Stage A shipped as SW-006. Remaining: shipward/mcp.mjs — zero-dep stdio JSON-RPC 2.0, protocol 2025-11-25, five verb tools (standup, log, start, done, sync) importing the rules from public/lib.js so the UI and Claude cannot drift; .mcp.json registration; mcp.test.mjs over a real pipe. Writes go through tracker-store.mjs, which is now cross-process safe. NO @modelcontextprotocol/sdk — zero-dep is an Always constraint; hand-roll the protocol.",
       "created": "2026-07-25T13:18:00Z",
@@ -172,6 +172,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:24:22.275Z",
+      "p": "shipward",
+      "msg": "SW-005 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:11:31.359Z",
+      "p": "shipward",
+      "msg": "SW-004 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:09:04.383Z",
       "p": "shipward",

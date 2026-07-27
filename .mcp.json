@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "shipward": {
+      "command": "node",
+      "args": ["shipward/mcp.mjs"]
+    }
+  }
+}

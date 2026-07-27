@@ -3,7 +3,7 @@
 import {
   COLUMNS, fmtDate, relTime, nextId, moveMsg, applyTransition,
   feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed,
-  archiveRows, archiveLede, rawJson,
+  archiveRows, archiveLede, rawJson, addMsg, editMsg, deleteMsg,
 } from './lib.js';
 
 const POLL_MS = 3000;
@@ -156,7 +156,7 @@ async function saveCard(values, opened) {
       if (!Object.keys(touched).length) return null;
       doc.cards[i] = { ...doc.cards[i], ...touched };
       const fields = Object.keys(touched).sort().join(', ');
-      doc.feed = feedAdd(doc.feed, doc.cards[i].p, `${doc.cards[i].id} edited — ${fields}`, now());
+      doc.feed = feedAdd(doc.feed, doc.cards[i].p, editMsg(doc.cards[i].id, fields), now());
       return doc;
     }
     const project = activeProject(doc);
@@ -165,7 +165,7 @@ async function saveCard(values, opened) {
       id, p: project.id, status: 'backlog', claude: null, commit: null,
       created: now(), pushed: null, shipped: null, ...values,
     });
-    doc.feed = feedAdd(doc.feed, project.id, `You added ${id} to Backlog — it's on the list`, now());
+    doc.feed = feedAdd(doc.feed, project.id, addMsg(id), now());
     return doc;
   });
   if (ok) closeDialog();   // a rejected write keeps the dialog and its text
@@ -178,7 +178,7 @@ async function deleteCard(id) {
     const card = doc.cards.find((c) => c.id === id);
     if (!card) return null;
     doc.cards = doc.cards.filter((c) => c.id !== id);
-    doc.feed = feedAdd(doc.feed, card.p, `${id} deleted — one less thing`, now());
+    doc.feed = feedAdd(doc.feed, card.p, deleteMsg(id), now());
     return doc;
   });
   if (ok) closeDialog();

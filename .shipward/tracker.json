@@ -17,11 +17,11 @@
       "type": "chore",
       "pri": "P1",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/spec-catch-up",
-      "commit": null,
-      "note": "The SPEC contract has drifted from the product across a day of building. Known drift: (1) non-goal 'No MCP server is built' is false — SW-005 shipped one; (2) CAP-5 Raw data describes a view removed in SW-011; (3) all four Open Questions were answered at checkpoints but never written back; (4) constraint 'last write wins' is false — SW-008 added If-Match/ETag optimistic concurrency with 428/409; (5) assumption 'No optimistic concurrency on PUT' likewise; (6) CAP-9 and interaction-rules Live reload still name the raw view; (7) ephemeral UI state still lists view raw and copied; (8) data-contract has no mcp heartbeat key and still says 'Last write wins'; (9) constraint says the server is ~60 lines, which stopped being true. ALSO RATIFY: two additions I made to interaction-rules.md mid-implementation without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both document behaviour the prototype and the code already implement, and Alberto is being told rather than asked-after-the-fact this time.",
+      "commit": "0edc2f6",
+      "note": "The SPEC contract has drifted from the product across a day of building. Known drift: (1) non-goal 'No MCP server is built' is false — SW-005 shipped one; (2) CAP-5 Raw data describes a view removed in SW-011; (3) all four Open Questions were answered at checkpoints but never written back; (4) constraint 'last write wins' is false — SW-008 added If-Match/ETag optimistic concurrency with 428/409; (5) assumption 'No optimistic concurrency on PUT' likewise; (6) CAP-9 and interaction-rules Live reload still name the raw view; (7) ephemeral UI state still lists view raw and copied; (8) data-contract has no mcp heartbeat key and still says 'Last write wins'; (9) constraint says the server is ~60 lines, which stopped being true. ALSO RATIFY: two additions I made to interaction-rules.md mid-implementation without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both document behaviour the prototype and the code already implement, and Alberto is being told rather than asked-after-the-fact this time. || DONE. Nine false statements corrected. SPEC.md: CAP-5 WITHDRAWN not deleted (renumbering would silently change what CAP-6..CAP-10 mean in the cards and artifacts citing them); CAP-11 MCP server and CAP-12 honest MCP tag added; CAP-9 and Live reload stop naming the raw view; non-goal 'No MCP server is built' becomes 'No MCP SDK, stdio only'; the '~60 lines' server figure dropped; constraints gained the single-store cross-process lock, the one-module rule for shared logic, and the If-Match/ETag contract; the 'last write wins' assumption RETIRED WITH ITS REASON KEPT ON THE RECORD rather than deleted, because a future reader needs to know an audit trail of a destroyed card was once thought sufficient; all four Open Questions moved to Resolved decisions with their answers. data-contract.md: mcp heartbeat documented including the git-dirtiness tradeoff, feed cap stated as truncating not rejecting, stat precedence resolved to shipped ?? pushed and pinned to UTC, MCP status derivation added, write rules rewritten. interaction-rules.md: ephemeral state now matches the real state object, sequential polling recorded, offline vs error kept distinct. RATIFIED AND NAMED IN THE MEMLOG: the two additions I made to interaction-rules.md during SW-001 without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both only document behaviour the prototype's moveMsg/applyTransition and the shipped code already implement. The process failure was mine; a SPEC companion is Ask First. LESSON ON THE RECORD: spec drift is cheap to create and expensive to find — re-derive at the end of any day that ships more than two cards.",
       "created": "2026-07-27T15:42:05.896Z",
       "pushed": null,
       "shipped": null
@@ -204,6 +204,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:45:14.620Z",
+      "p": "shipward",
+      "msg": "SW-012 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:42:06.203Z",
       "p": "shipward",
@@ -440,7 +446,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T15:42:06.188Z",
-    "pid": 46241
+    "lastSeen": "2026-07-27T15:45:14.596Z",
+    "pid": 46971
   }
 }

@@ -13,6 +13,11 @@
 //     breakers cannot both win and then delete each other's fresh lock;
 //   * liveness over age — a holder whose pid is alive is never stale, however
 //     slow it is, and a heartbeat keeps its mtime fresh regardless;
+//   * one observation — staleness is judged from a single open handle, never
+//     from a stat and a read that could land on two different locks;
+//   * a future mtime means new, not dead — filesystem timestamps carry
+//     sub-millisecond precision that Date.now() truncates away;
+//   * the sweep only collects files whose pid is dead;
 //   * every retry path checks the deadline and sleeps, so no input can spin.
 //
 // SHIPWARD_TRACKER overrides the tracker path. It exists for tests. Two
@@ -31,6 +36,7 @@ const BASE = basename(TRACKER);
 
 const LOCK_HEARTBEAT_MS = 1000;   // holder refreshes its mtime this often
 const LOCK_STALE_MS = 30000;      // backstop: a heartbeating holder never reaches this
+const ORPHAN_GRACE_MS = 2000;     // a lock with no readable holder behind it
 const LOCK_RETRY_MS = 15;
 const LOCK_TIMEOUT_MS = 60000;    // must exceed LOCK_STALE_MS, or breaking becomes the common path
 
@@ -127,36 +133,82 @@ async function readHolder() {
   try { return JSON.parse(await readFile(LOCK, 'utf8')); } catch { return null; }
 }
 
+// One observation of one inode: mtime and holder come from the same open file
+// handle. Reading them separately was a lost-write bug — readHolder() could hit
+// the lock during its momentary absence between a release and the next publish,
+// return null, and then lstat() measured a DIFFERENT, brand-new lock.
+// `ino` lets the breaker confirm it is breaking the lock it actually judged.
+async function inspect() {
+  let fh;
+  try {
+    fh = await open(LOCK, 'r');
+  } catch {
+    // Unopenable, but the path may still exist and still block link(): a
+    // dangling symlink opens ENOENT while lstat succeeds. lstat, not stat —
+    // stat follows the link to the missing target and reports it gone.
+    try {
+      const st = await lstat(LOCK);
+      return { ino: st.ino, mtimeMs: st.mtimeMs, holder: null, unreadable: true };
+    } catch {
+      return null;                                     // genuinely free
+    }
+  }
+  try {
+    const st = await fh.stat();
+    let holder = null;
+    try { holder = JSON.parse(await fh.readFile('utf8')); } catch { /* corpse or torn */ }
+    return { ino: st.ino, mtimeMs: st.mtimeMs, holder, unreadable: false };
+  } finally {
+    await fh.close().catch(() => {});
+  }
+}
+
+// A lock is stale only when nothing alive is behind it AND it has stopped
+// heartbeating for the full grace period.
+function isStale(snap) {
+  if (!snap) return false;                             // nothing there to break
+  if (snap.holder && alive(snap.holder.pid)) return false;   // slow but alive is not stale
+  // A future mtime means brand new, not broken. st.mtimeMs keeps sub-millisecond
+  // precision while Date.now() truncates to whole milliseconds, so a lock created
+  // moments ago reads as up to ~1ms ahead — measured on 54% of fresh locks. The
+  // old `age < 0 → stale` rule therefore condemned most newborn locks outright.
+  const age = Date.now() - snap.mtimeMs;
+  if (age < 0) return false;
+  // No readable holder behind it: a dangling symlink, a foreign file, or a
+  // corpse. Nothing will ever heartbeat it, so the long grace buys nothing —
+  // and it can no longer be one of our own live locks, because publish() links
+  // a fully written scratch into place and inspect() reads body and mtime from
+  // that one inode. A short grace still covers an unlucky moment.
+  if (!snap.holder) return age > ORPHAN_GRACE_MS;
+  return age > LOCK_STALE_MS;
+}
+
 // Steal a dead lock in ONE atomic step. Renaming a path succeeds for exactly
 // one caller; everyone else gets ENOENT and loops. The previous version
 // unlinked blind, so four processes each removed the last winner's fresh lock
 // and all four entered the critical section.
-async function breakLock() {
+//
+// `snap` is what we judged. rename() moves whatever sits at the path NOW, which
+// may already be someone else's fresh lock, so the grave is checked afterwards
+// and an innocent lock is put back.
+async function breakLock(snap) {
   const grave = `${LOCK}.dead.${randomUUID()}`;
   try {
     await rename(LOCK, grave);
   } catch {
     return false;                        // someone else broke it first
   }
+  const graved = await lstat(grave).catch(() => null);   // lstat: the lock may be a symlink
+  if (graved && snap && graved.ino !== snap.ino) {
+    // Not the corpse we condemned. Put it back if the path is still free; if
+    // someone has already published there, drop ours rather than clobber theirs.
+    try { await link(grave, LOCK); } catch { /* path retaken — leave it alone */ }
+    await unlink(grave).catch(() => {});
+    return false;
+  }
   await unlink(grave).catch(() => {});
   await sweepTmp();                      // the dead holder may have orphaned one
   return true;
-}
-
-async function isStale() {
-  const holder = await readHolder();
-  if (holder && alive(holder.pid)) return false;     // slow but alive is not stale
-  let age;
-  try {
-    age = Date.now() - (await lstat(LOCK)).mtimeMs;
-  } catch {
-    return false;                                     // vanished; just retry
-  }
-  if (age < 0) return true;                           // clock skew: as broken as too old
-  // Unparsable means a symlink, a truncated write, or a corpse — but give it a
-  // grace period so a transient read can never condemn a live holder.
-  if (!holder) return age > 2000;
-  return age > LOCK_STALE_MS;
 }
 
 // Publish the lock atomically: build it complete in a scratch file, then link
@@ -189,10 +241,9 @@ async function acquire() {
       throw err;
     } catch (err) {
       if (err.code !== 'EEXIST') throw err;
-      if (await isStale()) {
-        if (await breakLock()) {
-          process.stderr.write('shipward: broke a stale tracker lock\n');
-        }
+      const snap = await inspect();
+      if (isStale(snap) && await breakLock(snap)) {
+        process.stderr.write('shipward: broke a stale tracker lock\n');
       }
       // Every path below reaches the deadline check and the sleep. Two of them
       // used to `continue` past both and spin at 100% CPU.
@@ -208,8 +259,25 @@ async function release(token) {
   await unlink(LOCK).catch(() => {});
 }
 
+// Thrown when a holder discovers, just before committing, that the lock it took
+// is no longer at the path. Loud beats silent: the caller can retry, where a
+// blind write would overwrite whoever holds it now.
+export class LockLostError extends Error {
+  constructor(msg) { super(msg); this.name = 'LockLostError'; }
+}
+
+// `fn` is handed a guard to call immediately before it commits anything. Every
+// known way to lose a lock has been closed, so this should never fire — it is
+// here so that if one is ever reopened, the symptom is an error rather than a
+// vanished card.
 export async function withLock(fn) {
   const token = await acquire();
+  const held = async () => {
+    const holder = await readHolder();
+    if (holder?.token !== token) {
+      throw new LockLostError('lost the tracker lock mid-write — another process took it; nothing was written');
+    }
+  };
   // Keep our mtime fresh so a long mutation is never mistaken for a corpse.
   // utimes, not writeFile: rewriting the body truncates it, and a waiter that
   // read during that window saw an invalid lock and broke a live holder's.
@@ -219,7 +287,7 @@ export async function withLock(fn) {
   }, LOCK_HEARTBEAT_MS);
   beat.unref?.();
   try {
-    return await fn();
+    return await fn(held);
   } finally {
     clearInterval(beat);
     await release(token);
@@ -227,12 +295,20 @@ export async function withLock(fn) {
 }
 
 /* ── io ──────────────────────────────────────────────────────── */
+// Both scratch kinds carry the pid of whoever made them, and only a DEAD pid's
+// files are swept. Sweeping by name alone deleted a live holder's in-flight
+// atomic-write temp out from under it — its rename then failed ENOENT mid-write.
+const TMP_RE = new RegExp(`^${escapeRe(BASE)}\\.(\\d+)\\.[0-9a-f-]+\\.tmp$`);
+const SCRATCH_RE = new RegExp(`^${escapeRe(BASE)}\\.lock\\.(\\d+)\\.[0-9a-f-]+$`);
+
+function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+
 async function sweepTmp() {
   try {
     for (const f of await readdir(DIR)) {
-      if (!f.startsWith(`${BASE}.`)) continue;
-      // orphan atomic-write temps, and lock scratch files from a killed publish
-      if (f.endsWith('.tmp') || /\.lock\.\d+\./.test(f)) await unlink(join(DIR, f)).catch(() => {});
+      const m = TMP_RE.exec(f) || SCRATCH_RE.exec(f);
+      if (!m || alive(Number(m[1]))) continue;
+      await unlink(join(DIR, f)).catch(() => {});
     }
   } catch { /* directory unreadable — nothing to sweep */ }
 }
@@ -287,7 +363,7 @@ async function atomicWrite(doc) {
 // Read-modify-write under one lock. `fn` receives the current document and
 // returns the replacement, or null/undefined for a deliberate no-op.
 export async function mutate(fn) {
-  return withLock(async () => {
+  return withLock(async (held) => {
     const doc = await read();
     const before = serialize(doc);
     const next = await fn(doc);
@@ -305,6 +381,7 @@ export async function mutate(fn) {
     const out = normalize(next);
     const bad = validate(out);
     if (bad) throw new ValidationError(`refusing to write an invalid tracker document: ${bad}`);
+    await held();
     const body = await atomicWrite(out);
     return { doc: out, body, changed: true, etag: etagOf(body) };
   });
@@ -322,7 +399,7 @@ export async function replace(doc, ifMatch) {
   const out = normalize(doc);
   const bad = validate(out);
   if (bad) throw new ValidationError(bad);
-  return withLock(async () => {
+  return withLock(async (held) => {
     if (ifMatch !== undefined) {
       const current = await readRaw();
       if (current.etag !== ifMatch) {
@@ -332,6 +409,7 @@ export async function replace(doc, ifMatch) {
         );
       }
     }
+    await held();
     const body = await atomicWrite(out);
     return { doc: out, body, changed: true, etag: etagOf(body) };
   });

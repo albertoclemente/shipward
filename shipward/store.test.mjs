@@ -136,6 +136,73 @@ test('contended breaking of one stale lock still admits only one writer', async 
   assert.equal(new Set(doc.cards.map((c) => c.id)).size, N);
 });
 
+test('a lock whose mtime is in the future is not read as a corpse', async () => {
+  // REGRESSION, and the subtlest one here. isStale() used to judge the lock from
+  // TWO observations of the path — readHolder() then lstat() — so a reader that
+  // hit the lock in its momentary absence between one release and the next
+  // publish got holder=null and then measured a DIFFERENT, brand-new lock. That
+  // lock tripped `age < 0 → stale`, because st.mtimeMs keeps sub-millisecond
+  // precision while Date.now() truncates: 1085 of 2000 freshly created locks
+  // measured as up to 0.62ms in the future. Over half of all newborn locks were
+  // therefore breakable, and the break took a LIVE holder's lock with it.
+  // Cost: ~1 silently lost write per 900 under sustained contention.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, '');                        // unparsable, as in the race
+  const { utimes, unlink } = await import('node:fs/promises');
+  const future = new Date(Date.now() + 1000);
+  await utimes(lock, future, future);
+
+  const pending = appendInChild(1);
+  await new Promise((r) => setTimeout(r, 600));
+  const waited = JSON.parse(await readFile(tracker, 'utf8')).cards.length === 0;
+  await unlink(lock);
+  await pending;
+
+  assert.ok(waited, 'a lock dated in the future must be treated as new, not dead');
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).cards.length, 1, 'and the write still lands');
+});
+
+test('the sweep spares a live process\'s in-flight temp file', async () => {
+  // REGRESSION: breakLock() swept every matching name, so it deleted the
+  // atomic-write temp of a LIVE holder mid-write — that holder's chmod then
+  // failed ENOENT. Only a dead pid's leftovers may be collected.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
+  const { utimes } = await import('node:fs/promises');
+  const old = new Date(Date.now() - 120_000);
+  await utimes(lock, old, old);
+
+  const dir = join(sandbox, '.shipward');
+  const mine = join(dir, `tracker.json.${process.pid}.abcd-ef01.tmp`);
+  const dead = join(dir, 'tracker.json.999999.abcd-ef02.tmp');
+  await writeFile(mine, 'in flight');
+  await writeFile(dead, 'orphan');
+
+  await appendInChild(1);                            // breaks the stale lock, sweeps
+
+  await stat(mine);                                  // throws if it was swept
+  await assert.rejects(stat(dead), 'a dead writer\'s orphan must be collected');
+});
+
+test('a holder that loses its lock mid-write writes nothing and says so', async () => {
+  // Defence in depth. Every known way to lose a lock is closed; if one is ever
+  // reopened, the symptom must be a loud error, not a vanished card.
+  const stolen = run(process.execPath, ['--input-type=module', '-e',
+    `import { mutate } from ${JSON.stringify(STORE)};
+     import { unlink, writeFile } from 'node:fs/promises';
+     const lock = process.env.SHIPWARD_TRACKER + '.lock';
+     await mutate(async (doc) => {
+       await unlink(lock);
+       await writeFile(lock, JSON.stringify({ pid: process.pid, token: 'someone-else', at: Date.now() }));
+       doc.cards.push(${JSON.stringify(card(1))});
+       return doc;
+     });`,
+  ], { env: { ...process.env, SHIPWARD_TRACKER: tracker } });
+
+  await assert.rejects(stolen, /lost the tracker lock/);
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).cards.length, 0, 'nothing was written');
+});
+
 test('a dangling symlink at the lock path does not spin forever', async () => {
   // REGRESSION: open(wx) returned EEXIST, stat followed the link and threw
   // ENOENT, and the catch looped with no deadline check and no sleep — 100% CPU

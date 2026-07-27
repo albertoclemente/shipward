@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-010",
+      "p": "shipward",
+      "title": "A live lock is broken as stale — silent lost write",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/live-lock-broken",
+      "commit": null,
+      "created": "2026-07-27T14:50:54.528Z",
+      "pushed": null,
+      "shipped": null,
+      "note": "REPRODUCED while fixing SW-009. The 12-writer store test fails about 1 run in 6 under full-suite load: 11 of 12 cards land, every child exits 0, nothing is logged. A high-cycle harness (6 processes x 150 mutations) loses ~1 write per 900 reliably. ROOT CAUSE: isStale() judges the lock from TWO separate observations of the path — readHolder() then lstat() — and the lock can be replaced between them. When readHolder() hits the lock in its momentary absence (normal, between one holder release and the next publish) it returns null, and lstat() then measures a DIFFERENT, brand-new lock. That new lock trips `if (age < 0) return true` — the line commented \"clock skew: as broken as too old\". Measured: st.mtimeMs carries sub-millisecond precision while Date.now() truncates to whole ms, so a freshly created lock reads as up to 0.62ms in the FUTURE in 1085 of 2000 observations. Over half of all new locks are therefore condemned the instant that race is hit. Trace confirms the full chain: break-won by a waiter, then 6ms later the true holder gets release-skip (its lock is gone) and its atomic-write chmod fails ENOENT because breakLock -> sweepTmp deleted the live holder’s in-flight .tmp. Two writers in the critical section, one write silently overwritten. THREE DEFECTS: (1) isStale reads stat and content from different observations; (2) age < 0 is treated as death when it actually means brand new; (3) sweepTmp unlinks temp and lock-scratch files belonging to LIVE processes."
+    },
+    {
       "id": "SW-001",
       "p": "shipward",
       "title": "Build the Shipward desk core (server + board)",
@@ -145,17 +161,35 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/test-port-zero",
-      "commit": null,
-      "note": "The sandbox server in serve.test.mjs hard-codes port 4749. A leftover server from an earlier or parallel run holds the port, the new server fails to bind, and the tests silently assert against the STALE server — observed here as three phantom failures (GET returning 200 for a missing tracker). Fix: bind port 0, read the assigned port back from the server, pass it to the tests. The sandbox server should also log bind failures rather than dying silently.",
+      "commit": "8bf611f",
+      "note": "The sandbox server in serve.test.mjs hard-codes port 4749. A leftover server from an earlier or parallel run holds the port, the new server fails to bind, and the tests silently assert against the STALE server — observed here as three phantom failures (GET returning 200 for a missing tracker). Fix: bind port 0, read the assigned port back from the server, pass it to the tests. The sandbox server should also log bind failures rather than dying silently. || SHIPPED: serve.mjs now reads SHIPWARD_PORT (default 4747) and logs the port it actually bound; the test spawns it with SHIPWARD_PORT=0 and parses the port back out of stdout, so the suite no longer rewrites serve.mjs source to patch the constant. A bind failure logs to stderr and exits 1 — covered by a test that starts a second server on the taken port and asserts exit 1 plus 'already in use'. 46 tests pass. FOUND WHILE DOING THIS: the 12-writer store test failed intermittently (~1 run in 6 under full-suite load, 11/12 cards). Not flaky — a real silent lost write. Root cause traced and filed as SW-010.",
       "created": "2026-07-25T15:25:44.607Z",
       "pushed": null,
       "shipped": null
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T14:50:57.780Z",
+      "p": "shipward",
+      "msg": "SW-010 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T14:50:54.528Z",
+      "p": "shipward",
+      "msg": "You added SW-010 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T14:50:38.188Z",
+      "p": "shipward",
+      "msg": "SW-009 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T14:33:55.973Z",
       "p": "shipward",

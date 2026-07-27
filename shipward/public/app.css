@@ -299,3 +299,9 @@ textarea.input { min-height: 90px; resize: vertical; }
   margin-left: var(--space-2); font-size: 11px; color: var(--color-accent-700);
   font-weight: 600; flex: none;
 }
+
+/* Disconnected MCP: muted and still. The dot blinks only when something is
+   actually listening — a blinking light that means nothing trains you to
+   ignore the one that means something. */
+.tag-off { border: 1px solid var(--color-neutral-400); color: var(--color-neutral-600); }
+.mcp-dot.is-off { background: var(--color-neutral-500); animation: none; }

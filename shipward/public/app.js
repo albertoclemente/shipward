@@ -3,7 +3,7 @@
 import {
   COLUMNS, fmtDate, relTime, nextId, moveMsg, applyTransition,
   feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed,
-  archiveRows, archiveLede, rawJson, addMsg, editMsg, deleteMsg,
+  archiveRows, archiveLede, rawJson, addMsg, editMsg, deleteMsg, mcpStatus,
 } from './lib.js';
 
 const POLL_MS = 3000;
@@ -228,10 +228,18 @@ function renderHeader(doc, project) {
         }),
         p.name,
       ))),
-    el('div', { class: 'tag tag-outline mcp-tag' },
-      el('span', { class: 'mcp-dot' }),
-      'MCP CONNECTED',
-    ),
+    (() => {
+      const mcp = mcpStatus(doc);
+      return el('div', {
+        class: `tag mcp-tag ${mcp.connected ? 'tag-outline' : 'tag-off'}`,
+        title: mcp.lastSeen
+          ? `MCP server last seen ${relTime(mcp.lastSeen)}`
+          : 'No MCP server has written to this tracker. Start it with: node shipward/mcp.mjs',
+      },
+        el('span', { class: `mcp-dot${mcp.connected ? '' : ' is-off'}` }),
+        mcp.label,
+      );
+    })(),
     el('button', { class: 'btn btn-primary', onclick: () => openDialog('new') },
       icon('plus'), 'New card'),
   );

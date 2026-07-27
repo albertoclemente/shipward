@@ -97,11 +97,11 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/mcp-server-stage-b",
-      "commit": null,
-      "note": "SCOPE NARROWED to stage B at the step-02 token check (~2757 tokens vs a 1600 ceiling). Stage A shipped as SW-006. Remaining: shipward/mcp.mjs — zero-dep stdio JSON-RPC 2.0, protocol 2025-11-25, five verb tools (standup, log, start, done, sync) importing the rules from public/lib.js so the UI and Claude cannot drift; .mcp.json registration; mcp.test.mjs over a real pipe. Writes go through tracker-store.mjs, which is now cross-process safe. NO @modelcontextprotocol/sdk — zero-dep is an Always constraint; hand-roll the protocol.",
+      "commit": "ed72dcf",
+      "note": "SCOPE NARROWED to stage B at the step-02 token check (~2757 tokens vs a 1600 ceiling). Stage A shipped as SW-006. Remaining: shipward/mcp.mjs — zero-dep stdio JSON-RPC 2.0, protocol 2025-11-25, five verb tools (standup, log, start, done, sync) importing the rules from public/lib.js so the UI and Claude cannot drift; .mcp.json registration; mcp.test.mjs over a real pipe. Writes go through tracker-store.mjs, which is now cross-process safe. NO @modelcontextprotocol/sdk — zero-dep is an Always constraint; hand-roll the protocol. || SHIPPED stage B. shipward/mcp.mjs is newline-delimited JSON-RPC 2.0 over stdio, protocol 2025-11-25, zero deps, no SDK. Five tools mirror the five slash commands (standup/log/start/done/sync); each does the tracker half and leaves git plus the work itself to Claude. All rules — id allocation, branch naming, status transitions, feed copy — are imported from public/lib.js so the desk and Claude cannot drift; addMsg/editMsg/deleteMsg were moved into lib.js for that and app.js now calls them. .mcp.json registers it as the shipward server. DESIGN CALLS: an unknown tool name returns a readable errored RESULT rather than -32601, because it is the model mistake to correct not a protocol failure; an unknown card id lists what IS startable; start is idempotent so a re-run after a crash re-reports context instead of refusing; done APPENDS to the note rather than replacing it; sync applies every update and creation in ONE locked write with ONE feed entry. BUG FOUND BY SMOKE-TESTING THE REAL BINARY: stdin end called process.exit immediately and killed a call still in flight — losing a write that had taken the tracker lock and never answering. Every test held stdin open so none of them saw it; now the queue drains first, and the regression test was verified to fail against the old code. 24 MCP tests over a real pipe (split frames, two messages in one chunk, notifications, malformed input, batch refusal, stdout purity); 80 tests in total. This card was itself started and finished THROUGH the MCP server.",
       "created": "2026-07-25T13:18:00Z",
       "pushed": null,
       "shipped": null
@@ -129,9 +129,9 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "chore/prefer-mcp-claude-md",
       "commit": null,
       "note": "Stage C of SW-005, depends on SW-005 stage B. Rewrite CLAUDE.md so the protocol prefers the MCP tools with direct file edits as the documented fallback (Alberto authorised this Ask First change at the SW-005 step-01 checkpoint). Drive the header MCP CONNECTED tag from an mcp.lastSeen heartbeat, stale after 150s, with a muted non-blinking disconnected variant. schema.json sets no additionalProperties, so the mcp key needs no schema change — verified. KNOWN TRADEOFF: a 60s heartbeat makes the committed tracker.json dirty in git about once a minute; the alternative is a .shipward/mcp-status.json sidecar.",
       "created": "2026-07-25T15:06:49.615Z",
@@ -172,6 +172,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:25:10.652Z",
+      "p": "shipward",
+      "msg": "SW-007 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:24:48.746Z",
+      "p": "shipward",
+      "msg": "SW-005 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T15:24:22.275Z",
       "p": "shipward",

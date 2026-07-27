@@ -110,6 +110,13 @@ async function handshake() {
 
 const doc = async () => JSON.parse(await readFile(tracker, 'utf8'));
 
+// Board state without the MCP heartbeat. The server stamps doc.mcp while it
+// runs, so a raw byte comparison would call every read-only tool a writer.
+const board = async () => {
+  const { mcp, ...rest } = await doc();
+  return JSON.stringify(rest);
+};
+
 beforeEach(async () => {
   sandbox = await mkdtemp(join(tmpdir(), 'shipward-mcp-'));
   sandboxes.push(sandbox);
@@ -154,7 +161,7 @@ test('tools/list exposes the five verbs with usable schemas', async () => {
 
 test('standup reports the board and writes nothing', async () => {
   const { c } = await handshake();
-  const before = await readFile(tracker, 'utf8');
+  const before = await board();
   const { text, isError } = await c.call('standup', {});
 
   assert.equal(isError, false);
@@ -164,7 +171,7 @@ test('standup reports the board and writes nothing', async () => {
   assert.match(text, /Backlog \(2\)/);
   // P1 leads P2 regardless of the order in the file
   assert.ok(text.indexOf('TS-002') < text.indexOf('TS-001'), 'backlog is sorted by priority');
-  assert.equal(await readFile(tracker, 'utf8'), before, 'standup is read-only');
+  assert.equal(await board(), before, 'standup touches no board state');
 });
 
 test('standup counts only the last seven days as shipped', async () => {
@@ -208,11 +215,11 @@ test('log defaults type, priority and effort rather than refusing', async () => 
 
 test('log refuses an empty title without touching the file', async () => {
   const { c } = await handshake();
-  const before = await readFile(tracker, 'utf8');
+  const before = await board();
   const { text, isError } = await c.call('log', { title: '   ' });
   assert.equal(isError, true);
   assert.match(text, /needs a title/);
-  assert.equal(await readFile(tracker, 'utf8'), before);
+  assert.equal(await board(), before);
 });
 
 test('start takes the card, names a branch, and hands back the note', async () => {
@@ -313,14 +320,14 @@ test('sync applies updates and creations in one write with one feed entry', asyn
 
 test('a sync naming an unknown card writes nothing at all', async () => {
   const { c } = await handshake();
-  const before = await readFile(tracker, 'utf8');
+  const before = await board();
   const { isError, text } = await c.call('sync', {
     summary: 'partly wrong',
     updates: [{ id: 'TS-001', commit: 'aaa1111' }, { id: 'TS-404', status: 'pushed' }],
   });
   assert.equal(isError, true);
   assert.match(text, /no card TS-404/);
-  assert.equal(await readFile(tracker, 'utf8'), before, 'the whole batch is atomic');
+  assert.equal(await board(), before, 'the whole batch is atomic');
 });
 
 test('two messages arriving in one chunk are both answered', async () => {
@@ -410,4 +417,20 @@ test('closing stdin drains the queue instead of killing the write', async () => 
   assert.equal(res.result.isError, false, res.result.content?.[0]?.text);
   assert.ok((await doc()).cards.some((x) => x.title === 'written as the pipe closes'), 'the write survived');
   assert.equal(await c.exited, 0, 'and then it exits cleanly');
+});
+
+test('the server heartbeats so the desk tag can tell the truth', async () => {
+  const { c } = await handshake();
+  await c.call('standup', {});                      // any call is after the startup beat
+  const { mcp } = await doc();
+  assert.ok(mcp, 'doc.mcp is stamped on startup, not a minute later');
+  assert.ok(Date.now() - Date.parse(mcp.lastSeen) < 10_000, 'and it is recent');
+  assert.equal(typeof mcp.pid, 'number');
+});
+
+test('a heartbeat never disturbs the board', async () => {
+  const { c } = await handshake();
+  const before = await board();
+  await c.call('standup', {});
+  assert.equal(await board(), before, 'cards and feed are untouched by the heartbeat');
 });

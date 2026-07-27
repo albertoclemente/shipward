@@ -63,6 +63,29 @@ export function nextId(cards, prefix) {
   return `${prefix}-${String(max + 1).padStart(3, '0')}`;
 }
 
+// The header tag tells the truth about the MCP server, which is the whole
+// premise of the product — a decorative "CONNECTED" that is lit whether or not
+// anything is listening is worse than no tag at all.
+//
+// The server stamps doc.mcp.lastSeen while it runs. The window is generous
+// relative to the 60s heartbeat, so one slow write or a stalled poll does not
+// flicker the tag; a genuinely dead server goes dark within two and a half
+// minutes.
+export const MCP_STALE_MS = 150000;
+
+export function mcpStatus(doc, now = Date.now()) {
+  const seen = Date.parse(doc?.mcp?.lastSeen);
+  if (Number.isNaN(seen)) return { connected: false, label: 'MCP OFFLINE', lastSeen: null };
+  // A timestamp from the future is a clock that disagrees, not a live server;
+  // treat it as seen now rather than as infinitely stale.
+  const age = Math.max(0, now - seen);
+  return {
+    connected: age <= MCP_STALE_MS,
+    label: age <= MCP_STALE_MS ? 'MCP CONNECTED' : 'MCP OFFLINE',
+    lastSeen: doc.mcp.lastSeen,
+  };
+}
+
 // Feed copy lives here, not at the call sites: the board and the MCP server
 // both write these lines, and two copies of a string drift.
 export const addMsg = (id) => `You added ${id} to Backlog — it's on the list`;

@@ -29,6 +29,27 @@ const ALSO_SPOKEN = new Set(['2025-06-18', '2025-03-26', '2024-11-05']);
 const log = (...a) => process.stderr.write(`shipward-mcp: ${a.join(' ')}\n`);
 const nowIso = () => new Date().toISOString();
 
+// The desk's "MCP CONNECTED" tag reads doc.mcp.lastSeen and goes dark after
+// MCP_STALE_MS (150s), so a tag that is lit means a server really is listening.
+// The interval is well inside that window: one slow write must not flicker it.
+//
+// KNOWN TRADEOFF, chosen deliberately: the heartbeat lives in tracker.json, so
+// a committed tracker goes dirty in git about once a minute while a session is
+// open. The alternative was a .shipward/mcp-status.json sidecar, which keeps
+// git quiet at the cost of a second file to keep in sync and a second thing to
+// explain. One file that is occasionally dirty beat two files that can disagree.
+const HEARTBEAT_MS = 60000;
+
+async function beat() {
+  try {
+    await mutate((doc) => ({ ...doc, mcp: { lastSeen: nowIso(), pid: process.pid } }));
+  } catch (err) {
+    // A heartbeat is never worth failing a session over — not a missing
+    // tracker, not a lock we could not get.
+    log(`heartbeat skipped: ${err.message}`);
+  }
+}
+
 /* ── tracker helpers ─────────────────────────────────────── */
 const projectOf = (doc, wanted) => {
   if (wanted) {
@@ -453,5 +474,12 @@ process.stdin.on('end', () => {
 // The client going away mid-write is a normal shutdown, not a crash.
 process.stdout.on('error', (err) => { if (err.code !== 'EPIPE') log(`stdout: ${err.message}`); });
 process.on('uncaughtException', (err) => { log(`uncaught: ${err.stack}`); });
+
+// Beat once at startup so the tag lights as soon as Claude Code connects,
+// rather than up to a minute later. unref so the heartbeat alone never holds
+// the process open.
+queue = queue.then(beat);
+const heart = setInterval(() => { queue = queue.then(beat); }, HEARTBEAT_MS);
+heart.unref?.();
 
 log(`ready — ${TOOLS.length} tools, tracker ${TRACKER}`);

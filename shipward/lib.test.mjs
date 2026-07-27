@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   fmtDate, relTime, autoBranch, nextId, moveMsg, applyTransition,
   feedAdd, deriveColumns, deriveStats, latestFeed, FEED_CAP,
-  archiveRows, archiveLede, rawJson,
+  archiveRows, archiveLede, rawJson, mcpStatus, MCP_STALE_MS,
 } from './public/lib.js';
 
 const card = (over = {}) => ({
@@ -251,4 +251,27 @@ test('raw JSON keeps nulls rather than dropping the keys', () => {
 
 test('raw JSON of an empty project is an empty array, not a crash', () => {
   assert.equal(rawJson([], 'shipward'), '[]');
+});
+
+test('the MCP tag is lit only while a server is actually heartbeating', () => {
+  const now = Date.parse('2026-07-27T12:00:00Z');
+  const at = (ms) => ({ mcp: { lastSeen: new Date(now - ms).toISOString() } });
+
+  assert.equal(mcpStatus(at(0), now).connected, true);
+  assert.equal(mcpStatus(at(MCP_STALE_MS - 1), now).connected, true, 'one heartbeat may be missed');
+  assert.equal(mcpStatus(at(MCP_STALE_MS + 1), now).connected, false);
+  assert.equal(mcpStatus(at(MCP_STALE_MS + 1), now).label, 'MCP OFFLINE');
+
+  // A tracker that has never seen the MCP server must not claim a connection —
+  // the tag was hardcoded before this, which made it decoration.
+  assert.equal(mcpStatus({}, now).connected, false);
+  assert.equal(mcpStatus({ mcp: {} }, now).connected, false);
+  assert.equal(mcpStatus({ mcp: { lastSeen: 'whenever' } }, now).connected, false);
+  assert.equal(mcpStatus(undefined, now).connected, false);
+});
+
+test('a heartbeat from the future reads as live, not as infinitely stale', () => {
+  const now = Date.parse('2026-07-27T12:00:00Z');
+  const ahead = { mcp: { lastSeen: new Date(now + 5000).toISOString() } };
+  assert.equal(mcpStatus(ahead, now).connected, true, 'a disagreeing clock is not a dead server');
 });

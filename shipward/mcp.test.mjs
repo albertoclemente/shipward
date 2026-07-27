@@ -367,13 +367,13 @@ test('a notification is never answered', async () => {
 test('malformed input is refused without killing the server', async () => {
   const { c } = await handshake();
   c.raw('this is not json');
-  c.raw(JSON.stringify([{ jsonrpc: '2.0', id: 1, method: 'ping' }]));
+  c.raw('[]');
   const alive = await c.request('tools/list');
   assert.ok(alive.result.tools, 'the server survived both');
 
   const codes = c.frames().filter((f) => f.error).map((f) => f.error.code);
   assert.ok(codes.includes(-32700), 'parse error reported');
-  assert.ok(codes.includes(-32600), 'batches refused explicitly');
+  assert.ok(codes.includes(-32600), 'an empty batch is not a request');
 });
 
 test('an unknown method gets -32601, an unknown tool gets a readable result', async () => {
@@ -449,7 +449,7 @@ test('standup carries the memory it used to return none of', async () => {
   assert.match(text, /which store should this use/);
   assert.match(text, /Decisions not to reverse \(1\)/);
   assert.match(text, /zero dependencies/);
-  assert.match(text, /\[TS-001 · \w{3} \d+\]/, 'every entry carries its card and date');
+  assert.match(text, /\[TS-001 · \w{3} \d+ \d{4}\]/, 'every entry carries its card, date AND year');
   assert.match(text, /Memory: 4 entries/);
   assert.match(text, /recall\(\{file:/, 'and points at how to get the rest');
 });
@@ -526,4 +526,140 @@ test('recall writes nothing', async () => {
   const before = await board();
   await c.call('recall', { query: 'something' });
   assert.equal(await board(), before);
+});
+
+
+/* -- after the adversarial review (SW-020) ------------------ */
+
+test('a non-string note is refused rather than bricking the memory surface', async () => {
+  // It used to be written verbatim: standup and recall then threw, the
+  // SessionStart hook emitted zero bytes so the session silently got no
+  // standup, and cards cannot be deleted by protocol, so recovery meant a
+  // hand-edit.
+  const { c } = await handshake();
+  for (const note of [42, { deep: 'object' }, ['a']]) {
+    const r = await c.call('log', { title: 'poison attempt', note });
+    assert.equal(r.isError, true, `note ${JSON.stringify(note)} was accepted`);
+    assert.match(r.text, /note must be a string/);
+  }
+  const bad = await c.call('done', { id: 'TS-002', note: { deep: 'object' } });
+  assert.equal(bad.isError, true);
+
+  const after = await c.call('standup', {});
+  assert.equal(after.isError, false, 'the memory surface still works');
+});
+
+test('the handshake does not wait behind a tracker write', async () => {
+  // The startup heartbeat was queued AHEAD of initialize, so the handshake
+  // could not answer until a write completed — 62s when a lock was never
+  // released. A handshake bounded by the lock timeout is a dead server.
+  const { writeFile: wf } = await import('node:fs/promises');
+  await wf(`${tracker}.lock`, JSON.stringify({ pid: process.pid, token: 'held-by-the-test', at: Date.now() }));
+  try {
+    const c = connect();
+    const started = Date.now();
+    const res = await c.request('initialize', { protocolVersion: PROTOCOL, capabilities: {} });
+    const took = Date.now() - started;
+    assert.equal(res.result.protocolVersion, PROTOCOL);
+    assert.ok(took < 5000, `initialize took ${took}ms with the tracker lock held`);
+
+    const listed = await c.request('tools/list');
+    assert.ok(listed.result.tools, 'and read-only protocol frames answer too');
+  } finally {
+    const { unlink } = await import('node:fs/promises');
+    await unlink(`${tracker}.lock`).catch(() => {});
+  }
+});
+
+test('a reply larger than the pipe buffer is not truncated when stdin closes', async () => {
+  // process.exit() discarded whatever had not flushed: the last frame stopped
+  // at exactly 65525 bytes, unparseable, with exit code 0 so nothing signalled
+  // failure.
+  const d = seed();
+  d.cards = d.cards.map((x, i) => ({ ...x, note: `REPRODUCED: ${'padding '.repeat(4000)} ${i}` }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const c = connect();
+  await c.request('initialize', { protocolVersion: PROTOCOL, capabilities: {} });
+  const pending = c.request('tools/call', { name: 'recall', arguments: { kind: 'finding', limit: 50 } });
+  c.close();                                   // stdin ends with a big reply in flight
+
+  const res = await pending;
+  assert.ok(res.result, 'the reply arrived whole');
+  assert.ok(res.result.content[0].text.length > 70000, `reply was ${res.result.content[0].text.length} chars`);
+  assert.equal(await c.exited, 0);
+});
+
+test('a request without an id is ignored, and never writes', async () => {
+  // These produced a response with no id member, and a success response with
+  // id:null — both invalid — and a tools/call notification still mutated the
+  // tracker while telling the caller nothing it could match.
+  const { c } = await handshake();
+  const before = await board();
+  c.send({ jsonrpc: '2.0', method: 'tools/call', params: { name: 'log', arguments: { title: 'silent write' } } });
+  c.send({ jsonrpc: '2.0', id: null, method: 'tools/list' });
+
+  await c.request('ping');                      // ordering barrier
+  assert.equal(c.frames().length, 0, 'no invalid frames were emitted');
+  assert.equal(await board(), before, 'and nothing was written');
+});
+
+test('a batch is answered as a batch, since we advertise revisions that allow one', async () => {
+  const { c } = await handshake();
+  const replies = await new Promise((resolve) => {
+    const check = setInterval(() => {
+      const hit = c.frames().find((f) => Array.isArray(f));
+      if (hit) { clearInterval(check); resolve(hit); }
+    }, 20);
+    c.proc.stdin.write(JSON.stringify([
+      { jsonrpc: '2.0', id: 501, method: 'ping' },
+      { jsonrpc: '2.0', id: 502, method: 'tools/list' },
+    ]) + '\n');
+  });
+  assert.equal(replies.length, 2);
+  assert.deepEqual(replies.map((r) => r.id).sort(), [501, 502]);
+});
+
+test('sync refuses a nameless card the way log does', async () => {
+  const { c } = await handshake();
+  const before = await board();
+  const r = await c.call('sync', { summary: 'audit', create: [{ title: '   ' }] });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /needs a title/);
+  assert.equal(await board(), before, 'and the whole batch is still atomic');
+});
+
+test('done on an already-pushed card does not claim a stamp it never wrote', async () => {
+  const { c } = await handshake();
+  await c.call('done', { id: 'TS-001', pushed: true });
+  const first = (await doc()).cards.find((x) => x.id === 'TS-001').pushed;
+  assert.ok(Date.parse(first) > 0);
+
+  const again = await c.call('done', { id: 'TS-001', pushed: true, commit: 'abc1234' });
+  assert.equal(again.isError, false);
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.ok(Date.parse(card.pushed) > 0, 'the stamp the reply promises must actually be there');
+  assert.equal(card.pushed, first, 'and the original timestamp is not moved');
+});
+
+test('the thousandth card of a prefix fails with something actionable', async () => {
+  const d = seed();
+  d.cards.push(mkCard({ id: 'TS-999', title: 'the last one' }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const r = await c.call('log', { title: 'one too many' });
+  assert.equal(r.isError, true);
+  assert.match(r.text, /full at 999 cards/, 'the schema error it used to give said nothing about what to do');
+});
+
+test('a nonsense limit does not print a total and then list nothing', async () => {
+  const d = seed();
+  d.cards = d.cards.map((x, i) => ({ ...x, note: `REPRODUCED: finding ${i}` }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('recall', { kind: 'finding', limit: 'all' });
+  assert.match(text, /3 recalled/);
+  assert.match(text, /finding 0/, 'the entries themselves must be there');
 });

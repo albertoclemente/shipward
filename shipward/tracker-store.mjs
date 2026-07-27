@@ -112,6 +112,13 @@ export function validate(d) {
     if (!EFFORT.has(c.effort)) return `${c.id}.effort is invalid`;
     if (!STATUS.has(c.status)) return `${c.id}.status is invalid`;
     if (c.claude != null && !CLAUDE.has(c.claude)) return `${c.id}.claude is invalid`;
+    // `note` was the one card field never checked, and it is the field the whole
+    // memory surface reads. A number or an object here passed validation, was
+    // written verbatim, and then threw out of standup, recall, the memory view
+    // and the SessionStart hook — which emitted zero bytes, so the session
+    // silently got no standup at all. Cards cannot be deleted by protocol, so
+    // recovery meant hand-editing the file.
+    if (c.note != null && !isStr(c.note)) return `${c.id}.note must be a string`;
     if (!isStr(c.created) || Number.isNaN(Date.parse(c.created))) return `${c.id}.created must be a date-time`;
     if (!isTime(c.pushed)) return `${c.id}.pushed must be a date-time or null`;
     if (!isTime(c.shipped)) return `${c.id}.shipped must be a date-time or null`;

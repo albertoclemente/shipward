@@ -73,6 +73,26 @@ class ToolError extends Error {
   constructor(msg) { super(msg); this.name = 'ToolError'; }
 }
 
+// Nothing validates tool arguments against their own inputSchema, so anything
+// that reaches the tracker is checked here. A non-string note used to be
+// written verbatim and permanently brick the memory surface.
+const asText = (v, field) => {
+  if (v == null) return '';
+  if (typeof v !== 'string') throw new ToolError(`${field} must be a string, got ${Array.isArray(v) ? 'array' : typeof v}`);
+  return v;
+};
+
+// nextId pads to three digits and the schema requires exactly three, so the
+// thousandth card of a prefix used to fail with an opaque schema error and no
+// way forward — renumbering is forbidden by the writing rules.
+const freshId = (doc, project) => {
+  const id = nextId(doc.cards, project.prefix);
+  if (!/^[A-Z]+-[0-9]{3}$/.test(id)) {
+    throw new ToolError(`the ${project.prefix} prefix is full at 999 cards — add a new project rather than renumbering`);
+  }
+  return id;
+};
+
 const findCard = (doc, id) => {
   const card = doc.cards.find((c) => c.id === id);
   if (card) return card;
@@ -276,9 +296,10 @@ async function recall({ file, kind, query, limit = 10, project: wanted }) {
   const project = projectOf(doc, wanted);
   const all = memoryEntries(doc.cards, project.id);
   const bridge = file ? await tokensFor(file) : { resolved: null, tokens: null };
-  const hit = recallEntries(all, {
-    file, kind, query, tokens: bridge.tokens, limit: Math.max(1, Math.min(50, limit)),
-  });
+  // Math.min(50, NaN) is NaN, which used to survive this clamp and make recall
+  // print a total and then list nothing at all.
+  const take = Number.isInteger(limit) && limit > 0 ? Math.min(50, limit) : 10;
+  const hit = recallEntries(all, { file, kind, query, tokens: bridge.tokens, limit: take });
 
   const asked = [
     file && `file ${file}${bridge.resolved ? ` (${bridge.resolved}, plus the ${bridge.tokens.length - 2} names it declares)` : ' (not found on disk — matching on the name only)'}`,
@@ -304,21 +325,23 @@ async function recall({ file, kind, query, limit = 10, project: wanted }) {
 }
 
 async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note, project: wanted }) {
-  if (!String(title || '').trim()) throw new ToolError('a card needs a title');
+  const text = asText(title, 'title').trim();
+  const context = asText(note, 'note');
+  if (!text) throw new ToolError('a card needs a title');
   let created;
   await mutate((doc) => {
     const project = projectOf(doc, wanted);
-    const id = nextId(doc.cards, project.prefix);
+    const id = freshId(doc, project);
     created = { id, project };
     doc.cards.unshift({
-      id, p: project.id, title: String(title).trim(), type, pri, effort,
+      id, p: project.id, title: text, type, pri, effort,
       status: 'backlog', claude: null, branch: null, commit: null,
-      note: note || '', created: nowIso(), pushed: null, shipped: null,
+      note: context, created: nowIso(), pushed: null, shipped: null,
     });
     doc.feed = feedAdd(doc.feed, project.id, addMsg(id), nowIso(), 'claude');
     return doc;
   });
-  return `${created.id} added to ${created.project.name} backlog — ${title}`;
+  return `${created.id} added to ${created.project.name} backlog — ${text}`;
 }
 
 async function startCard({ id, branch }) {
@@ -352,19 +375,25 @@ async function startCard({ id, branch }) {
     `Type ${card.type} · ${card.pri} · effort ${card.effort}`,
   ];
   lines.push(card.note ? `Note:\n${card.note}` : 'Note: (empty)');
-  lines.push(`Next: git checkout -b ${card.branch}`);
+  lines.push(already ? `Next: git checkout ${card.branch}` : `Next: git checkout -b ${card.branch}`);
   return lines.join('\n');
 }
 
 async function doneCard({ id, commit, note, pushed = false }) {
   const to = pushed ? 'pushed' : 'review';
+  const addition = asText(note, 'note');
+  const sha = asText(commit, 'commit').trim();
   let card;
   await mutate((doc) => {
     const found = findCard(doc, id);
     const moved = applyTransition(found, to, nowIso()) || { ...found };
     moved.claude = 'done';
-    if (commit) moved.commit = commit;
-    if (note) moved.note = moved.note ? `${moved.note} || ${note}` : note;
+    // applyTransition returns null when the card is already in that status, so
+    // done({pushed:true}) on an already-pushed card left `pushed` null while the
+    // reply claimed a stamp — and the card then never counted as shipped.
+    if (to === 'pushed' && !moved.pushed) moved.pushed = nowIso();
+    if (sha) moved.commit = sha;
+    if (addition) moved.note = moved.note ? `${moved.note} || ${addition}` : addition;
     doc.cards[doc.cards.indexOf(found)] = moved;
     doc.feed = feedAdd(doc.feed, moved.p, moveMsg(id, to), nowIso(), 'claude');
     card = moved;
@@ -380,9 +409,21 @@ async function doneCard({ id, commit, note, pushed = false }) {
 }
 
 async function syncCards({ summary, updates = [], create = [], project: wanted }) {
-  if (!String(summary || '').trim()) throw new ToolError('sync needs a one-line summary for the feed');
+  const headline = asText(summary, 'summary').trim();
+  if (!headline) throw new ToolError('sync needs a one-line summary for the feed');
+  for (const [i, c] of create.entries()) {
+    // logCard refuses an empty title; sync used to accept one and write a
+    // permanent, undeletable card called "undefined" or "".
+    if (!asText(c?.title, `create[${i}].title`).trim()) {
+      throw new ToolError(`create[${i}] needs a title — sync will not add a nameless card`);
+    }
+    asText(c?.note, `create[${i}].note`);
+  }
+  for (const [i, u] of updates.entries()) asText(u?.note, `updates[${i}].note`);
+
   const changed = [];
   const added = [];
+  const touched = new Set();
   await mutate((doc) => {
     const project = projectOf(doc, wanted);
     for (const u of updates) {
@@ -397,10 +438,12 @@ async function syncCards({ summary, updates = [], create = [], project: wanted }
       if (u.branch) next.branch = u.branch;
       if (u.note) next.note = next.note ? `${next.note} || ${u.note}` : u.note;
       doc.cards[doc.cards.indexOf(card)] = next;
+      touched.add(next.p);
       changed.push(`${next.id} → ${next.status}${u.commit ? ` @${u.commit}` : ''}`);
     }
     for (const c of create) {
-      const id = nextId(doc.cards, project.prefix);
+      const id = freshId(doc, project);
+      touched.add(project.id);
       doc.cards.unshift({
         id, p: project.id, title: String(c.title).trim(),
         type: c.type || 'chore', pri: c.pri || 'P2', effort: c.effort || 'M',
@@ -413,8 +456,11 @@ async function syncCards({ summary, updates = [], create = [], project: wanted }
       added.push(`${id} ${c.title}`);
     }
     // One feed entry for the whole audit, per the /sync contract — not one per
-    // card, which would bury a week of real activity under bookkeeping.
-    doc.feed = feedAdd(doc.feed, project.id, `Synced with git — ${summary}`, nowIso(), 'claude');
+    // card, which would bury a week of real activity under bookkeeping. It is
+    // filed against the project whose cards actually moved: findCard searches
+    // every project, so an audit of one board used to be recorded on another.
+    const home = touched.size === 1 ? [...touched][0] : project.id;
+    doc.feed = feedAdd(doc.feed, home, `Synced with git — ${headline}`, nowIso(), 'claude');
     return doc;
   });
   const lines = [`Sync applied: ${changed.length} updated, ${added.length} created.`];
@@ -425,8 +471,10 @@ async function syncCards({ summary, updates = [], create = [], project: wanted }
 
 /* ── JSON-RPC ────────────────────────────────────────────── */
 const send = (msg) => process.stdout.write(`${JSON.stringify(msg)}\n`);
-const result = (id, value) => send({ jsonrpc: '2.0', id, result: value });
-const error = (id, code, message) => send({ jsonrpc: '2.0', id, error: { code, message } });
+// Inside a batch the frames are collected and emitted together instead.
+const emit = (collect, frame) => (collect ? collect(frame) : send(frame));
+const result = (id, value, collect) => emit(collect, { jsonrpc: '2.0', id, result: value });
+const error = (id, code, message, collect) => emit(collect, { jsonrpc: '2.0', id, error: { code, message } });
 
 const text = (s, isError = false) => ({ content: [{ type: 'text', text: s }], isError });
 
@@ -451,9 +499,34 @@ async function callTool(params) {
   }
 }
 
-async function handle(msg) {
+// Each member is dispatched as usual, but the replies leave as one array — a
+// batch gets a batch back, and a batch of pure notifications gets nothing.
+function handleBatch(batch) {
+  const replies = [];
+  const collect = (frame) => { replies.push(frame); };
+  Promise.all(batch.map((m) => (isObj(m)
+    ? Promise.resolve(handle(m, collect)).catch((err) => {
+        if (m?.id != null) collect({ jsonrpc: '2.0', id: m.id, error: { code: -32603, message: err.message } });
+      })
+    : Promise.resolve(collect({ jsonrpc: '2.0', id: null, error: { code: -32600, message: 'not a request object' } })))))
+    .then(() => { if (replies.length) process.stdout.write(`${JSON.stringify(replies)}\n`); });
+}
+
+const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+
+async function handle(msg, collect) {
   const { id, method, params } = msg;
   const isNotification = id === undefined || id === null;
+
+  // A request with no id is a notification, whatever it asks for. The switch
+  // below used to reply anyway — emitting a response with no `id` member, and a
+  // success response with `id: null`, both invalid JSON-RPC. Worse, a
+  // `tools/call` notification still WROTE: a mutation happened and the caller
+  // was told nothing it could match to it.
+  if (isNotification && method !== 'notifications/initialized' && method !== 'notifications/cancelled') {
+    log(`ignoring ${method} sent without an id — a request that wants an answer needs one`);
+    return;
+  }
 
   switch (method) {
     case 'initialize': {
@@ -466,22 +539,22 @@ async function handle(msg) {
           `The Shipward tracker at ${TRACKER} is your memory for this repo, not a status board you update afterwards. `
           + 'Call standup at the start of a session. Every piece of work needs a card before it is begun (log, then start), '
           + 'and every finished piece needs done with a note a future session can read. Never delete a card — archive it.',
-      });
+      }, collect);
     }
     case 'notifications/initialized':
     case 'notifications/cancelled':
       return;                                   // notifications get no reply, ever
     case 'ping':
-      return isNotification ? undefined : result(id, {});
+      return result(id, {}, collect);
     case 'tools/list':
       return result(id, {
         tools: TOOLS.map(({ name, title, description, inputSchema }) => ({ name, title, description, inputSchema })),
-      });
+      }, collect);
     case 'tools/call':
-      return result(id, await callTool(params));
+      // The only path that takes the lock, so the only one that queues.
+      return result(id, await onWriteQueue(() => callTool(params)), collect);
     default:
-      if (isNotification) return;               // unknown notification: ignore
-      return error(id, -32601, `method not found: ${method}`);
+      return error(id, -32601, `method not found: ${method}`, collect);
   }
 }
 
@@ -489,9 +562,19 @@ async function handle(msg) {
 // Newline-delimited JSON. A chunk can hold several messages or half of one, so
 // the tail is always carried over rather than parsed.
 let buffer = '';
-// Sequential: two tool calls in flight would each take the tracker lock, and
-// the second would sit waiting on the first for no benefit.
-let queue = Promise.resolve();
+// Two chains, deliberately. Anything that touches the tracker is sequential,
+// because two tool calls in flight would each take the lock and the second
+// would just wait. But protocol frames must NOT sit behind that: the startup
+// heartbeat was queued ahead of the handshake, so `initialize` could not answer
+// until a tracker write completed — measured 5.8s behind a held lock and 62s
+// when the lock was never released. A handshake bounded by the lock timeout is
+// a server the client gives up on.
+let writes = Promise.resolve();
+const onWriteQueue = (fn) => {
+  const run = writes.then(fn, fn);
+  writes = run.then(() => {}, () => {});
+  return run;
+};
 
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => {
@@ -510,10 +593,13 @@ process.stdin.on('data', (chunk) => {
       continue;
     }
     if (Array.isArray(msg)) {
-      error(null, -32600, 'batch requests are not supported; send one message per line');
+      // We negotiate protocol revisions in which JSON-RPC batching is legal, so
+      // refusing them was advertising a version we did not implement.
+      if (!msg.length) { error(null, -32600, 'an empty batch is not a request'); continue; }
+      handleBatch(msg);
       continue;
     }
-    queue = queue.then(() => handle(msg)).catch((err) => {
+    Promise.resolve(handle(msg)).catch((err) => {
       log(`handler crashed: ${err.stack || err.message}`);
       if (msg?.id != null) error(msg.id, -32603, `internal error: ${err.message}`);
     });
@@ -528,9 +614,18 @@ process.stdin.on('data', (chunk) => {
 // was still running — including one holding the tracker lock mid-write, which
 // loses the write and never answers. No further input can arrive, so the queue
 // as it stands now is the whole remaining job.
-process.stdin.on('end', () => {
-  queue.then(() => process.exit(0), () => process.exit(0));
-});
+// Drain before exiting, twice over: the queued work has to finish, and then the
+// bytes it produced have to reach the pipe. process.exit() discards whatever is
+// still buffered, so a reply over 64KiB used to arrive truncated mid-JSON with
+// exit code 0 — nothing signalled failure and the client threw on the frame.
+function shutdown() {
+  if (process.stdout.writableLength === 0) process.exit(0);
+  const bail = setTimeout(() => process.exit(0), 5000);
+  bail.unref?.();
+  process.stdout.once('drain', () => process.exit(0));
+}
+
+process.stdin.on('end', () => { writes.then(shutdown, shutdown); });
 // The client going away mid-write is a normal shutdown, not a crash.
 process.stdout.on('error', (err) => { if (err.code !== 'EPIPE') log(`stdout: ${err.message}`); });
 process.on('uncaughtException', (err) => { log(`uncaught: ${err.stack}`); });
@@ -538,8 +633,8 @@ process.on('uncaughtException', (err) => { log(`uncaught: ${err.stack}`); });
 // Beat once at startup so the tag lights as soon as Claude Code connects,
 // rather than up to a minute later. unref so the heartbeat alone never holds
 // the process open.
-queue = queue.then(beat);
-const heart = setInterval(() => { queue = queue.then(beat); }, HEARTBEAT_MS);
+onWriteQueue(beat);
+const heart = setInterval(() => onWriteQueue(beat), HEARTBEAT_MS);
 heart.unref?.();
 
 log(`ready — ${TOOLS.length} tools, tracker ${TRACKER}`);

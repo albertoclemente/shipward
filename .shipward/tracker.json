@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-020",
+      "p": "shipward",
+      "title": "MCP server: the Blind Hunter's 13 findings",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "L",
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/mcp-review",
+      "commit": null,
+      "note": "THREE SERIOUS. (1) DATA-LOSS: no tool argument is ever checked against its own inputSchema, and validate() in tracker-store checks every card field EXCEPT note — while schema.json declares note as a string. So log({note:42}) is accepted, written verbatim, and then permanently bricks the entire memory surface: standup and recall both throw, the session-start hook emits ZERO BYTES so the session silently gets no standup, and status.mjs drops its count. Cards cannot be deleted by protocol, so recovery needs a hand-edit. (2) SESSION-BREAKING: the startup heartbeat is queued AHEAD of the handshake, so initialize cannot answer until a tracker WRITE completes — measured 5.8s behind a held lock and 62s when the lock is never released. A handshake bounded by LOCK_TIMEOUT is a server the client declares dead. (3) SESSION-BREAKING: process.exit(0) on stdin end discards unflushed stdout, so any reply over the 64KiB pipe buffer is truncated mid-JSON with exit code 0 — measured, last frame exactly 65525 bytes and unparseable. recall({query:'e',limit:50}) is already 32775 bytes against the real tracker, half the cliff. THE REST: a non-numeric limit prints a total then lists nothing; sync(create) bypasses the empty-title guard log enforces and writes permanent junk cards; the 1000th card of a prefix makes log fail forever with an opaque schema error; requests with no id (or id:null) get invalid frames back and a tools/call notification still WRITES; done({pushed:true}) on an already-pushed card claims a stamp it never wrote, so it never counts as shipped; sync files its single feed entry under the default project even when every card it touched is in another; the provenance stamp carries no year so a three-year-old note looks like yesterday; the idempotent start path still tells Claude to create a branch that already exists; and we advertise protocol revisions in which batching is legal, then refuse batches.",
+      "created": "2026-07-27T18:37:50.675Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-019",
       "p": "shipward",
       "title": "Tracker lock: the layer under the SW-010 fix",
@@ -316,6 +332,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T18:37:50.902Z",
+      "p": "shipward",
+      "msg": "SW-020 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:37:50.675Z",
+      "p": "shipward",
+      "msg": "You added SW-020 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T18:35:34.356Z",
       "p": "shipward",
@@ -696,7 +724,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T18:35:34.338Z",
-    "pid": 78532
+    "lastSeen": "2026-07-27T18:56:41.971Z",
+    "pid": 81323
   }
 }

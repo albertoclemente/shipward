@@ -16,7 +16,14 @@ export const STANDUP_DECISIONS = 6;
 // Every recalled entry carries its card id and its date. A session is being
 // handed something it did not write and cannot verify; without a provenance
 // stamp it can only believe it, and confident wrong memory is worse than none.
-export const stamp = (e) => `[${e.card} · ${fmtDate(e.at)}]`;
+// The year matters: "Jul 26" alone made a note from three years ago and one
+// from yesterday indistinguishable, which is exactly what the stamp and the
+// PERISHABLE caveat exist to prevent.
+export const stamp = (e) => {
+  const when = Date.parse(e?.at);
+  const year = Number.isNaN(when) ? '' : ` ${new Date(when).getUTCFullYear()}`;
+  return `[${e.card} · ${fmtDate(e.at)}${year}]`;
+};
 
 // Evidence rots. "45 tests pass" was true the morning it was written and is
 // false now. Say so at the point of use, not in a doc nobody reads.

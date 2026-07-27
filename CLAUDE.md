@@ -49,6 +49,19 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 - Commit messages reference the card id: `BW-016: add bloom interval alerts`.
 - `note` is append-only in spirit: it is the memory a future session reads, so add to it rather than replacing it.
 
+## Hooks
+
+`.claude/settings.json` wires four hooks to `.claude/hooks/shipward.mjs`, because the rules above are advice and advice decays over a long session:
+
+| Hook | Does |
+|---|---|
+| `SessionStart` | injects a standup before you ask for one |
+| `UserPromptSubmit` | injects one line naming the active card, every turn |
+| `PreToolUse` on edits | **warns** — never blocks — when source changes with no card in progress |
+| `Stop` | refuses to end the session while a card is still `working` with no `done` |
+
+They read the same `tracker.json` everything else does, they exit silently on any error, and they never deny a tool call. They can make you *touch* Shipward; they cannot make you write a note worth reading. `done` with `"fixed it"` satisfies all four and teaches the next session nothing.
+
 ## The app
 
 `shipward/` contains the tracker UI (see `design_handoff_shipward/README.md` for the spec) and the MCP server. Both read the same `tracker.json`.

@@ -19,9 +19,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readRaw, mutate, TRACKER } from './tracker-store.mjs';
 import {
-  nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, cardsOf, fmtDate,
+  nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, fmtDate,
 } from './public/lib.js';
-import { memoryEntries, recall as recallEntries, stillOpen, excerpt, ALL_KINDS } from './public/memory-lib.js';
+import { memoryEntries, recall as recallEntries, ALL_KINDS } from './public/memory-lib.js';
+import { standupText, line } from './standup.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -46,11 +47,6 @@ const nowIso = () => new Date().toISOString();
 // explain. One file that is occasionally dirty beat two files that can disagree.
 const HEARTBEAT_MS = 60000;
 
-// How much memory standup carries unasked. Small enough that a session start
-// stays cheap, large enough that the things which change what you do next are
-// never behind a second call.
-const STANDUP_OPEN = 5;
-const STANDUP_DECISIONS = 6;
 
 async function beat() {
   try {
@@ -91,27 +87,6 @@ const findCard = (doc, id) => {
       : `no card ${id}, and the backlog is empty.`,
   );
 };
-
-/* ── memory formatting ───────────────────────────────────── */
-// Every recalled entry carries its card id and its date. A session is being
-// handed something it did not write and cannot verify; without a provenance
-// stamp it can only believe it, and confident wrong memory is worse than none.
-const stamp = (e) => `[${e.card} · ${fmtDate(e.at)}]`;
-
-// Evidence rots. "45 tests pass" was true the morning it was written and is
-// false now — it is 96. Say so at the point of use, not in a doc nobody reads.
-const PERISHABLE = 'as of then, not a claim about now';
-
-function line(e, { max = 0 } = {}) {
-  const caveat = e.kind === 'evidence' ? ` (${PERISHABLE})` : '';
-  // Clipped entries lead with the point, not the preamble — see excerpt().
-  const body = max ? excerpt(e, max) : e.text;
-  return `  ${stamp(e)}${caveat} ${body}`;
-}
-
-const PRI_ORDER = { P1: 0, P2: 1, P3: 2 };
-const byPriThenAge = (a, b) =>
-  (PRI_ORDER[a.pri] ?? 9) - (PRI_ORDER[b.pri] ?? 9) || Date.parse(a.created) - Date.parse(b.created);
 
 /* ── tools ───────────────────────────────────────────────── */
 const str = (description) => ({ type: 'string', description });
@@ -260,62 +235,7 @@ const TOOLS = [
 
 async function standup({ project: wanted }) {
   const { doc } = await readRaw();
-  const project = projectOf(doc, wanted);
-  const mine = cardsOf(doc.cards, project.id);
-  const of = (s) => mine.filter((c) => c.status === s);
-
-  const lines = [`${project.name} (${project.prefix}) — ${mine.length} cards`];
-
-  const working = of('claude');
-  lines.push(`Claude working (${working.length})`);
-  for (const c of working) {
-    lines.push(`  ${c.id} ${c.claude || 'queued'}${c.branch ? ` · ${c.branch}` : ''} — ${c.title}`);
-  }
-
-  const review = of('review');
-  lines.push(`Waiting on you (${review.length})`);
-  for (const c of review.slice(0, 5)) lines.push(`  ${c.id} — ${c.title}`);
-  if (review.length > 5) lines.push(`  …and ${review.length - 5} more`);
-
-  const backlog = of('backlog').slice().sort(byPriThenAge);
-  lines.push(`Backlog (${backlog.length})${backlog.length > 3 ? ' — top 3 by priority, then age' : ''}`);
-  for (const c of backlog.slice(0, 3)) lines.push(`  ${c.id} ${c.pri}/${c.effort} — ${c.title}`);
-
-  // "Shipped" here means it reached production, whether or not it has since
-  // been filed to the archive.
-  const weekAgo = Date.now() - 7 * 86400_000;
-  const recent = mine.filter((c) => {
-    const t = Date.parse(c.shipped || c.pushed);
-    return !Number.isNaN(t) && t >= weekAgo;
-  });
-  lines.push(`Shipped in the last 7 days (${recent.length})`);
-  for (const c of recent) lines.push(`  ${c.id} ${fmtDate(c.shipped || c.pushed)} — ${c.title}`);
-
-  // The memory, which standup used to return none of. Bounded on purpose: the
-  // notes are ~4,000 words and growing, so this carries the two kinds that
-  // change what you do next — what is unresolved, and what must not be
-  // reversed — clipped, with the card id kept so the full text is one recall
-  // away. Everything else waits to be asked for.
-  const memory = memoryEntries(doc.cards, project.id);
-  if (memory.length) {
-    const open = stillOpen(memory);
-    if (open.length) {
-      lines.push('', `Still open, from the card notes (${open.length})`);
-      for (const e of open.slice(0, STANDUP_OPEN)) lines.push(line(e, { max: 240 }));
-      if (open.length > STANDUP_OPEN) lines.push(`  …and ${open.length - STANDUP_OPEN} more — recall({kind:"open"})`);
-    }
-    const decisions = recallEntries(memory, { kind: 'decision', limit: STANDUP_DECISIONS });
-    if (decisions.total) {
-      lines.push('', `Decisions not to reverse (${decisions.total})`);
-      for (const e of decisions.entries) lines.push(line(e, { max: 200 }));
-      if (decisions.dropped) lines.push(`  …and ${decisions.dropped} more — recall({kind:"decision"})`);
-    }
-    const words = memory.reduce((n, e) => n + e.text.split(/\s+/).length, 0);
-    lines.push('', `Memory: ${memory.length} entries, ~${words.toLocaleString('en-US')} words. `
-      + 'Call recall({file:"…"}) before editing a file — findings are filed by the card that found them, not by the code they concern.');
-  }
-
-  return lines.join('\n');
+  return standupText(doc, projectOf(doc, wanted));
 }
 
 // The bridge between "the file I am about to edit" and "what the notes call

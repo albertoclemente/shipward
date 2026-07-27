@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-015",
+      "p": "shipward",
+      "title": "Hooks — make the Shipward protocol continuous, not aspirational",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/shipward-hooks",
+      "commit": null,
+      "note": "WHY, with evidence from this very session: CLAUDE.md, the MCP instructions field and the tool descriptions are three layers of ADVICE and nothing checks. Proof they are not enough — I built the entire MCP server for SW-005 without ever calling start; the card sat in Backlog while 500 lines were written against it, and I only noticed by running standup for an unrelated reason. If the author of the protocol, holding it in active context, drifts inside one session, advice is not a mechanism. FOUR HOOKS: SessionStart injects a standup so a session begins already knowing; UserPromptSubmit injects one line naming the active card EVERY TURN, which is the actual continuous part because drift cannot accumulate; PreToolUse on Edit/Write warns when source is about to change with no card in claude/working — WARNS, never blocks, because a hook that gets disabled protects nothing; Stop refuses to end while a card is still working with no done. DESIGN RULES: a hook must never be able to break a session, so every one exits 0 silently on any error; the Stop hook honours stop_hook_active so it cannot loop; and the standup text is extracted into a shared module so the hook and the MCP tool cannot drift apart. KNOWN LIMIT stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note — done with 'fixed it' satisfies every one of them and teaches the next session nothing.",
+      "created": "2026-07-27T16:18:46.568Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-014",
       "p": "shipward",
       "title": "Close the memory loop — standup carries it, recall retrieves it",
@@ -236,6 +252,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T16:18:51.337Z",
+      "p": "shipward",
+      "msg": "SW-015 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:18:46.568Z",
+      "p": "shipward",
+      "msg": "You added SW-015 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T16:09:27.605Z",
       "p": "shipward",
@@ -514,7 +542,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T16:09:27.557Z",
-    "pid": 52209
+    "lastSeen": "2026-07-27T16:18:51.321Z",
+    "pid": 54578
   }
 }

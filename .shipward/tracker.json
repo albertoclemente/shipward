@@ -17,14 +17,14 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/live-lock-broken",
-      "commit": null,
+      "commit": "988f8be",
       "created": "2026-07-27T14:50:54.528Z",
       "pushed": null,
       "shipped": null,
-      "note": "REPRODUCED while fixing SW-009. The 12-writer store test fails about 1 run in 6 under full-suite load: 11 of 12 cards land, every child exits 0, nothing is logged. A high-cycle harness (6 processes x 150 mutations) loses ~1 write per 900 reliably. ROOT CAUSE: isStale() judges the lock from TWO separate observations of the path — readHolder() then lstat() — and the lock can be replaced between them. When readHolder() hits the lock in its momentary absence (normal, between one holder release and the next publish) it returns null, and lstat() then measures a DIFFERENT, brand-new lock. That new lock trips `if (age < 0) return true` — the line commented \"clock skew: as broken as too old\". Measured: st.mtimeMs carries sub-millisecond precision while Date.now() truncates to whole ms, so a freshly created lock reads as up to 0.62ms in the FUTURE in 1085 of 2000 observations. Over half of all new locks are therefore condemned the instant that race is hit. Trace confirms the full chain: break-won by a waiter, then 6ms later the true holder gets release-skip (its lock is gone) and its atomic-write chmod fails ENOENT because breakLock -> sweepTmp deleted the live holder’s in-flight .tmp. Two writers in the critical section, one write silently overwritten. THREE DEFECTS: (1) isStale reads stat and content from different observations; (2) age < 0 is treated as death when it actually means brand new; (3) sweepTmp unlinks temp and lock-scratch files belonging to LIVE processes."
+      "note": "REPRODUCED while fixing SW-009. The 12-writer store test fails about 1 run in 6 under full-suite load: 11 of 12 cards land, every child exits 0, nothing is logged. A high-cycle harness (6 processes x 150 mutations) loses ~1 write per 900 reliably. ROOT CAUSE: isStale() judges the lock from TWO separate observations of the path — readHolder() then lstat() — and the lock can be replaced between them. When readHolder() hits the lock in its momentary absence (normal, between one holder release and the next publish) it returns null, and lstat() then measures a DIFFERENT, brand-new lock. That new lock trips `if (age < 0) return true` — the line commented \"clock skew: as broken as too old\". Measured: st.mtimeMs carries sub-millisecond precision while Date.now() truncates to whole ms, so a freshly created lock reads as up to 0.62ms in the FUTURE in 1085 of 2000 observations. Over half of all new locks are therefore condemned the instant that race is hit. Trace confirms the full chain: break-won by a waiter, then 6ms later the true holder gets release-skip (its lock is gone) and its atomic-write chmod fails ENOENT because breakLock -> sweepTmp deleted the live holder’s in-flight .tmp. Two writers in the critical section, one write silently overwritten. THREE DEFECTS: (1) isStale reads stat and content from different observations; (2) age < 0 is treated as death when it actually means brand new; (3) sweepTmp unlinks temp and lock-scratch files belonging to LIVE processes. || FIXED. inspect() now reads mtime, inode and holder from ONE open handle, so a stat and a read can never land on two different locks. A future mtime means new, not dead (the old 'age < 0 = as broken as too old' line was the trigger). breakLock() compares the grave's inode against the snapshot it judged and puts an innocent lock back. sweepTmp() only collects files whose pid is dead. withLock() hands callers a held() guard checked immediately before the commit, so a lost lock raises LockLostError instead of overwriting whoever holds it now. EVIDENCE: before, ~1 write lost per 900 under sustained contention (2 of 4 trials) and the 12-writer test failed ~1 run in 6 under full-suite load; after, 12960 contended writes across 14 trials with zero lost and six consecutive clean suite runs. 49 tests pass. Three new regression tests were each run against the PREVIOUS store and all three fail there: future-dated lock read as a corpse, sweep eating a live process's in-flight temp, and a mid-write lock loss writing anyway."
     },
     {
       "id": "SW-001",
@@ -65,8 +65,8 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
+      "status": "claude",
+      "claude": "working",
       "branch": "feat/archive-view-shipped",
       "commit": null,
       "note": "SPEC CAP-4. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Shipped & archived' + muted lede, .table sorted by shipped desc: Shipped (Mon D) / ID (mono 12px) / What went out / Type / Effort / Commit (mono). Tab label carries the count. Read-only projection over state the desk core already builds.",
@@ -172,6 +172,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T15:04:45.788Z",
+      "p": "shipward",
+      "msg": "SW-003 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:04:10.319Z",
+      "p": "shipward",
+      "msg": "SW-010 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T14:50:57.780Z",
       "p": "shipward",

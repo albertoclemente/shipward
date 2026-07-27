@@ -3,6 +3,7 @@
 import {
   COLUMNS, fmtDate, relTime, nextId, moveMsg, applyTransition,
   feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed,
+  archiveRows, archiveLede,
 } from './lib.js';
 
 const POLL_MS = 3000;
@@ -196,11 +197,14 @@ function render() {
   const feed = latestFeed(doc.feed, project.id);
   const stats = deriveStats(doc.cards, project.id);
 
+  const view = state.view === 'archive' ? renderArchive(doc, project)
+    : renderBoard(doc, project);
+
   root.replaceChildren(
     renderHeader(doc, project),
     renderActivity(feed, stats, project),
     renderTabs(doc, project),
-    renderBoard(doc, project),
+    view,
   );
   renderDialog(doc, project);
 }
@@ -256,10 +260,42 @@ function renderTabs(doc, project) {
     el('button', {
       class: `tab${state.view === key ? ' is-active' : ''}`,
       text: label,
-      // Archive and Raw ship as SW-003/SW-004; the tabs render but stay inert.
-      disabled: key !== 'board',
-      title: key === 'board' ? null : 'Coming in a later card',
+      'aria-current': state.view === key ? 'page' : null,
+      onclick: () => { if (state.view !== key) { state.view = key; render(); } },
     })));
+}
+
+function renderArchive(doc, project) {
+  const rows = archiveRows(doc.cards, project.id);
+  return el('main', { class: 'view-wrap' },
+    el('div', { class: 'view-body' },
+      el('h3', { class: 'view-title', text: 'Shipped & archived' }),
+      el('p', { class: 'text-muted view-lede', text: archiveLede(project.name, rows.length) }),
+      rows.length
+        ? el('table', { class: 'table archive-table' },
+            el('thead', {},
+              el('tr', {},
+                el('th', { class: 'w-date', text: 'Shipped' }),
+                el('th', { class: 'w-id', text: 'ID' }),
+                el('th', { text: 'What went out' }),
+                el('th', { class: 'w-type', text: 'Type' }),
+                el('th', { class: 'w-effort', text: 'Effort' }),
+                el('th', { class: 'w-commit', text: 'Commit' }),
+              )),
+            el('tbody', {}, rows.map((r) =>
+              el('tr', {},
+                el('td', { class: 'cell-date', text: r.date }),
+                el('td', { class: 'cell-mono', text: r.id }),
+                el('td', { class: 'cell-what', text: r.title }),
+                el('td', { text: r.type }),
+                el('td', { text: r.effort }),
+                el('td', { class: 'cell-mono', text: r.commit }),
+              ))),
+          )
+        : el('div', { class: 'text-muted view-empty',
+            text: 'Nothing archived yet. Push something, then file it here.' }),
+    ),
+  );
 }
 
 function renderBoard(doc, project) {

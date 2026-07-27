@@ -126,6 +126,34 @@ export function deriveStats(cards, projectId, now = new Date()) {
   return { inFlight, waiting, shipped, line: `${inFlight} in flight · ${waiting} waiting on you · ${shipped} shipped this month` };
 }
 
+// Archive rows: shipped cards, newest first. An entry with a missing or
+// unparseable `shipped` sinks to the bottom rather than scrambling the order —
+// Claude Code writes this file directly, so a hand-edited timestamp is possible.
+const shippedAt = (c) => {
+  const t = Date.parse(c.shipped);
+  return Number.isNaN(t) ? -Infinity : t;
+};
+
+export function archiveRows(cards, projectId) {
+  return cardsOf(cards, projectId)
+    .filter((c) => c.status === 'shipped')
+    .sort((a, b) => shippedAt(b) - shippedAt(a))
+    .map((c) => ({
+      id: c.id,
+      date: fmtDate(c.shipped),
+      title: c.title,
+      type: c.type,
+      effort: c.effort,
+      commit: c.commit || '—',
+    }));
+}
+
+export function archiveLede(projectName, count) {
+  // "1 entries" reads like a bug in a product whose whole pitch is care.
+  const entries = count === 1 ? '1 entry' : `${count} entries`;
+  return `Everything ${projectName} has pushed to production — ${entries} and counting. Look how far it's come.`;
+}
+
 // Sort rather than trusting position: the file is newest-first by convention,
 // but Claude Code writes it directly and an appended entry would otherwise
 // surface an ancient message as the latest activity.

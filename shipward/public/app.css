@@ -204,6 +204,31 @@ textarea.input { min-height: 90px; resize: vertical; }
   color: var(--color-neutral-600); border-bottom: 3px solid transparent;
 }
 .tab.is-active { color: var(--color-text); border-bottom-color: var(--color-accent); }
+.tab:hover { color: var(--color-text); }
+
+/* ── archive & raw views ─────────────────────────────────── */
+.view-wrap { flex: 1; padding: var(--space-6) var(--space-4); }
+.view-body { max-width: 1100px; }
+.view-title { margin-bottom: 4px; }
+.view-lede { font-size: 13px; max-width: 60ch; }
+.view-empty { font-size: 13px; margin-top: var(--space-4); }
+
+.table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.table th {
+  text-align: left; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: color-mix(in srgb, var(--color-text) 60%, transparent);
+  padding: var(--space-2); border-bottom: 2px solid var(--color-divider);
+}
+.table td { padding: var(--space-2); border-bottom: 1px solid var(--color-divider); }
+.table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
+
+.archive-table { margin-top: var(--space-4); }
+.archive-table .w-date, .archive-table .w-id, .archive-table .w-type { width: 90px; }
+.archive-table .w-effort { width: 70px; }
+.archive-table .w-commit { width: 100px; }
+.cell-date { white-space: nowrap; }
+.cell-mono { font-family: var(--font-mono); font-size: 12px; }
+.cell-what { font-family: var(--font-heading); font-weight: 600; }
 
 .board-wrap { flex: 1; padding: var(--space-4); }
 .board {

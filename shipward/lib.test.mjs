@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   fmtDate, relTime, autoBranch, nextId, moveMsg, applyTransition,
   feedAdd, deriveColumns, deriveStats, latestFeed, FEED_CAP,
+  archiveRows, archiveLede,
 } from './public/lib.js';
 
 const card = (over = {}) => ({
@@ -172,4 +173,47 @@ test('stats count in-flight, waiting, and this month only', () => {
   assert.equal(s.waiting, 1);
   assert.equal(s.shipped, 1, 'year must match too');
   assert.equal(s.line, '2 in flight · 1 waiting on you · 1 shipped this month');
+});
+
+test('archive rows hold only shipped cards, newest first', () => {
+  const cards = [
+    card({ id: 'SW-001', status: 'shipped', shipped: '2026-07-02T00:00:00Z', title: 'first out' }),
+    card({ id: 'SW-002', status: 'pushed', pushed: '2026-07-09T00:00:00Z' }),
+    card({ id: 'SW-003', status: 'shipped', shipped: '2026-07-20T00:00:00Z', commit: 'a1b2c3d' }),
+    card({ id: 'BW-001', p: 'brewnote', status: 'shipped', shipped: '2026-07-30T00:00:00Z' }),
+  ];
+  const rows = archiveRows(cards, 'shipward');
+  assert.deepEqual(rows.map((r) => r.id), ['SW-003', 'SW-001'], 'shipped only, newest first');
+  assert.equal(rows[0].date, 'Jul 20');
+  assert.equal(rows[0].commit, 'a1b2c3d');
+  assert.equal(rows[1].commit, '—', 'a card with no sha still gets a cell');
+  assert.equal(rows[1].title, 'first out');
+});
+
+test('an archive entry with no usable shipped date sinks, it does not scramble the order', () => {
+  // Claude Code writes this file directly, so a hand-edited timestamp is real.
+  const cards = [
+    card({ id: 'SW-001', status: 'shipped', shipped: '2026-07-02T00:00:00Z' }),
+    card({ id: 'SW-002', status: 'shipped', shipped: null }),
+    card({ id: 'SW-003', status: 'shipped', shipped: 'last tuesday' }),
+    card({ id: 'SW-004', status: 'shipped', shipped: '2026-07-11T00:00:00Z' }),
+  ];
+  const rows = archiveRows(cards, 'shipward');
+  assert.deepEqual(rows.map((r) => r.id).slice(0, 2), ['SW-004', 'SW-001'], 'dated entries lead');
+  assert.deepEqual(rows.slice(2).map((r) => r.date), ['', ''], 'undated entries sink with a blank cell');
+});
+
+test('archiveRows does not reorder the caller\'s array', () => {
+  const cards = [
+    card({ id: 'SW-001', status: 'shipped', shipped: '2026-07-02T00:00:00Z' }),
+    card({ id: 'SW-002', status: 'shipped', shipped: '2026-07-20T00:00:00Z' }),
+  ];
+  archiveRows(cards, 'shipward');
+  assert.deepEqual(cards.map((c) => c.id), ['SW-001', 'SW-002'], 'sort must not mutate the input');
+});
+
+test('the archive lede counts one entry as an entry', () => {
+  assert.match(archiveLede('Shipward', 1), /— 1 entry and counting/);
+  assert.match(archiveLede('Shipward', 0), /— 0 entries and counting/);
+  assert.match(archiveLede('Brewnote', 12), /^Everything Brewnote has pushed to production — 12 entries and counting\./);
 });

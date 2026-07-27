@@ -11,17 +11,33 @@
   ],
   "cards": [
     {
+      "id": "SW-021",
+      "p": "shipward",
+      "title": "MCP cancellation is accepted and ignored",
+      "type": "bug",
+      "pri": "P3",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "Deferred from SW-020, deliberately. notifications/cancelled is accepted and then ignored: the cancelled call keeps running, still writes, and still holds the write queue behind it. Real cancellation means carrying an AbortSignal from the notification through callTool into mutate() and the cross-process file lock, and deciding what a half-applied mutation means — a lock holder cannot simply be abandoned. That is a larger change than the finding warrants, and bodging it would be worse than the honest gap. The blast radius today is small: a client that cancels gets no reply and the write lands anyway.",
+      "created": "2026-07-27T18:57:43.529Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-020",
       "p": "shipward",
       "title": "MCP server: the Blind Hunter's 13 findings",
       "type": "bug",
       "pri": "P1",
       "effort": "L",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/mcp-review",
-      "commit": null,
-      "note": "THREE SERIOUS. (1) DATA-LOSS: no tool argument is ever checked against its own inputSchema, and validate() in tracker-store checks every card field EXCEPT note — while schema.json declares note as a string. So log({note:42}) is accepted, written verbatim, and then permanently bricks the entire memory surface: standup and recall both throw, the session-start hook emits ZERO BYTES so the session silently gets no standup, and status.mjs drops its count. Cards cannot be deleted by protocol, so recovery needs a hand-edit. (2) SESSION-BREAKING: the startup heartbeat is queued AHEAD of the handshake, so initialize cannot answer until a tracker WRITE completes — measured 5.8s behind a held lock and 62s when the lock is never released. A handshake bounded by LOCK_TIMEOUT is a server the client declares dead. (3) SESSION-BREAKING: process.exit(0) on stdin end discards unflushed stdout, so any reply over the 64KiB pipe buffer is truncated mid-JSON with exit code 0 — measured, last frame exactly 65525 bytes and unparseable. recall({query:'e',limit:50}) is already 32775 bytes against the real tracker, half the cliff. THE REST: a non-numeric limit prints a total then lists nothing; sync(create) bypasses the empty-title guard log enforces and writes permanent junk cards; the 1000th card of a prefix makes log fail forever with an opaque schema error; requests with no id (or id:null) get invalid frames back and a tools/call notification still WRITES; done({pushed:true}) on an already-pushed card claims a stamp it never wrote, so it never counts as shipped; sync files its single feed entry under the default project even when every card it touched is in another; the provenance stamp carries no year so a three-year-old note looks like yesterday; the idempotent start path still tells Claude to create a branch that already exists; and we advertise protocol revisions in which batching is legal, then refuse batches.",
+      "commit": "fbabf77",
+      "note": "THREE SERIOUS. (1) DATA-LOSS: no tool argument is ever checked against its own inputSchema, and validate() in tracker-store checks every card field EXCEPT note — while schema.json declares note as a string. So log({note:42}) is accepted, written verbatim, and then permanently bricks the entire memory surface: standup and recall both throw, the session-start hook emits ZERO BYTES so the session silently gets no standup, and status.mjs drops its count. Cards cannot be deleted by protocol, so recovery needs a hand-edit. (2) SESSION-BREAKING: the startup heartbeat is queued AHEAD of the handshake, so initialize cannot answer until a tracker WRITE completes — measured 5.8s behind a held lock and 62s when the lock is never released. A handshake bounded by LOCK_TIMEOUT is a server the client declares dead. (3) SESSION-BREAKING: process.exit(0) on stdin end discards unflushed stdout, so any reply over the 64KiB pipe buffer is truncated mid-JSON with exit code 0 — measured, last frame exactly 65525 bytes and unparseable. recall({query:'e',limit:50}) is already 32775 bytes against the real tracker, half the cliff. THE REST: a non-numeric limit prints a total then lists nothing; sync(create) bypasses the empty-title guard log enforces and writes permanent junk cards; the 1000th card of a prefix makes log fail forever with an opaque schema error; requests with no id (or id:null) get invalid frames back and a tools/call notification still WRITES; done({pushed:true}) on an already-pushed card claims a stamp it never wrote, so it never counts as shipped; sync files its single feed entry under the default project even when every card it touched is in another; the provenance stamp carries no year so a three-year-old note looks like yesterday; the idempotent start path still tells Claude to create a branch that already exists; and we advertise protocol revisions in which batching is legal, then refuse batches. || FIXED, 12 of 13. THE DATA-LOSS ROOT CAUSE was one missing line: validate() checked every card field EXCEPT note, the one field the whole memory surface reads and one schema.json already required to be a string. Tool arguments were never checked against their own inputSchema either, so both halves were open. THE HANDSHAKE FIX is architectural rather than a patch: there are two chains now, because tools/call takes the lock and must queue, while initialize/ping/tools/list must never wait on the tracker at all — a handshake bounded by LOCK_TIMEOUT is a server the client declares dead. Output drains before exit, the same defect and the same fix as the hooks in SW-018. Batches are now HANDLED rather than refused, because we negotiate revisions in which they are legal and refusing them was advertising a version we did not implement. NOT FIXED, deliberately: notifications/cancelled is still accepted and ignored, so a cancelled call keeps running and still writes. Real cancellation needs the tool layer to carry an abort signal through mutate() and the file lock, which is a bigger change than the finding warrants today — filed rather than bodged. TESTING NOTE WORTH KEEPING: I could not verify these tests against the pre-fix code the way I did for SW-017/18/19, because the pre-fix suite HANGS rather than fails — 8m20s with no result. That is itself the confirmation for the hang-class findings, but it means the other nine rest on the reviewer's reproductions plus the fixed-state tests, not on a watched red-to-green transition. 169 tests pass, 9 new.",
       "created": "2026-07-27T18:37:50.675Z",
       "pushed": null,
       "shipped": null
@@ -332,6 +348,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T18:57:43.529Z",
+      "p": "shipward",
+      "msg": "You added SW-021 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:57:43.331Z",
+      "p": "shipward",
+      "msg": "SW-020 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T18:37:50.902Z",
       "p": "shipward",
@@ -724,7 +752,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T18:56:41.971Z",
-    "pid": 81323
+    "lastSeen": "2026-07-27T18:57:43.514Z",
+    "pid": 81561
   }
 }

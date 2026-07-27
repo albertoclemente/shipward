@@ -60,6 +60,8 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 | `PreToolUse` on edits | **warns** — never blocks — when source changes with no card in progress |
 | `Stop` | refuses to end the session while a card is still `working` with no `done` |
 
+The same file also wires a **status line** — `node shipward/status.mjs`, one line showing the card in flight and what is waiting. It runs standalone too, for a shell prompt or tmux. ~120ms per render, almost all of it Node startup.
+
 They read the same `tracker.json` everything else does, they exit silently on any error, and they never deny a tool call. They can make you *touch* Shipward; they cannot make you write a note worth reading. `done` with `"fixed it"` satisfies all four and teaches the next session nothing.
 
 ## The app

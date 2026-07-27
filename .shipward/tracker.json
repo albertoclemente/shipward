@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-016",
+      "p": "shipward",
+      "title": "Ambient status line — know without looking",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/ambient-statusline",
+      "commit": null,
+      "note": "The ambient angle from the 2026-07-27 divergence exercise. THE OBSERVATION THAT MADE IT WORTH BUILDING: the UserPromptSubmit hook is already an ambient surface and is the highest-frequency Shipward surface that exists — it fires on every single prompt, while the board gets opened a few times a day. You do not want to LOOK AT the board, you want to know without looking. A Claude Code statusLine is the terminal-native version of that: always visible, nothing to open, no window to arrange. SCOPE: shipward/status.mjs prints one line — the active card, what is waiting on the human, and how many memory items are still open — wired into .claude/settings.json as statusLine, and runnable standalone so it also works in a tmux or shell prompt. CONSTRAINT THAT SHAPES THE WHOLE THING: it is re-rendered constantly, so it must be FAST and must never break a terminal. That rules out importing tracker-store.mjs (crypto, full schema validation) — a plain readFileSync and JSON.parse is the whole data path — and it means every error prints nothing and exits 0.",
+      "created": "2026-07-27T17:26:07.950Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-015",
       "p": "shipward",
       "title": "Hooks — make the Shipward protocol continuous, not aspirational",
@@ -252,6 +268,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T17:26:08.253Z",
+      "p": "shipward",
+      "msg": "SW-016 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T17:26:07.950Z",
+      "p": "shipward",
+      "msg": "You added SW-016 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T16:29:20.433Z",
       "p": "shipward",
@@ -554,7 +582,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T16:29:29.484Z",
-    "pid": 56900
+    "lastSeen": "2026-07-27T17:26:08.235Z",
+    "pid": 62548
   }
 }

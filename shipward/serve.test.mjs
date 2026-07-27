@@ -9,9 +9,7 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
-const PORT = 4749;                       // not 4747 — never touch a running desk
-const base = `http://127.0.0.1:${PORT}`;
-let sandbox, tracker, proc;
+let sandbox, tracker, proc, base;
 
 const seed = () => ({
   version: 1,
@@ -33,14 +31,30 @@ before(async () => {
   await writeFile(tracker, JSON.stringify(seed(), null, 2) + '\n');
   await cp(join(HERE, 'tracker-store.mjs'), join(sandbox, 'shipward', 'tracker-store.mjs'));
   await cp(join(HERE, 'public'), join(sandbox, 'shipward', 'public'), { recursive: true });
+  await cp(join(HERE, 'serve.mjs'), join(sandbox, 'shipward', 'serve.mjs'));
 
-  // serve.mjs hard-codes 4747; rewrite the port for the sandbox copy.
-  const src = (await readFile(join(HERE, 'serve.mjs'), 'utf8')).replace('const PORT = 4747;', `const PORT = ${PORT};`);
-  await writeFile(join(sandbox, 'shipward', 'serve.mjs'), src);
-  proc = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], { stdio: 'ignore' });
-  for (let i = 0; i < 50; i++) {
-    try { await fetch(`${base}/api/tracker`); break; } catch { await new Promise((r) => setTimeout(r, 100)); }
-  }
+  // SHIPWARD_PORT=0 lets the OS pick. A fixed port meant a leftover server from
+  // an earlier run kept the port, this spawn died on EADDRINUSE, and the suite
+  // then asserted against the STALE server instead of failing.
+  proc = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], {
+    env: { ...process.env, SHIPWARD_PORT: '0' },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stderr = '';
+  proc.stderr.on('data', (d) => { stderr += d; });
+
+  const port = await new Promise((resolve, reject) => {
+    let out = '';
+    const timer = setTimeout(() => reject(new Error(`server never reported a port. stderr: ${stderr}`)), 10000);
+    proc.stdout.on('data', (d) => {
+      out += d;
+      const m = out.match(/http:\/\/localhost:(\d+)/);
+      if (m) { clearTimeout(timer); resolve(Number(m[1])); }
+    });
+    proc.once('exit', (code) => { clearTimeout(timer); reject(new Error(`server exited ${code}: ${stderr}`)); });
+  });
+  base = `http://127.0.0.1:${port}`;
+  await fetch(`${base}/api/tracker`);   // the port is bound before it is printed
 });
 
 after(() => proc?.kill());
@@ -104,13 +118,13 @@ test('concurrent writes from one base: exactly one wins, the rest 409', async ()
   // stays valid AND a writer working from an overtaken base is refused rather
   // than silently overwriting the winner.
   for (let round = 0; round < 15; round++) {
-    const base = await etag();
+    const from = await etag();
     const docs = Array.from({ length: 6 }, (_, i) => {
       const d = seed();
       d.cards[0].title = `concurrent ${round}-${i}`.padEnd(500, 'x');
       return d;
     });
-    const codes = await Promise.all(docs.map((d) => put(d, base).then((r) => r.status)));
+    const codes = await Promise.all(docs.map((d) => put(d, from).then((r) => r.status)));
     assert.equal(codes.filter((c) => c === 200).length, 1, `round ${round}: one winner, got ${codes}`);
     assert.ok(codes.every((c) => c === 200 || c === 409), `round ${round}: ${codes}`);
 
@@ -211,6 +225,22 @@ test('retrying with the ETag from a 409 succeeds', async () => {
   const retry = await put(seed(), fresh);
   assert.equal(retry.status, 200, 'the retry lands with the current ETag');
   assert.equal(retry.headers.get('etag'), await etag());
+});
+
+test('a second server on the same port fails loudly instead of dying silently', async () => {
+  // The bug this guards: the old harness bound a fixed port, the spawn lost the
+  // race, and the tests happily talked to the server that was already there.
+  const taken = Number(new URL(base).port);
+  const clash = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], {
+    env: { ...process.env, SHIPWARD_PORT: String(taken) },
+    stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let said = '';
+  clash.stderr.on('data', (d) => { said += d; });
+  const code = await new Promise((r) => clash.once('exit', r));
+  assert.equal(code, 1, 'a losing bind must exit non-zero');
+  assert.match(said, /already in use/);
+  assert.equal((await fetch(`${base}/api/tracker`)).status, 200, 'the first server is untouched');
 });
 
 test('unsupported methods are refused', async () => {

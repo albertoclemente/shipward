@@ -145,9 +145,9 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "chore/test-port-zero",
       "commit": null,
       "note": "The sandbox server in serve.test.mjs hard-codes port 4749. A leftover server from an earlier or parallel run holds the port, the new server fails to bind, and the tests silently assert against the STALE server — observed here as three phantom failures (GET returning 200 for a missing tracker). Fix: bind port 0, read the assigned port back from the server, pass it to the tests. The sandbox server should also log bind failures rather than dying silently.",
       "created": "2026-07-25T15:25:44.607Z",
@@ -156,6 +156,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T14:33:55.973Z",
+      "p": "shipward",
+      "msg": "SW-009 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-25T16:05:07.948Z",
       "p": "shipward",

@@ -11,7 +11,9 @@ import { readRaw, replace, TRACKER } from './tracker-store.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const PUBLIC = join(HERE, 'public');
-const PORT = 4747;
+// 0 asks the OS for a free port — how the tests avoid fighting over a fixed one.
+// The bound port is printed on the line below, so a caller can read it back.
+const PORT = Number(process.env.SHIPWARD_PORT ?? 4747);
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -110,7 +112,7 @@ async function serveStatic(pathname, res) {
 
 // Every handler is async; an unhandled rejection here would take the whole desk
 // down, so nothing escapes this wrapper.
-createServer((req, res) => {
+const server = createServer((req, res) => {
   let pathname;
   try {
     pathname = new URL(req.url, 'http://localhost').pathname;
@@ -126,6 +128,18 @@ createServer((req, res) => {
   }
   if (req.method !== 'GET') return fail(res, 405, 'use GET');
   done(serveStatic(pathname, res));
-}).listen(PORT, '127.0.0.1', () => {
-  console.log(`Shipward — the solo shipping desk\n  http://localhost:${PORT}\n  tracker: ${TRACKER}`);
+});
+
+// A failed bind used to kill the process with no output, and a test harness
+// waiting on the port then talked to whatever server already held it.
+server.on('error', (err) => {
+  console.error(err.code === 'EADDRINUSE'
+    ? `Shipward: port ${PORT} is already in use — another desk is running.`
+    : `Shipward: cannot listen on ${PORT} — ${err.message}`);
+  process.exit(1);
+});
+
+server.listen(PORT, '127.0.0.1', () => {
+  const { port } = server.address();
+  console.log(`Shipward — the solo shipping desk\n  http://localhost:${port}\n  tracker: ${TRACKER}`);
 });

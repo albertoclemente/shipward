@@ -144,3 +144,74 @@ test('importing the module prints nothing', () => {
   // it — including this test run.
   assert.equal(typeof statusLine, 'function');
 });
+
+
+/* -- after the adversarial review (SW-018) ------------------
+   The reviewer broke the "never breaks the terminal" invariant on its first
+   try. These reproduce its payloads, built from char codes so the test file
+   itself stays free of control characters. */
+
+const ESCC = String.fromCharCode(27);
+const BEL = String.fromCharCode(7);
+const CONTROLS = new RegExp('[\\u0000-\\u001F\\u007F-\\u009F]');
+const BIDI = new RegExp('[\\u200E\\u200F\\u202A-\\u202E\\u2066-\\u2069]');
+
+test('tracker text can never reach the terminal as control sequences', () => {
+  const attacks = {
+    'tab title': ESCC + ']0;PWNED' + BEL + 'ok',
+    'clear screen': ESCC + '[2J' + ESCC + '[Hgone',
+    'alt screen': ESCC + '[?1049h' + ESCC + '#8',
+    'carriage return': 'safe\rEVIL',
+    newline: 'line1\nline2\nline3',
+    'rtl override': 'safe' + String.fromCharCode(0x202E) + 'reversed',
+    'c1 control': 'a' + String.fromCharCode(0x9B) + 'B',
+  };
+  for (const [name, title] of Object.entries(attacks)) {
+    const out = statusLine(doc([card({ status: 'claude', claude: 'working', title })]));
+    // Only the colour codes this module emits itself may contain ESC.
+    assert.doesNotMatch(out.replace(ESC, ''), CONTROLS, name + ' leaked a control character');
+    assert.equal(out.split('\n').length, 1, name + ' broke the line in two');
+    assert.doesNotMatch(out, BIDI, name + ' leaked a bidi override');
+  }
+});
+
+test('the card id is bounded and scrubbed too, not just the title', () => {
+  // status.mjs never calls validate(), so ID_RE does not apply here — the id
+  // was interpolated raw and never clipped.
+  const evil = ESCC + ']0;OWNED' + BEL + ESCC + '[2J' + 'SW-1'.repeat(40);
+  const out = statusLine(doc([card({ id: evil, status: 'claude', claude: 'working' })]));
+  assert.doesNotMatch(out.replace(ESC, ''), CONTROLS);
+  assert.ok(out.length < 90, 'id was not bounded: ' + out.length + ' chars');
+});
+
+test('a clip never leaves half an emoji in the status line', () => {
+  const rocket = String.fromCodePoint(0x1F680);
+  const out = statusLine(doc([card({
+    status: 'claude', claude: 'working', title: 'A'.repeat(32) + rocket + rocket,
+  })]));
+  assert.doesNotMatch(out, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/,
+    'a lone surrogate renders as a replacement glyph');
+});
+
+test('the open-item scan is dropped rather than stalling a huge board', async () => {
+  // Measured 390ms at 1000 cards and 1.6s at 5000 — on the critical path of a
+  // line that renders constantly.
+  const sandbox = await mkdtemp(join(tmpdir(), 'shipward-status-'));
+  try {
+    await mkdir(join(sandbox, '.shipward'));
+    const tracker = join(sandbox, '.shipward', 'tracker.json');
+    const many = Array.from({ length: 900 }, (_, i) =>
+      card({ id: 'SW-' + String((i % 999) + 1).padStart(3, '0'), note: 'NEEDS ALBERTO: something' }));
+    many[0] = card({ id: 'SW-001', status: 'claude', claude: 'working', title: 'busy' });
+    await writeFile(tracker, JSON.stringify(doc(many)));
+
+    const started = Date.now();
+    const { out, code } = await run(tracker, { NO_COLOR: '1' });
+    assert.equal(code, 0);
+    assert.match(out, /SW-001/, 'the line still renders');
+    assert.doesNotMatch(out, /open/, 'the count is dropped, not stalled on');
+    assert.ok(Date.now() - started < 20000, 'and it did not hang');
+  } finally {
+    await rm(sandbox, { recursive: true, force: true });
+  }
+});

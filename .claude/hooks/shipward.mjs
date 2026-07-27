@@ -30,15 +30,64 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 // Read stdin to the end. Claude Code delivers the hook payload as one JSON
 // object; a hook that blocks forever waiting for more would hang the session.
+// The isTTY guard covers a terminal, not a pipe someone forgot to close. With
+// no timeout the hook waited for a stream that never ended — on
+// UserPromptSubmit that is a stall on every single turn, until the runtime
+// kills it. The byte cap is the same defence from the other side: 600MiB of
+// stdin was buffered in full before this existed.
+const STDIN_TIMEOUT_MS = 2000;
+const STDIN_MAX_BYTES = 1 << 20;
+
 async function payload() {
   if (process.stdin.isTTY) return {};
   const chunks = [];
-  for await (const c of process.stdin) chunks.push(c);
+  let bytes = 0;
+  // The stream has to be destroyed, not merely signalled: a `for await` blocked
+  // on the next chunk never reaches a condition it could check, so an
+  // AbortSignal alone left the hook waiting exactly as long as before.
+  const cutoff = setTimeout(() => process.stdin.destroy(), STDIN_TIMEOUT_MS);
+  cutoff.unref?.();
+  try {
+    for await (const chunk of process.stdin) {
+      chunks.push(chunk);
+      bytes += chunk.length;
+      if (bytes > STDIN_MAX_BYTES) break;
+    }
+  } catch { /* destroyed or closed — use whatever arrived */ }
+  clearTimeout(cutoff);
   try { return JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}'); } catch { return {}; }
 }
 
-const emit = (obj) => { process.stdout.write(JSON.stringify(obj)); process.exit(0); };
-const quiet = () => process.exit(0);
+// Nothing this hook prints is worth more than the session it prints into, and
+// half a JSON object is worth less than none. process.exit() drops whatever has
+// not flushed — a hard cliff at 64KiB on a pipe — so one card with a large
+// title made every hook emit truncated, unparseable JSON, and past ~1000 cards
+// the Stop hook's output vanished entirely and it silently stopped blocking.
+// Failing open was the wrong direction, so the payload is bounded first and the
+// write is flushed before exiting.
+const MAX_EMIT_BYTES = 48 * 1024;
+
+const done = (code = 0) => {
+  // Give the write a chance to drain; exit anyway rather than hang the session.
+  if (process.stdout.writableLength === 0) process.exit(code);
+  const bail = setTimeout(() => process.exit(code), 2000);
+  bail.unref?.();
+  process.stdout.once('drain', () => process.exit(code));
+};
+
+const emit = (obj) => {
+  let body = JSON.stringify(obj);
+  if (body.length > MAX_EMIT_BYTES) {
+    // Say less, correctly, rather than more, corruptly.
+    body = JSON.stringify({
+      systemMessage: 'Shipward: the tracker holds more text than a hook can report. Run standup or open the desk.',
+    });
+  }
+  process.stdout.write(body);
+  done();
+};
+
+const quiet = () => done();
 
 const context = (event, text) => emit({
   hookSpecificOutput: { hookEventName: event, additionalContext: text },
@@ -84,7 +133,7 @@ const EXEMPT = [
 ];
 
 async function preEdit(input) {
-  const file = input?.tool_input?.file_path;
+  const file = input?.tool_input?.file_path || input?.tool_input?.notebook_path;
   if (!file) return quiet();
 
   const rel = relative(ROOT, resolve(file));

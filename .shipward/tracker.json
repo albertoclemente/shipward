@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-018",
+      "p": "shipward",
+      "title": "Status line and hooks: terminal injection, truncation, and a hang",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/memory-lib-hardening",
+      "commit": null,
+      "note": "The Blind Hunter BROKE the invariant I claimed for the status line, on its first try. FINDING 1, worst of the day: status.mjs interpolates card text straight into stdout with nothing stripped, so tracker data becomes terminal control. Proven with real output — a title containing \\u001b]0;PWNED\\u0007 rewrites the terminal/tab title, \\u001b[2J\\u001b[H clears the screen, \\u001b[?1049h switches to the alternate screen buffer, a bare \\r overwrites the line just drawn, and a newline turns a one-line status line into three. TITLE_BUDGET is no mitigation: the clear-screen payload is 7 characters. Worse, the card ID is never clipped at all and status.mjs never calls validate(), so ID_RE does not apply to it. U+202E RTL override passes through too. CLAUDE.md blesses hand-editing and log() takes free text, so this is data the tool invites. FINDING 2: emit() in the hooks writes then calls process.exit(0), which drops whatever has not flushed — a hard cliff at exactly 65536 bytes on a pipe. One card with a 70KiB title makes every hook emit unparseable truncated JSON, and past ~1000 cards the write is lost entirely so the STOP HOOK SILENTLY STOPS BLOCKING. It fails open, which is the wrong direction. FINDING 3: the stdin read has no timeout, so a pipe held open hangs the hook until the runtime kills it — on UserPromptSubmit that is a stall every single turn; 600MiB of stdin was also buffered in full. FINDING 4: the PreToolUse matcher includes NotebookEdit but the handler reads tool_input.file_path, and NotebookEdit passes notebook_path, so it can never warn. Also: clip() splits emoji into lone surrogates; openItems() does an uncapped memory scan on every render (390ms at 1000 cards); and activeLine() injects card text into the model context every turn with no framing that it is data.",
+      "created": "2026-07-27T18:16:18.639Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-017",
       "p": "shipward",
       "title": "Harden memory-lib against the edge-case review",
@@ -284,6 +300,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T18:16:20.635Z",
+      "p": "shipward",
+      "msg": "SW-018 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:16:18.639Z",
+      "p": "shipward",
+      "msg": "You added SW-018 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T18:00:03.356Z",
       "p": "shipward",
@@ -622,7 +650,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T18:09:14.148Z",
-    "pid": 71025
+    "lastSeen": "2026-07-27T18:16:20.086Z",
+    "pid": 72901
   }
 }

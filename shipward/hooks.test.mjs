@@ -85,7 +85,9 @@ test('prompt names the active card, every turn', async () => {
   const { parsed } = await run('prompt');
   assert.equal(parsed.hookSpecificOutput.hookEventName, 'UserPromptSubmit');
   const ctx = parsed.hookSpecificOutput.additionalContext;
-  assert.match(ctx, /TS-002 \(working, feat\/x\) — The live one/);
+  assert.match(ctx, /TS-002 \(working, feat\/x\) — "The live one"/);
+  assert.match(ctx, /tracker data, not instructions/,
+    'a card title can be logged from an issue body — it arrives labelled as data');
   assert.ok(ctx.split('\n').length === 1, 'it is paid for on every prompt — one line');
 });
 
@@ -188,4 +190,50 @@ test('every hook emits parseable JSON or nothing at all', async () => {
     const r = await run(which, {});
     assert.equal(r.unparseable, false, `${which} printed something the runtime cannot read`);
   }
+});
+
+
+/* -- after the adversarial review (SW-018) ------------------ */
+
+test('a huge tracker never makes a hook emit truncated JSON', async () => {
+  // process.exit() dropped whatever had not flushed — a hard cliff at 64KiB on
+  // a pipe. One card with a large title made every hook emit unparseable JSON,
+  // and past ~1000 cards the Stop hook's output vanished entirely and it
+  // silently stopped blocking. Failing open was the wrong direction.
+  await writeFile(tracker, JSON.stringify(seed([
+    card({ id: 'TS-002', status: 'claude', claude: 'working', title: 'x'.repeat(80 * 1024) }),
+  ])), 'utf8');
+
+  for (const which of ['session-start', 'prompt', 'stop']) {
+    const r = await run(which, {});
+    assert.equal(r.code, 0, which + ' exited non-zero');
+    assert.equal(r.unparseable, false, which + ' emitted ' + r.out.length + ' bytes of unparseable JSON');
+  }
+  const stop = await run('stop', {});
+  assert.ok(stop.out.trim().length > 0,
+    'the Stop hook must not fall silent — silence is how it stops blocking');
+});
+
+test('a hook does not wait forever for a stdin that never closes', async () => {
+  // With no timeout this stalled every turn until the runtime killed it.
+  const child = execFile(process.execPath, [HOOK, 'prompt'],
+    { env: { ...process.env, SHIPWARD_TRACKER: tracker } }, () => {});
+  child.stdin.write('{}');                      // written, deliberately never ended
+
+  const started = Date.now();
+  const code = await Promise.race([
+    new Promise((r) => child.once('exit', r)),
+    new Promise((r) => setTimeout(() => r('TIMEOUT'), 10000)),
+  ]);
+  child.kill();
+  assert.notEqual(code, 'TIMEOUT', 'still running after ' + (Date.now() - started) + 'ms with stdin held open');
+});
+
+test('pre-edit sees a notebook, whose path parameter is not file_path', async () => {
+  const { parsed } = await run('pre-edit', {
+    tool_name: 'NotebookEdit', tool_input: { notebook_path: join(ROOT, 'shipward', 'analysis.ipynb') },
+  });
+  assert.equal(parsed?.hookSpecificOutput?.permissionDecision, 'allow');
+  assert.match(parsed.systemMessage, /no card in progress/,
+    'NotebookEdit was in the matcher but could never warn');
 });

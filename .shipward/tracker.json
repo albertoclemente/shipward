@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-017",
+      "p": "shipward",
+      "title": "Harden memory-lib against the edge-case review",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "L",
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/memory-lib-hardening",
+      "commit": null,
+      "note": "Edge Case Hunter returned 15 CONFIRMED findings against public/memory-lib.js, every one reproduced with a script. THREE ARE SERIOUS. (1) resolves() matches RESOLUTION markers by substring with no polarity check, so 'Not yet fixed — parked until he answers' marks an open item SUPERSEDED: the card says the question is open and the module reports zero open, dropping it from stillOpen, standup, recall and the status line. The module's stated purpose, inverted. (2) A non-string note throws — validate() in tracker-store.mjs never checks `note`, and CLAUDE.md explicitly calls hand-editing supported, so note:12345 passes readRaw and then kills standup, the memory view and both MCP tools; status.mjs swallows it and prints '◇ no card', which is a lie. (3) PATH_RE backtracks quadratically: 24k chars took 2.9s, 120k did not finish in 120 SECONDS. Reachable by pasting a data URI or base64 blob into a note, and it runs on the browser main thread and in every standup. The rest: markerIndex desyncs when toUpperCase changes string length (ß, ﬁ) and files an open item under 'What shipped'; markers match inside URLs and filenames, so a link to a repo called todo-list becomes a permanent open item; ⚠ without the variation selector never matches ⚠️; hits() is a bare endsWith so the 1-char token 't' matches commit(), reachable because tokensFor feeds recall every declared name; recall returns NOTHING when every token is generic even with file given — the exact failure the code comments claim was fixed, only fixed on the path where the basename is in tokens; basename indexing conflates two different index.js; and a batch of library-level throws and NaN/limit/surrogate boundary bugs.",
+      "created": "2026-07-27T17:59:45.296Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-016",
       "p": "shipward",
       "title": "Ambient status line — know without looking",
@@ -268,6 +284,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-27T18:00:03.356Z",
+      "p": "shipward",
+      "msg": "SW-017 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T17:59:45.296Z",
+      "p": "shipward",
+      "msg": "You added SW-017 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-27T17:30:19.492Z",
       "p": "shipward",
@@ -594,7 +622,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-27T17:30:19.471Z",
-    "pid": 63684
+    "lastSeen": "2026-07-27T18:09:14.148Z",
+    "pid": 71025
   }
 }

@@ -241,3 +241,161 @@ test('on a young repo nothing is generic yet', () => {
   assert.deepEqual(distinctiveTokens(entries, ['isStale']), ['isstale']);
   assert.equal(recall(entries, { tokens: ['isStale'] }).total, 1);
 });
+
+/* ── hardening after the edge-case review (SW-017) ──────────
+   Every test below reproduces a defect the review confirmed. Each was run
+   against the pre-fix module first and observed to fail. */
+
+test('a note that is not a string is skipped, not thrown on', () => {
+  // validate() never checked `note`, and hand-editing the tracker is a
+  // documented supported path, so this reached memoryEntries and threw —
+  // killing standup, the memory view and both MCP tools at once.
+  for (const note of [12345, ['a'], { a: 1 }, true]) {
+    assert.doesNotThrow(() => memoryEntries([card({ note })], 'shipward'), `note: ${JSON.stringify(note)}`);
+    assert.deepEqual(memoryEntries([card({ note })], 'shipward'), []);
+  }
+});
+
+test('a negated resolution does not close the item it is reporting', () => {
+  for (const later of [
+    'Not yet fixed — parked until he answers.',
+    'we have not decided',
+    'still waiting to be decided',
+    'nothing was removed',
+    'this must be fixed before release',
+    'ALMOST done. one thing left',
+  ]) {
+    const note = ['NEEDS ALBERTO: pick one', later].join(SEGMENT_SEP);
+    const entries = memoryEntries([card({ note })], 'shipward');
+    assert.equal(stillOpen(entries).length, 1, `"${later}" must not resolve anything`);
+  }
+  // and a real resolution still resolves
+  const settled = memoryEntries([card({ note: ['NEEDS ALBERTO: pick one', 'DECIDED: picked'].join(SEGMENT_SEP) })], 'shipward');
+  assert.equal(stillOpen(settled).length, 0);
+});
+
+test('a marker is found even when uppercasing would change the string length', () => {
+  // "ß" uppercases to "SS": scanning an uppercased copy desynchronised the
+  // index from the real string and the boundary check read the wrong char.
+  assert.equal(classify('Die Größe war falsch. TODO: fix the sizing'), 'open');
+  assert.equal(classify('straße refactor. NEEDS ALBERTO: sign off'), 'open');
+  assert.equal(classify('the oﬃce build. BLOCKED on certs'), 'open');
+});
+
+test('markers inside URLs, filenames and hyphenated words do not count', () => {
+  assert.equal(classify('see https://github.com/acme/todo-list/pull/3 for the rename'), 'outcome');
+  assert.equal(classify('renamed todo.js to tasks.js'), 'outcome');
+  assert.equal(classify('the todos are all cleared'), 'outcome');
+  // a real marker at the end of a sentence still counts
+  assert.equal(classify('the archive table. VERIFIED.'), 'evidence');
+  assert.equal(classify('TODO: this one is real'), 'open');
+});
+
+test('the warning sign counts with or without its variation selector', () => {
+  assert.equal(classify('⚠️ the tests are flaky'), 'open');
+  assert.equal(classify('⚠ the tests are flaky'), 'open', 'same warning, same meaning');
+});
+
+test('a long unbroken token cannot hang the parser', () => {
+  // 24k chars took 2.9s and 120k never finished: the pattern backtracked across
+  // the whole note. A pasted data URI was enough, on the browser main thread.
+  const blob = `data:image/png;base64,${'AAAA.'.repeat(24000)}`;
+  const started = Date.now();
+  const found = refs(`before ${blob} after app.js`);
+  const ms = Date.now() - started;
+  assert.ok(ms < 2000, `refs() took ${ms}ms on a ${blob.length}-char blob`);
+  assert.deepEqual(found, ['app.js'], 'and the real path beside it is still found');
+});
+
+test('helpers degrade on hand-built entries instead of throwing', () => {
+  assert.doesNotThrow(() => mentionsAny({ refs: ['a.js'] }, ['a.js']));
+  assert.doesNotThrow(() => mentionsAny({ syms: ['foo'] }, ['foo']));
+  assert.doesNotThrow(() => mentionsAny({ syms: [], refs: [] }, null));
+  assert.doesNotThrow(() => fileIndex([{ card: 'A' }]));
+  assert.doesNotThrow(() => searchEntries([], null));
+  assert.doesNotThrow(() => classify(null));
+  assert.doesNotThrow(() => refs(null));
+  assert.doesNotThrow(() => symbols(null));
+  assert.doesNotThrow(() => excerpt({}));
+  assert.equal(mentionsAny({ refs: ['a.js'] }, ['a.js']), true, 'and still answers correctly');
+});
+
+test('a token shorter than three characters does not suffix-match', () => {
+  // tokensFor() hands recall every name a file declares, including `const t =`.
+  assert.equal(mentionsAny({ syms: ['commit'], refs: [] }, ['t']), false);
+  assert.equal(mentionsAny({ syms: ['grid'], refs: [] }, ['id']), false);
+  assert.equal(mentionsAny({ syms: ['isStale'], refs: [] }, ['isstale']), true, 'an exact name still matches');
+  assert.equal(mentionsAny({ syms: [], refs: ['tracker-store.mjs'] }, ['store.mjs']), true, 'a real suffix still matches');
+});
+
+test('a file query carrying a directory does not match a different directory', () => {
+  const entries = memoryEntries([
+    card({ id: 'SW-001', note: 'the auth handler in packages/auth/index.js leaks a token' }),
+    card({ id: 'SW-002', note: 'tidied docs/index.js formatting' }),
+  ], 'shipward');
+  const docs = recall(entries, { file: 'docs/index.js' });
+  assert.equal(docs.total, 1, 'two different index.js are two files');
+  assert.equal(docs.entries[0].card, 'SW-002');
+  // without a directory the basename still gathers both
+  assert.equal(recall(entries, { file: 'index.js' }).total, 2);
+  assert.equal(recall(entries, { file: 'e' }).total, 0, 'a one-letter query matches nothing');
+});
+
+test('recall still answers when every token turns out to be generic', () => {
+  // Filtering on an empty token set is [].some(...) — false for everything — so
+  // recall reported "nothing found" while holding entries about that very file.
+  const entries = Array.from({ length: 20 }, (_, i) =>
+    card({ id: `SW-${String(i + 1).padStart(3, '0')}`, note: `touched serve.mjs via isStale() run ${i}` }));
+  const parsed = memoryEntries(entries, 'shipward');
+  const hit = recall(parsed, { file: 'shipward/serve.mjs', tokens: ['isStale'] });
+  assert.equal(hit.total, 20, 'falls back to the file rather than returning nothing');
+  assert.deepEqual(hit.matchedOn, [], 'and says it had no discriminating token');
+});
+
+test('a nonsense limit falls back to the default instead of returning nothing', () => {
+  const entries = memoryEntries(Array.from({ length: 5 }, (_, i) =>
+    card({ id: `SW-00${i + 1}`, note: `REPRODUCED: failure ${i}` })), 'shipward');
+  for (const limit of [0, -1, null, NaN, 2.5, 'many']) {
+    const hit = recall(entries, { kind: 'finding', limit });
+    assert.equal(hit.entries.length, 5, `limit ${String(limit)} must not swallow the results`);
+    assert.equal(hit.dropped, 0, `limit ${String(limit)} reported a bogus dropped count`);
+  }
+  assert.equal(recall(entries, { kind: 'finding', limit: 2 }).dropped, 3, 'a real limit still applies');
+});
+
+test('an undated entry sorts last rather than scrambling the order', () => {
+  const entries = memoryEntries([
+    card({ id: 'SW-001', note: 'oldest', created: '2026-07-01T00:00:00Z' }),
+    card({ id: 'SW-002', note: 'undated', created: '2026-07-02T00:00:00Z', pushed: 'not a date' }),
+    card({ id: 'SW-003', note: 'newest', created: '2026-07-20T00:00:00Z' }),
+  ], 'shipward');
+  assert.deepEqual(entries.map((e) => e.card), ['SW-003', 'SW-001', 'SW-002']);
+});
+
+test('excerpt honours small and nonsense limits without losing the text', () => {
+  // Old behaviour was not even monotonic: max=0 returned 18 characters, max=2
+  // returned "……" with the text gone entirely.
+  const e = { text: 'Preamble here. TODO fix the thing', kind: 'open' };
+  for (const max of [0, 1, 2, 3, -10, NaN]) {
+    const out = excerpt(e, max);
+    assert.match(out, /[A-Za-z]/, `max ${String(max)} lost the text entirely: "${out}"`);
+    if (Number.isFinite(max)) {
+      assert.ok(out.length <= Math.max(3, Math.floor(max)),
+        `max ${String(max)} returned ${out.length} chars: "${out}"`);
+    }
+  }
+  assert.ok(excerpt(e, 200).endsWith('fix the thing'), 'a sane limit is unchanged');
+});
+
+test('a clip never leaves half of an emoji behind', () => {
+  // The orphan lands mid-string, before the appended ellipsis, so checking only
+  // the last character caught nothing.
+  const out = excerpt({ text: 'Preamble. TODO 🚀🚀', kind: 'open' }, 8);
+  assert.doesNotMatch(out, /[\uD800-\uDBFF](?![\uDC00-\uDFFF])/,
+    `unpaired high surrogate renders as a replacement glyph: ${JSON.stringify(out)}`);
+});
+
+test('a non-ASCII identifier does not invent a function name', () => {
+  assert.deepEqual(symbols('called señor() and 日本()'), [], 'no fabricated "or"');
+  assert.deepEqual(symbols('called isStale() twice'), ['isStale'], 'real names still found');
+});

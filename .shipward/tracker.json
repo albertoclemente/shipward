@@ -17,7 +17,7 @@
       "type": "feature",
       "pri": "P1",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/onboard-button",
       "commit": "64c1a7d",
@@ -41,10 +41,15 @@
           "t": "2026-07-28T15:17:08.943Z",
           "kind": "evidence",
           "text": "VERIFIED against the real projects folder: the fleet at ~/projects showed 1 board + 9 candidates, and Catch was onboarded BY CLICKING ITS BUTTON in the live page — fulfilling Alberto_s standing onboard-catch request the way he asked for it (no commands). Catch now: .shipward/tracker.json with project catch-grocery-app prefix CA, hooks merged into its EXISTING .claude/settings.json (nothing clobbered), protocol appended to its EXISTING CLAUDE.md, and the fleet shows it as a live board with its own desk. 249 tests pass, 3 new (candidate discovery + button round-trip, endpoint refusals, served-script-parses)."
+        },
+        {
+          "t": "2026-07-28T15:17:09.426Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 64c1a7d is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T15:10:33.807Z",
-      "pushed": null,
+      "pushed": "2026-07-28T15:17:09.426Z",
       "shipped": null
     },
     {
@@ -1160,6 +1165,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T15:17:09.426Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-036 review → pushed",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T15:17:08.943Z",
       "p": "shipward",

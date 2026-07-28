@@ -17,15 +17,30 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/a11y-pass",
-      "commit": null,
+      "commit": "22e6e33",
       "note": [
         {
           "t": "2026-07-28T13:01:23.159Z",
           "kind": "brief",
           "text": "Items 1-4 of the ui-ux-pro-max assessment, the CRITICAL rows. (1) Drag is the only way to move a card — the skill rule says never rely on a gesture without a visible alternative; fix = a Status seg-group in the edit dialog going through the same applyTransition the drag uses. (2) Muted text measured at ~3.7:1 on the page background (neutral-600 at 10.5-12px) — below the 4.5:1 AA floor for small text; neutral-700 measures ~5.7:1. (3) The MCP dot blinks on an infinite 2.4s loop with no prefers-reduced-motion guard. (4) The activity strip repaints every 3s poll but is silent to screen readers — role=status; the global ::focus-visible outline was AUDITED and already covers tabs/cards/buttons, so that half of item 4 needs nothing."
+        },
+        {
+          "t": "2026-07-28T13:04:32.605Z",
+          "kind": "outcome",
+          "text": "SHIPPED, all four. (1) Status seg-group in the edit dialog — radios, so arrow keys walk the columns; the save routes through the SAME applyTransition the drag uses and emits the drag_s own moveMsg, so the Log cannot tell how a card travelled. Status changes are moves, not edits: moveMsg for the move, editMsg only for other fields. (2) .text-muted 55%→70% and component text neutral-600→neutral-700. (3) prefers-reduced-motion parks the MCP dot — the ONLY infinite animation; 150-300ms transitions stay because state feedback is meaning, not motion. (4) role=status on the activity strip."
+        },
+        {
+          "t": "2026-07-28T13:04:32.605Z",
+          "kind": "evidence",
+          "text": "MEASURED, not asserted: old muted text 3.67:1 against the page background (fails the 4.5 floor at 10.5-12px); new values 5.79:1 (page), 5.83:1 (neutral-700 on page), 5.38:1 (neutral-700 on card surface) — all pass. Round-tripped SW-030 itself through the dialog live: claude→review→claude, both directions produced the correct feed messages and the reverse move re-queued claude exactly as a drag would. 230 tests pass — view-layer only, applyTransition already covered."
+        },
+        {
+          "t": "2026-07-28T13:04:32.605Z",
+          "kind": "decision",
+          "text": "AUDITED AND LEFT ALONE: a global ::focus-visible outline (2px accent) already exists and covers tabs, cards, and buttons — item 4_s focus half needed nothing, and adding per-component rings would have duplicated it. KNOWN LIMIT, stated in a comment: render() replaces the strip node each paint, so role=status announcements depend on the SR treating the swapped region as an update; a persistent live node outside root would be surer and is not worth the plumbing until a real SR user hits it."
         }
       ],
       "created": "2026-07-28T13:01:23.159Z",
@@ -913,6 +928,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T13:04:32.605Z",
+      "p": "shipward",
+      "msg": "SW-030 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T13:03:29.611Z",
       "p": "shipward",

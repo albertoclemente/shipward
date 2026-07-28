@@ -485,3 +485,48 @@ test('validate accepts both note forms and rejects malformed entries', async () 
   assert.match(await v(mk([{ t: '2026-07-28T10:00:00Z', text: 'x', kind: 'vibe' }])), /kind is invalid/);
   assert.match(await v(mk([{ t: '2026-07-28T10:00:00Z', text: 'x', resolves: 'not-an-id' }])), /resolves must be a card id/);
 });
+
+/* ── the card-loss warning (SW-035) ──────────────────────── */
+
+const manyCards = (n) => Array.from({ length: n }, (_, i) => card(i + 1));
+
+test('a write that drops most of the board says so on stderr, and still lands', async () => {
+  const d = { ...seed(), cards: manyCards(8) };
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  const { stderr } = await inChild(`
+    import { replace } from ${JSON.stringify(STORE)};
+    const doc = ${JSON.stringify({ ...seed(), cards: [] })};
+    doc.cards = [${JSON.stringify(card(1))}];
+    await replace(doc);`);
+  assert.match(stderr, /WARNING — this write drops 7 of 8 cards/);
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(doc.cards.length, 1, 'a warning, never a gate — the write lands');
+});
+
+test('ordinary edits and small boards stay quiet', async () => {
+  // Deleting one card from a real board is an edit, not an event.
+  const d = { ...seed(), cards: manyCards(8) };
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  const one = await inChild(`
+    import { mutate } from ${JSON.stringify(STORE)};
+    await mutate((doc) => { doc.cards = doc.cards.slice(0, 7); return doc; });`);
+  assert.doesNotMatch(one.stderr, /WARNING/);
+
+  // And a tiny board being emptied is below the floor — the desk's own tests
+  // replace 1-2 card seeds constantly.
+  const small = { ...seed(), cards: manyCards(2) };
+  await writeFile(tracker, JSON.stringify(small, null, 2) + '\n');
+  const tiny = await inChild(`
+    import { replace } from ${JSON.stringify(STORE)};
+    await replace(${JSON.stringify(seed())});`);
+  assert.doesNotMatch(tiny.stderr, /WARNING/);
+});
+
+test('mutate is guarded too — a callback that eats the board is announced', async () => {
+  const d = { ...seed(), cards: manyCards(6) };
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  const { stderr } = await inChild(`
+    import { mutate } from ${JSON.stringify(STORE)};
+    await mutate((doc) => { doc.cards = []; return doc; });`);
+  assert.match(stderr, /drops 6 of 6 cards/);
+});

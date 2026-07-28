@@ -39,10 +39,10 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/replace-guard",
+      "commit": "6a81fd4",
       "created": "2026-07-28T14:26:46.531Z",
       "pushed": null,
       "shipped": null,
@@ -51,6 +51,11 @@
           "t": "2026-07-28T14:26:46.531Z",
           "kind": "brief",
           "text": "Born from the SW-033 clobber: a whole-document PUT replaced 32 cards with 1 and the store said nothing. The feed survived because SW-027 archives drops; the cards survived only because the tracker is committed to git. A write that removes more than half the existing cards should at least say so on stderr — visibility, not a gate, same doctrine as the feed archive: the desk legitimately replaces whole documents, but a massacre should never be silent."
+        },
+        {
+          "t": "2026-07-28T14:32:01.032Z",
+          "kind": "outcome",
+          "text": "SHIPPED. warnCardLoss() at BOTH write seams — replace (the incident_s path) and mutate (a callback can eat a board just as silently). Fires only when the board has ≥4 cards and the write keeps fewer than half: dropping 1 of 8 is an edit, 20 of 32 is an event, and the desk_s own test seeds (1-2 cards) never trip it. stderr only, the write always lands — a gate would have blocked the desk_s legitimate whole-document PUTs and been ripped out within a week. Message names the tracker path and points at git for the previous state. 242 tests pass, 3 new, including the replayed incident shape: 8 cards → 1 warns and still writes."
         }
       ]
     },
@@ -1093,6 +1098,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T14:32:01.032Z",
+      "p": "shipward",
+      "msg": "SW-035 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T14:30:37.978Z",
+      "p": "shipward",
+      "msg": "SW-035 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:27:39.431Z",
       "p": "shipward",

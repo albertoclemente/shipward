@@ -17,7 +17,7 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/a11y-pass",
       "commit": "22e6e33",
@@ -41,10 +41,15 @@
           "t": "2026-07-28T13:04:32.605Z",
           "kind": "decision",
           "text": "AUDITED AND LEFT ALONE: a global ::focus-visible outline (2px accent) already exists and covers tabs, cards, and buttons — item 4_s focus half needed nothing, and adding per-component rings would have duplicated it. KNOWN LIMIT, stated in a comment: render() replaces the strip node each paint, so role=status announcements depend on the SR treating the swapped region as an update; a persistent live node outside root would be surer and is not worth the plumbing until a real SR user hits it."
+        },
+        {
+          "t": "2026-07-28T13:04:47.045Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 22e6e33 is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T13:01:23.159Z",
-      "pushed": null,
+      "pushed": "2026-07-28T13:04:47.045Z",
       "shipped": null
     },
     {
@@ -928,6 +933,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T13:04:47.045Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-030 review → pushed",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T13:04:32.605Z",
       "p": "shipward",

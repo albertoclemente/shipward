@@ -41,9 +41,14 @@ if (!existsSync(ROOT)) {
 }
 
 /* ── discovery ───────────────────────────────────────────── */
-async function scan(dir = ROOT, depth = 0, out = []) {
+// Two kinds of find: boards (a tracker exists) and CANDIDATES — git repos the
+// walk saw that are not onboarded yet. Candidates become rows with an Onboard
+// button, because "I do not want commands" is a legitimate requirement and the
+// fleet already knows where the projects live.
+async function scan(dir = ROOT, depth = 0, out = { boards: [], candidates: [] }) {
   const tracker = join(dir, '.shipward', 'tracker.json');
-  if (existsSync(tracker)) out.push({ repo: dir, tracker });
+  if (existsSync(tracker)) out.boards.push({ repo: dir, tracker });
+  else if (existsSync(join(dir, '.git'))) out.candidates.push({ repo: dir });
   if (depth >= SCAN_DEPTH) return out;
   let entries = [];
   try { entries = await readdir(dir, { withFileTypes: true }); } catch { return out; }
@@ -52,6 +57,22 @@ async function scan(dir = ROOT, depth = 0, out = []) {
     await scan(join(dir, e.name), depth + 1, out);
   }
   return out;
+}
+
+/* ── onboarding over HTTP ────────────────────────────────── */
+// Runs the exact same setup.mjs the command line runs — one implementation of
+// "wire a repo", per the one-module rule. The path is never taken on faith:
+// the request must name a repo the walk itself just found as a candidate, so
+// this endpoint cannot be aimed at an arbitrary directory.
+const SETUP = join(HERE, 'setup.mjs');
+const { execFile } = await import('node:child_process');
+
+function onboard(repo) {
+  return new Promise((res) => {
+    execFile(process.execPath, [SETUP, repo], { timeout: 15000 }, (err, stdout, stderr) => {
+      res({ ok: !err, output: String(stdout || '') + String(stderr || '') });
+    });
+  });
 }
 
 /* ── one child desk per tracker ──────────────────────────── */
@@ -99,10 +120,10 @@ async function rows() {
   const found = await scan();
   // A tracker that vanished takes its desk with it.
   for (const [tracker, entry] of desks) {
-    if (!found.some((f) => f.tracker === tracker)) { entry.proc?.kill(); desks.delete(tracker); }
+    if (!found.boards.some((f) => f.tracker === tracker)) { entry.proc?.kill(); desks.delete(tracker); }
   }
   const out = [];
-  for (const f of found.slice(0, MAX_DESKS)) {
+  for (const f of found.boards.slice(0, MAX_DESKS)) {
     const desk = desks.get(f.tracker) ?? spawnDesk(f);
     const row = { repo: f.repo, folder: basename(f.repo), pid: desk.proc?.pid ?? null };
     try {
@@ -129,9 +150,14 @@ async function rows() {
       out.push({ ...row, ok: false, name: row.folder, error: `tracker unreadable — ${err.message}`, desk: null });
     }
   }
-  // The boards with something happening float to the top.
-  return out.sort((a, b) => ((b.working ?? 0) + (b.review ?? 0)) - ((a.working ?? 0) + (a.review ?? 0))
+  // The boards with something happening float to the top; candidates trail,
+  // dimmed, waiting for their button to be pressed.
+  out.sort((a, b) => ((b.working ?? 0) + (b.review ?? 0)) - ((a.working ?? 0) + (a.review ?? 0))
     || String(a.name).localeCompare(String(b.name)));
+  const candidates = found.candidates
+    .map((c) => ({ kind: 'candidate', repo: c.repo, folder: basename(c.repo), name: basename(c.repo) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  return [...out.map((r) => ({ kind: 'board', ...r })), ...candidates];
 }
 
 /* ── the page ────────────────────────────────────────────── */
@@ -167,6 +193,12 @@ const PAGE = `<!doctype html>
   .last .who { font-weight:600; color:var(--text); }
   .down { color:#ae1800; font-size:12px; }
   .dead { opacity:.6; }
+  .cand { opacity:.75; border-style:dashed; }
+  .onboard { font:800 12px Archivo,system-ui,sans-serif; letter-spacing:.02em; cursor:pointer;
+             background:var(--accent); color:var(--bg); border:none; padding:7px 14px; min-height:32px; }
+  .onboard:hover { background:#dd2b0f; }
+  .onboard:disabled { opacity:.5; cursor:wait; }
+  .cand .tagline { color:var(--muted); font-size:12px; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 </style></head><body>
 <header><div class="mark"></div><div class="brand">SHIPWARD</div><div class="tag">the fleet</div></header>
@@ -185,7 +217,32 @@ const PAGE = `<!doctype html>
     if (text != null) n.textContent = text;
     return n;
   };
+  function candidateNode(r) {
+    const row = el('div', 'row cand');
+    row.append(el('span', 'name dead', r.name));
+    row.append(el('span', 'tagline', r.folder + ' — a git repo, not on Shipward yet'));
+    const btn = el('button', 'onboard', 'Onboard');
+    btn.onclick = async () => {
+      // Escaped once for THIS file's template literal, so the page receives a
+      // literal backslash-n. An unescaped pair here became a real newline in
+      // the served source, snapped this string across lines, and killed the
+      // entire script with a syntax error the poll's catch never sees.
+      if (!confirm('Wire ' + r.name + ' to Shipward?\\n\\nAdds .shipward/, hooks, MCP registration and the CLAUDE.md protocol to that repo. Additive and reversible; nothing existing is overwritten.')) return;
+      btn.disabled = true;
+      btn.textContent = 'Wiring…';
+      try {
+        const out = await (await fetch('/api/onboard', { method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ repo: r.repo }) })).json();
+        if (!out.ok) { alert('Onboarding failed:\\n' + (out.error || out.output)); btn.disabled = false; btn.textContent = 'Onboard'; return; }
+      } catch (e) { alert('Onboarding failed: ' + e); btn.disabled = false; btn.textContent = 'Onboard'; return; }
+      refresh();   // the row comes back as a live board with its own desk
+    };
+    row.append(btn);
+    return row;
+  }
   function rowNode(r) {
+    if (r.kind === 'candidate') return candidateNode(r);
     const row = el('div', r.ok ? 'row' : 'row dead');
     if (r.ok && r.desk && /^http:\\/\\/localhost:\\d+$/.test(r.desk)) {
       const a = el('a', 'name', r.name);
@@ -212,10 +269,13 @@ const PAGE = `<!doctype html>
   async function refresh() {
     try {
       const rows = await (await fetch('/api/fleet')).json();
-      const active = rows.filter((r) => r.ok && (r.working + r.review) > 0).length;
+      const boards = rows.filter((r) => r.kind === 'board');
+      const cands = rows.length - boards.length;
+      const active = boards.filter((r) => r.ok && (r.working + r.review) > 0).length;
       document.getElementById('lede').textContent =
-        rows.length + ' board' + (rows.length === 1 ? '' : 's') + ' found' +
-        (rows.length ? ' — ' + active + ' with something in flight. Click a name to open its desk.' : '.');
+        boards.length + ' board' + (boards.length === 1 ? '' : 's') + ' — ' + active + ' with something in flight'
+        + (cands ? ' · ' + cands + ' repo' + (cands === 1 ? '' : 's') + ' not onboarded yet' : '')
+        + '. Click a name to open its desk.';
       const box = document.getElementById('rows');
       box.replaceChildren(...(rows.length ? rows.map(rowNode)
         : [el('p', 'lede', 'No .shipward/tracker.json under this root. Onboard a repo with shipward/setup.mjs.')]));
@@ -235,6 +295,26 @@ const server = createServer(async (req, res) => {
     if (url.pathname === '/api/fleet') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(await rows()));
+    } else if (url.pathname === '/api/onboard' && req.method === 'POST') {
+      let body = '';
+      req.on('data', (d) => { body += d; if (body.length > 4096) req.destroy(); });
+      await new Promise((r) => req.on('end', r));
+      let repo;
+      try { repo = JSON.parse(body).repo; } catch { /* falls through to the check */ }
+      // Only a repo the walk itself just found as a candidate. Anything else —
+      // an arbitrary path, an already-onboarded board, a dir with no git —
+      // is refused with the reason.
+      const { candidates } = await scan();
+      const hit = candidates.find((c) => c.repo === repo);
+      if (!hit) {
+        res.writeHead(400, { 'content-type': 'application/json' });
+        res.end(JSON.stringify({ ok: false, error: 'not an onboardable repo under this root (needs .git, no tracker yet)' }));
+        return;
+      }
+      const result = await onboard(hit.repo);
+      log(`onboard ${basename(hit.repo)}: ${result.ok ? 'ok' : 'FAILED'}`);
+      res.writeHead(result.ok ? 200 : 500, { 'content-type': 'application/json' });
+      res.end(JSON.stringify(result));
     } else if (url.pathname === '/') {
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
       res.end(PAGE.replace('__ROOT__', ROOT.replace(/[&<>]/g, '')));
@@ -259,5 +339,5 @@ server.listen(PORT, '127.0.0.1', async () => {
   const port = server.address().port;
   console.log(`Shipward — the fleet\n  http://localhost:${port}\n  root: ${ROOT}`);
   // Spawn the desks up front so first click works; rows() keeps them honest.
-  for (const f of (await scan()).slice(0, MAX_DESKS)) if (!desks.has(f.tracker)) spawnDesk(f);
+  for (const f of (await scan()).boards.slice(0, MAX_DESKS)) if (!desks.has(f.tracker)) spawnDesk(f);
 });

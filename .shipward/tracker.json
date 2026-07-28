@@ -11,6 +11,28 @@
   ],
   "cards": [
     {
+      "id": "SW-036",
+      "p": "shipward",
+      "title": "Onboard from the fleet — a button, not a command",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/onboard-button",
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-28T15:10:33.807Z",
+          "kind": "brief",
+          "text": "Alberto: I do not want commands, I want something easier. The fleet already walks the projects folder, so it can SEE git repos that are not onboarded yet. They become rows — dimmed, with an Onboard button — and the button POSTs to the fleet server, which runs the same setup.mjs the command line runs. SAFETY SHAPE: the endpoint never takes a path on faith — it re-scans and only onboards a repo the walk itself found under the root with a .git and no tracker, so the API cannot be aimed at an arbitrary directory; the server stays bound to 127.0.0.1."
+        }
+      ],
+      "created": "2026-07-28T15:10:33.807Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-034",
       "p": "shipward",
       "title": "Fleet view — one page over every onboarded board",
@@ -1123,6 +1145,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T15:10:33.807Z",
+      "p": "shipward",
+      "msg": "SW-036 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:36:27.883Z",
       "p": "shipward",

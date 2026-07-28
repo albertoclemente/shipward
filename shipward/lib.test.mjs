@@ -310,7 +310,8 @@ test('feedLede counts who did what, and says when the cap has bitten', () => {
   ], 'shipward', { now: NOW });
 
   assert.equal(feedLede(days), '3 entries over 2 days, 2 by Claude Code, 1 by you.');
-  assert.match(feedLede(days, { capped: true }), new RegExp(`most recent ${FEED_CAP} — anything older has rolled off`));
+  assert.match(feedLede(days, { capped: true }),
+    new RegExp(`most recent ${FEED_CAP} — older entries live in .shipward/feed-archive.jsonl`));
 
   // "1 entries" reads like a bug in a product whose whole pitch is care.
   const solo = feedDays([at('2026-07-28T09:00:00Z', 'a')], 'shipward', { now: NOW });

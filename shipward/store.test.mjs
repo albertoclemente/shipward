@@ -380,3 +380,85 @@ test('a grave left by a killed breaker is eventually collected', async () => {
 
   await assert.rejects(stat(grave), 'the grave should have been swept');
 });
+
+/* ── the feed archive (SW-027) ───────────────────────────── */
+// The store reads its paths at import time, so these run in a child process
+// pointed at the sandbox, same as the concurrency tests.
+
+const inChild = (code) => run(process.execPath, ['--input-type=module', '-e', code],
+  { env: { ...process.env, SHIPWARD_TRACKER: tracker } });
+
+const feedEntry = (n) => ({
+  t: new Date(Date.UTC(2026, 6, 1, 0, 0, n)).toISOString(),
+  p: 'test', msg: `entry ${n}`, by: 'claude',
+});
+
+test('entries trimmed by the cap land in the archive, oldest first', async () => {
+  // Fill to the cap, then push 5 more through mutate — normalize() trims.
+  const d = seed();
+  d.feed = Array.from({ length: 200 }, (_, i) => feedEntry(200 - i)); // newest first
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  await inChild(`
+    import { mutate } from ${JSON.stringify(STORE)};
+    await mutate((doc) => {
+      for (let n = 201; n <= 205; n++) {
+        doc.feed.unshift({ t: new Date(Date.UTC(2026, 6, 1, 0, 0, n)).toISOString(), p: 'test', msg: 'entry ' + n, by: 'claude' });
+      }
+      return doc;
+    });`);
+
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(doc.feed.length, 200, 'the cap still holds');
+  assert.equal(doc.feed[0].msg, 'entry 205');
+
+  const lines = (await readFile(join(sandbox, '.shipward', 'feed-archive.jsonl'), 'utf8'))
+    .trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((l) => l.msg), ['entry 1', 'entry 2', 'entry 3', 'entry 4', 'entry 5'],
+    'exactly the trimmed entries, oldest first');
+
+  // The union of tracker + archive is everything ever written.
+  const all = new Set([...doc.feed, ...lines].map((f) => f.msg));
+  assert.equal(all.size, 205, 'no entry exists nowhere');
+});
+
+test('a write that drops nothing writes no archive', async () => {
+  await inChild(`
+    import { mutate } from ${JSON.stringify(STORE)};
+    await mutate((doc) => { doc.feed.unshift({ t: '2026-07-01T00:00:00Z', p: 'test', msg: 'one', by: 'user' }); return doc; });`);
+  await assert.rejects(stat(join(sandbox, '.shipward', 'feed-archive.jsonl')),
+    'no drops, no file — an empty archive would look like a bug');
+});
+
+test('replace() archives what the incoming body no longer carries', async () => {
+  const d = seed();
+  d.feed = [feedEntry(2), feedEntry(1)];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  // The desk PUTs a doc whose feed lost entry 1 (its own feedAdd sliced it).
+  await inChild(`
+    import { replace } from ${JSON.stringify(STORE)};
+    const doc = ${JSON.stringify(d)};
+    doc.feed = [doc.feed[0]];
+    await replace(doc);`);
+
+  const lines = (await readFile(join(sandbox, '.shipward', 'feed-archive.jsonl'), 'utf8'))
+    .trim().split('\n').map((l) => JSON.parse(l));
+  assert.deepEqual(lines.map((l) => l.msg), ['entry 1']);
+});
+
+test('an unwritable archive does not take the tracker write with it', async () => {
+  const d = seed();
+  d.feed = [feedEntry(2), feedEntry(1)];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  // A directory where the archive file should be makes appendFile fail.
+  await mkdir(join(sandbox, '.shipward', 'feed-archive.jsonl'));
+
+  const { stderr } = await inChild(`
+    import { mutate } from ${JSON.stringify(STORE)};
+    await mutate((doc) => { doc.feed = [doc.feed[0]]; return doc; });`);
+
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(doc.feed.length, 1, 'the tracker write must land regardless');
+  assert.match(stderr, /could not archive 1 feed entry/, 'but not silently');
+});

@@ -26,7 +26,7 @@ All state lives in `.shipward/tracker.json` (schema: `.shipward/schema.json`). S
 - `backlog` — planned, not started
 - `claude` — you are actively working on it (set `claude` field: `queued` → `working` → `done`)
 - `review` — done, waiting for the human to look at it
-- `pushed` — merged/deployed to production
+- `pushed` — landed on the trunk (`main`); this is the status the git reconciler can prove and set on its own
 - `shipped` — archived; terminal. Never delete cards — archive them.
 
 Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, never reused).

@@ -74,7 +74,7 @@ test('dropping a card on the column it already occupies is a no-op', () => {
 test('feed copy is verbatim', () => {
   assert.equal(moveMsg('SW-004', 'claude'), 'SW-004 handed to Claude Code — queued');
   assert.equal(moveMsg('SW-004', 'review'), 'SW-004 moved to Review — give it a look');
-  assert.equal(moveMsg('SW-004', 'pushed'), 'SW-004 pushed to production — nice work');
+  assert.equal(moveMsg('SW-004', 'pushed'), 'SW-004 landed on main — nice work');
   assert.equal(moveMsg('SW-004', 'shipped'), 'SW-004 filed to the archive');
   assert.equal(moveMsg('SW-004', 'backlog'), 'SW-004 sent back to Backlog');
 });
@@ -216,7 +216,7 @@ test('archiveRows does not reorder the caller\'s array', () => {
 test('the archive lede counts one entry as an entry', () => {
   assert.match(archiveLede('Shipward', 1), /— 1 entry and counting/);
   assert.match(archiveLede('Shipward', 0), /— 0 entries and counting/);
-  assert.match(archiveLede('Brewnote', 12), /^Everything Brewnote has pushed to production — 12 entries and counting\./);
+  assert.match(archiveLede('Brewnote', 12), /^Everything Brewnote has landed on main — 12 entries and counting\./);
 });
 
 test('the MCP tag is lit only while a server is actually heartbeating', () => {

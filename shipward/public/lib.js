@@ -7,7 +7,7 @@ export const COLUMNS = [
   { key: 'backlog', label: 'Backlog', hint: 'ideas & queued work', empty: 'Backlog is clear — dream something up.' },
   { key: 'claude', label: 'Claude working', hint: 'delegated over MCP', empty: 'Claude is idle. Drag a card here to delegate.' },
   { key: 'review', label: 'Review', hint: 'your eyes on it', empty: 'Nothing to review — trust your past self.' },
-  { key: 'pushed', label: 'Pushed', hint: 'in production', empty: 'The next push lands here.' },
+  { key: 'pushed', label: 'Pushed', hint: 'landed on main', empty: 'The next merge lands here.' },
 ];
 
 export const FEED_CAP = 200;
@@ -96,7 +96,7 @@ export function moveMsg(id, status) {
   switch (status) {
     case 'claude': return `${id} handed to Claude Code — queued`;
     case 'review': return `${id} moved to Review — give it a look`;
-    case 'pushed': return `${id} pushed to production — nice work`;
+    case 'pushed': return `${id} landed on main — nice work`;
     case 'shipped': return `${id} filed to the archive`;
     default: return `${id} sent back to Backlog`;
   }
@@ -180,7 +180,7 @@ export function archiveRows(cards, projectId) {
 export function archiveLede(projectName, count) {
   // "1 entries" reads like a bug in a product whose whole pitch is care.
   const entries = count === 1 ? '1 entry' : `${count} entries`;
-  return `Everything ${projectName} has pushed to production — ${entries} and counting. Look how far it's come.`;
+  return `Everything ${projectName} has landed on main — ${entries} and counting. Look how far it's come.`;
 }
 
 // Sort rather than trusting position: the file is newest-first by convention,

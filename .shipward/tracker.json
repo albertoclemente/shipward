@@ -17,13 +17,13 @@
       "type": "bug",
       "pri": "P3",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/mcp-cancellation",
       "commit": "708aeb9",
       "note": "Deferred from SW-020, deliberately. notifications/cancelled is accepted and then ignored: the cancelled call keeps running, still writes, and still holds the write queue behind it. Real cancellation means carrying an AbortSignal from the notification through callTool into mutate() and the cross-process file lock, and deciding what a half-applied mutation means — a lock holder cannot simply be abandoned. That is a larger change than the finding warrants, and bodging it would be worse than the honest gap. The blast radius today is small: a client that cancels gets no reply and the write lands anyway. || IMPLEMENTED, and the deferral reasoning in the brief above turned out to be answerable rather than blocking. THE SHAPE: cancellation is best-effort with a DEFINED COMMIT POINT, which is the only honest version of it. A queued call never runs. A running one is abandoned inside mutate() just before the write, lock released and file untouched. While waiting for the lock, acquire() checks the signal on each retry, so a cancelled call stops occupying the write queue instead of blocking whatever is behind it — that was the part I had assumed needed a big change and did not. Past the rename the write is durable, so the work finishes; cancelling there would mean inventing an undo. Either way NO response is sent, per the protocol. DESIGN CALL: CancelledError is its own type, not a tool failure — nothing went wrong and nothing was written, so it must not surface as an errored result the model would read and retry. An unknown or already-finished requestId is ignored, because a reply and a cancellation crossing is the normal race. TESTING GOTCHA WORTH KEEPING: my first cancellation test PASSED against the pre-fix server, which nearly let a non-test through. It was racing the write it was meant to catch — it used tools/list as its barrier, and SW-020 had just made protocol frames stop waiting on the write queue, so the barrier no longer barred anything. Serialising behind a tools/call fixed it, and both tests then failed against the old code as they should. A test that passes before the fix is not a test. 173 tests pass, 4 new.",
       "created": "2026-07-27T18:57:43.529Z",
-      "pushed": null,
+      "pushed": "2026-07-28T07:26:14.536Z",
       "shipped": null
     },
     {
@@ -348,6 +348,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T07:26:14.536Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-021 merged to main — cancellation honoured",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T07:26:14.188Z",
       "p": "shipward",
@@ -770,7 +776,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-28T07:26:14.172Z",
-    "pid": 97694
+    "lastSeen": "2026-07-28T07:26:14.517Z",
+    "pid": 97706
   }
 }

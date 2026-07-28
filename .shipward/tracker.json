@@ -17,15 +17,30 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/fleet-link",
-      "commit": null,
+      "commit": "5302d84",
       "note": [
         {
           "t": "2026-07-28T15:59:53.736Z",
           "kind": "brief",
           "text": "Alberto, on the desk: where is browser back? A desk opened from the fleet had no way home but browser chrome — invisible in the Claude Code pane. Fix: the fleet appends ?fleet=<its origin> to each desk link; the desk renders a home link in the header when, and only when, that param names a localhost origin. Validated by a pure lib function, because a URL taken from the query string and rendered as a link is exactly how open-redirect decorations get in."
+        },
+        {
+          "t": "2026-07-28T16:04:53.002Z",
+          "kind": "outcome",
+          "text": "SHIPPED. fleet.mjs stamps each desk link with ?fleet=<origin>; app.js reads it once through lib_s fleetLinkFrom(), which accepts ONLY http://localhost:port or http://127.0.0.1:port — javascript: urls, real domains, localhost.evil.com and path-carrying values all die in the test suite, because a link rendered from a query parameter is an open redirect wearing a home icon. A desk opened without the param (bookmark, manual serve) shows no link at all."
+        },
+        {
+          "t": "2026-07-28T16:04:53.002Z",
+          "kind": "finding",
+          "text": "REGRESSION, CAUGHT LIVE, MY OWN BELT: the fleet page_s SW-034 defence — a strict origin-only regex before rendering desk hrefs — rejected the new ?fleet= URLs and silently UNLINKED every board (10 rows, zero anchors, no error anywhere). Producer grew, consumer_s pattern did not. Fixed by parsing with new URL() and checking what actually matters (http, local host, bare path), which survives the next parameter too; the producer_s URL shape is now pinned by an assertion in fleet.test. LESSON: a validator written as a snapshot of today_s shape is a regression waiting for the first evolution — validate properties, not spellings. KNOWN LIMIT: the fleet page_s row rendering still has no DOM-level test (zero-dep, no jsdom), which is exactly why this only surfaced in the live browser."
+        },
+        {
+          "t": "2026-07-28T16:04:53.002Z",
+          "kind": "evidence",
+          "text": "VERIFIED as the full round trip in the live pane against the launchd service (kickstarted twice to pick up code): fleet → click Shipward → desk header shows ← fleet linking to http://localhost:4740/ → click → back on the fleet. 252 tests pass (fleetLinkFrom acceptance/rejection table, producer URL shape)."
         }
       ],
       "created": "2026-07-28T15:59:53.736Z",
@@ -1224,6 +1239,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T16:04:53.002Z",
+      "p": "shipward",
+      "msg": "SW-038 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T15:59:53.736Z",
       "p": "shipward",

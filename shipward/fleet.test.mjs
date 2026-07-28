@@ -97,7 +97,12 @@ test('rows carry the counts and the last feed line, busiest board first', async 
 test('each child desk serves ITS OWN board — isolation is the whole point', async () => {
   const rows = await fleetRows();
   for (const r of rows.filter((x) => x.ok)) {
-    const doc = await (await fetch(`${r.desk.replace('localhost', '127.0.0.1')}/api/tracker`)).json();
+    // The desk link now carries the way home; strip it for the API probe and
+    // assert it points back at THIS fleet.
+    const u = new URL(r.desk);
+    assert.equal(u.pathname, '/', 'origin + fleet param only — the page validator counts on this shape');
+    assert.equal(new URLSearchParams(u.search).get('fleet'), base.replace('127.0.0.1', 'localhost'), 'the return address names the fleet that spawned the desk');
+    const doc = await (await fetch(`${u.origin.replace('localhost', '127.0.0.1')}/api/tracker`)).json();
     assert.equal(doc.projects[0].name, r.name, `${r.name}'s desk serves ${doc.projects[0].name}`);
   }
 });

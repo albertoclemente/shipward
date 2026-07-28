@@ -3,7 +3,7 @@
 import {
   COLUMNS, fmtDate, relTime, nextId, moveMsg, applyTransition,
   feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed, feedDays, feedLede,
-  claudeSince, elapsedShort, filterFeed,
+  claudeSince, elapsedShort, filterFeed, fleetLinkFrom,
   archiveRows, archiveLede, addMsg, editMsg, deleteMsg, mcpStatus, FEED_CAP,
 } from './lib.js';
 import {
@@ -239,12 +239,18 @@ function render() {
   renderDialog(doc, project);
 }
 
+// Set once by the fleet's link (?fleet=http://localhost:4740) and validated
+// hard in lib — a desk opened any other way has no fleet to go back to, and
+// shows nothing.
+const FLEET_HOME = fleetLinkFrom(location.search);
+
 function renderHeader(doc, project) {
   return el('header', { class: 'nav' },
     el('div', { class: 'brand-group' },
       el('div', { class: 'brand-mark' }),
       el('div', { class: 'nav-brand', text: 'SHIPWARD' }),
       el('div', { class: 'text-muted brand-tag', text: 'the solo shipping desk' }),
+      FLEET_HOME ? el('a', { class: 'nav-fleet', href: FLEET_HOME, text: '← fleet' }) : null,
     ),
     el('div', { class: 'seg' }, doc.projects.map((p) =>
       el('label', { class: 'seg-opt', style: 'font-family:var(--font-heading);font-weight:600' },

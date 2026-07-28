@@ -218,6 +218,15 @@ export function elapsedShort(iso, now = Date.now()) {
   return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
 }
 
+// The fleet's return address, taken from the query string the fleet itself
+// appended (?fleet=http://localhost:4740). Validated hard: this value becomes
+// an href, and a link rendered from an unchecked query parameter is an open
+// redirect wearing a home icon. Only a local origin, nothing else.
+export function fleetLinkFrom(search) {
+  const v = new URLSearchParams(search || '').get('fleet');
+  return v && /^http:\/\/(localhost|127\.0\.0\.1):\d{1,5}$/.test(v) ? v : null;
+}
+
 // The Log's filters. `by` follows the same rule feedDays uses to label
 // authors: anything that is not 'user' reads as Claude, because `by` is
 // nullable in old hand-written entries and a null there is not a third person.

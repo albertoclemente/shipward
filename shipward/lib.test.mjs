@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 import {
   fmtDate, relTime, autoBranch, nextId, moveMsg, applyTransition,
   feedAdd, deriveColumns, deriveStats, latestFeed, feedDays, feedLede, messageParts, FEED_CAP,
-  claudeSince, elapsedShort, filterFeed,
+  claudeSince, elapsedShort, filterFeed, fleetLinkFrom,
   archiveRows, archiveLede, mcpStatus, MCP_STALE_MS,
 } from './public/lib.js';
 
@@ -406,4 +406,15 @@ test('filterFeed query matches the message text, case-insensitively', () => {
   assert.deepEqual(filterFeed(feed, { query: 'sw-024' }).map((f) => f.msg), ['SW-024 moved to Review']);
   assert.deepEqual(filterFeed(feed, { query: '  ' }).length, 2, 'whitespace is no filter');
   assert.deepEqual(filterFeed(feed, { by: 'claude', query: 'reconciled' }).map((f) => f.msg), ['Reconciled with git']);
+});
+
+test('fleetLinkFrom accepts only a local origin — an href from a query param earns paranoia', () => {
+  assert.equal(fleetLinkFrom('?fleet=http%3A%2F%2Flocalhost%3A4740'), 'http://localhost:4740');
+  assert.equal(fleetLinkFrom('?fleet=http://127.0.0.1:4740'), 'http://127.0.0.1:4740');
+  for (const evil of [
+    '?fleet=https://evil.example', '?fleet=http://localhost:4740/phish',
+    '?fleet=javascript:alert(1)', '?fleet=http://localhost.evil.com:80', '', null,
+  ]) {
+    assert.equal(fleetLinkFrom(evil), null, `${evil} must not become a link`);
+  }
 });

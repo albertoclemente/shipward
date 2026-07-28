@@ -17,7 +17,7 @@
       "type": "bug",
       "pri": "P3",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/pushed-copy",
       "commit": "a801d1b",
@@ -31,10 +31,15 @@
           "t": "2026-07-28T13:20:22.896Z",
           "kind": "outcome",
           "text": "SHIPPED. Column hint in production → landed on main; empty copy The next push lands here → The next merge lands here; moveMsg pushed to production — nice work → landed on main — nice work; archiveLede likewise; CLAUDE.md status list now says pushed = landed on the trunk, the status the reconciler can prove and set on its own. Two test assertions updated with the copy. 234 tests pass. NOTE FOR THE LOG READER: feed entries written before this card still say pushed to production — a log records what was said at the time, and rewriting history is exactly what this tracker exists to not do."
+        },
+        {
+          "t": "2026-07-28T13:20:23.394Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — a801d1b is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T13:19:36.099Z",
-      "pushed": null,
+      "pushed": "2026-07-28T13:20:23.394Z",
       "shipped": null
     },
     {
@@ -997,6 +1002,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T13:20:23.394Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-032 review → pushed",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T13:20:22.896Z",
       "p": "shipward",

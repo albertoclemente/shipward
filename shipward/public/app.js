@@ -162,10 +162,23 @@ async function saveCard(values, opened) {
       if (noteAdd) {
         touched.note = appendedNote(doc.cards[i].note, doc.cards[i].created, { t: now(), text: noteAdd });
       }
-      if (!Object.keys(touched).length) return null;
-      doc.cards[i] = { ...doc.cards[i], ...touched };
-      const fields = Object.keys(touched).sort().join(', ');
-      doc.feed = feedAdd(doc.feed, doc.cards[i].p, editMsg(doc.cards[i].id, fields), now());
+      // A status change is a MOVE, not an edit: it goes through the same
+      // applyTransition the drag uses (stamps pushed/shipped, clears claude)
+      // and gets the drag's own feed message, so the Log reads identically
+      // whichever way the card travelled.
+      const { status: toStatus, ...rest } = touched;
+      let moved = null;
+      if (toStatus && toStatus !== doc.cards[i].status) {
+        moved = applyTransition(doc.cards[i], toStatus, now());
+        if (moved) doc.cards[i] = moved;
+      }
+      if (!moved && !Object.keys(rest).length) return null;
+      doc.cards[i] = { ...doc.cards[i], ...rest };
+      if (moved) doc.feed = feedAdd(doc.feed, doc.cards[i].p, moveMsg(doc.cards[i].id, doc.cards[i].status), now());
+      if (Object.keys(rest).length) {
+        const fields = Object.keys(rest).sort().join(', ');
+        doc.feed = feedAdd(doc.feed, doc.cards[i].p, editMsg(doc.cards[i].id, fields), now());
+      }
       return doc;
     }
     const project = activeProject(doc);
@@ -256,7 +269,12 @@ function renderHeader(doc, project) {
 }
 
 function renderActivity(feed, stats, project) {
-  return el('div', { class: 'activity' },
+  // role="status" = an implicit polite live region: the strip is the desk's
+  // heartbeat and repaints on every poll, and without this it was silent to
+  // screen readers. Honest limit: render() replaces the whole node, so
+  // announcement of changes depends on the SR treating the swapped-in region
+  // as an update — the common ones do, but a persistent node would be surer.
+  return el('div', { class: 'activity', role: 'status' },
     icon('terminal'),
     // Attribute honestly — the strip used to label your own drags "Claude Code".
     el('span', { class: 'activity-who', text: feed?.by === 'user' ? 'You' : 'Claude Code' }),
@@ -625,7 +643,7 @@ function renderDialog(doc, project) {
   // Snapshot of the card as it stood when the dialog opened, so save can tell
   // what the human edited from what merely drifted on disk underneath.
   const opened = card
-    ? { title: c.title || '', type: c.type, pri: c.pri, effort: c.effort, branch: c.branch || null, note: c.note || '' }
+    ? { title: c.title || '', type: c.type, pri: c.pri, effort: c.effort, status: c.status, branch: c.branch || null, note: c.note || '' }
     : null;
 
   const form = el('form', { class: 'dialog', onclick: (e) => e.stopPropagation(),
@@ -640,6 +658,7 @@ function renderDialog(doc, project) {
         type: fd.get('type') || 'feature',
         pri: fd.get('pri') || 'P2',
         effort: fd.get('effort') || 'M',
+        ...(card ? { status: fd.get('status') || c.status } : {}),
         branch: String(fd.get('branch') || '').trim() || null,
         // Three shapes on purpose: a new card's note starts life as its brief
         // entry; a structured note APPENDS (against the live card, not the
@@ -669,6 +688,20 @@ function renderDialog(doc, project) {
       segGroup('Priority', 'pri', ['P1', 'P2', 'P3'], c.pri, 'P2'),
       segGroup('Effort', 'effort', ['S', 'M', 'L'], c.effort, 'M'),
     ),
+    // The keyboard's answer to dragging. Radios are arrow-key navigable, and
+    // the save routes through the same applyTransition the drag uses, so the
+    // two paths cannot disagree about what a move means. New cards always land
+    // in Backlog, which the dialog already says — no control needed there.
+    card
+      ? el('div', { class: 'field' },
+          el('label', { text: 'Status — moves the card, same as dragging it' }),
+          el('div', { class: 'seg' }, ['backlog', 'claude', 'review', 'pushed', 'shipped'].map((v) =>
+            el('label', { class: 'seg-opt' },
+              el('input', { type: 'radio', name: 'status', value: v, checked: c.status === v }),
+              v === 'claude' ? 'claude working' : v,
+            ))),
+        )
+      : null,
     el('div', { class: 'field' },
       el('label', { text: "Branch — optional, Claude names one if you don't" }),
       el('input', { class: 'input', name: 'branch', value: c.branch || '', placeholder: 'feat/…',

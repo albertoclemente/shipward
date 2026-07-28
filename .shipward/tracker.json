@@ -17,7 +17,7 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/product-fit",
       "commit": "6dbc14c",
@@ -36,10 +36,15 @@
           "t": "2026-07-28T13:10:09.893Z",
           "kind": "evidence",
           "text": "VERIFIED live: badge read Claude is on it · 2m against this card_s own start entry; the You filter returned 6 rows with the lede agreeing (every one written by you); query SW-028 under You isolated the single by:user dialog-append test entry, which is exactly right; answered by SW-012 opened SW-012_s dialog with the correct title; Claude Code filter over the full log read 100 entries over 3 days, every one written by Claude Code — the sentence the product was built to produce. 234 tests pass, 4 new (claudeSince newest-wins and cross-project blindness, elapsedShort thresholds, filterFeed author rule + query)."
+        },
+        {
+          "t": "2026-07-28T13:10:26.494Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 6dbc14c is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T13:06:33.565Z",
-      "pushed": null,
+      "pushed": "2026-07-28T13:10:26.494Z",
       "shipped": null
     },
     {
@@ -965,6 +970,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T13:10:26.494Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-031 review → pushed",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T13:10:09.893Z",
       "p": "shipward",

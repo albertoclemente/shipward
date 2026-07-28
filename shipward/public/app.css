@@ -441,3 +441,23 @@ textarea.input { min-height: 90px; resize: vertical; }
 @media (prefers-reduced-motion: reduce) {
   .mcp-dot { animation: none; }
 }
+
+/* ── product-fit pass (SW-031) ───────────────────────────── */
+.log-controls { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; margin-bottom: var(--space-4); }
+.log-who-seg { display: inline-flex; border: 1px solid var(--color-divider); }
+.log-filter {
+  font-family: var(--font-heading); font-weight: 600; font-size: 12px;
+  background: transparent; border: none; cursor: pointer; color: var(--color-neutral-700);
+  padding: 6px 12px; min-height: 32px;
+}
+.log-filter + .log-filter { border-left: 1px solid var(--color-divider); }
+.log-filter.is-on { background: var(--color-accent); color: var(--color-bg); }
+.log-filter:not(.is-on):hover { background: color-mix(in srgb, var(--color-text) 7%, transparent); }
+.log-search { max-width: 320px; min-height: 32px; font-size: 13px; }
+
+.mem-flag-link { background: transparent; cursor: pointer; font-family: inherit; }
+.mem-flag-link:hover { color: var(--color-accent-700); border-color: var(--color-accent); }
+
+/* Numbers that repaint every poll must not shimmy: same-width digits for
+   every counter the eye rests on. */
+.activity-stats, .log-day-n, .col-count, .tab, .mem-file-n, .log-day-date { font-variant-numeric: tabular-nums; }

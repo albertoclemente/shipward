@@ -11,6 +11,54 @@
   ],
   "cards": [
     {
+      "id": "SW-027",
+      "p": "shipward",
+      "title": "Feed entries roll off the cap into an archive, not the void",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/feed-archive",
+      "commit": null,
+      "note": "The Log tab (SW-025) promoted the feed to a first-class history view, but FEED_CAP still deletes entry 201 forever — 87 entries in 3 days means history starts vanishing within weeks. The lede admits the cap; admitting is not fixing. DESIGN: archive at the ONLY write seam, tracker-store, so every writer is covered (browser PUT via replace, MCP+hooks via mutate, and normalize(), which also trims). Entries present on disk but absent from the incoming doc are appended to .shipward/feed-archive.jsonl, oldest first, BEFORE the write — a failed write can duplicate an archive line, but the alternative orphans it, and for an archive dupes beat loss. KNOWN LIMIT: a direct hand-edit of tracker.json bypasses the store and cannot be caught; CLAUDE.md already routes writes through the tools.",
+      "created": "2026-07-28T11:12:54.619Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-028",
+      "p": "shipward",
+      "title": "Structured note entries — kinds and resolves become facts, not guesses",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "L",
+      "status": "backlog",
+      "claude": null,
+      "branch": "feat/structured-notes",
+      "commit": null,
+      "note": "Alberto ratified the fork SW-013 left open: card.note becomes an array of {t, kind, text, resolves?} entries instead of prose split on an unescaped delimiter. This kills all three parsing limits SW-013 documented on real data: mention-vs-use (SW-018 and SW-013 both sat on the standup as false opens for quoting marker words), the unescaped separator (a note mentioning the delimiter splits itself), and invisible cross-card resolution (SW-011 stayed open after SW-012 fixed the SPEC). resolves names a CARD id and settles that card_s open items — item 2 of the assessment folds in as a field. COMPAT: string notes remain valid in the schema and the parser, because CLAUDE.md documents hand-editing as a supported fallback; the classifier stays as the fallback for unlabelled text. Migration converts all existing cards via the existing splitter+classifier, hand-correcting the two known misclassifications, and files explicit resolves entries for SW-011 and SW-013.",
+      "created": "2026-07-28T11:12:54.619Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-029",
+      "p": "shipward",
+      "title": "done() nudges when a note teaches the next session nothing",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": "feat/note-lint",
+      "commit": null,
+      "note": "The one rung of the ladder that stays good faith: hooks can force touching Shipward but nothing can force a note worth reading — done with fixed-it satisfies every check. A gate would be gamed and then resented, so this is a NUDGE in the done() result text, never a rejection: when the note is missing or thin (few words, no decision/gotcha/verification signal), the tool answers with what the next session will be missing. Mirrors the pre-edit hook philosophy: warn, never block.",
+      "created": "2026-07-28T11:12:54.619Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-026",
       "p": "shipward",
       "title": "The desk overflows horizontally below ~444px",
@@ -428,6 +476,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T11:13:04.451Z",
+      "p": "shipward",
+      "msg": "SW-027 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:12:54.619Z",
+      "p": "shipward",
+      "msg": "You added SW-027, SW-028 and SW-029 to Backlog — the assessment becomes work",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T10:48:18.004Z",
       "p": "shipward",

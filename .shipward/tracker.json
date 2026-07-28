@@ -17,11 +17,11 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/feed-archive",
-      "commit": null,
-      "note": "The Log tab (SW-025) promoted the feed to a first-class history view, but FEED_CAP still deletes entry 201 forever — 87 entries in 3 days means history starts vanishing within weeks. The lede admits the cap; admitting is not fixing. DESIGN: archive at the ONLY write seam, tracker-store, so every writer is covered (browser PUT via replace, MCP+hooks via mutate, and normalize(), which also trims). Entries present on disk but absent from the incoming doc are appended to .shipward/feed-archive.jsonl, oldest first, BEFORE the write — a failed write can duplicate an archive line, but the alternative orphans it, and for an archive dupes beat loss. KNOWN LIMIT: a direct hand-edit of tracker.json bypasses the store and cannot be caught; CLAUDE.md already routes writes through the tools.",
+      "commit": "6f3c67c",
+      "note": "The Log tab (SW-025) promoted the feed to a first-class history view, but FEED_CAP still deletes entry 201 forever — 87 entries in 3 days means history starts vanishing within weeks. The lede admits the cap; admitting is not fixing. DESIGN: archive at the ONLY write seam, tracker-store, so every writer is covered (browser PUT via replace, MCP+hooks via mutate, and normalize(), which also trims). Entries present on disk but absent from the incoming doc are appended to .shipward/feed-archive.jsonl, oldest first, BEFORE the write — a failed write can duplicate an archive line, but the alternative orphans it, and for an archive dupes beat loss. KNOWN LIMIT: a direct hand-edit of tracker.json bypasses the store and cannot be caught; CLAUDE.md already routes writes through the tools. || SHIPPED. archiveDropped() at the one write seam, after normalize() because normalize is itself a trim site. Oldest-first JSONL; append BEFORE the write so failure duplicates rather than loses; unwritable archive warns on stderr and never blocks the tracker. THE BUG THE TESTS CAUGHT: mutate hands fn the LIVE document, so a callback that reassigns doc.feed (rather than unshifting in place) destroyed the only record of the previous feed — the diff compared the new feed to itself and archived nothing while entries vanished. The feed is now snapshotted before fn runs. My first cap test passed against the broken code purely because unshift mutates in place — the replace-style test is the one that failed honestly. Lede updated to name the archive file. 212 tests pass, 4 new. KNOWN LIMIT stands: a hand-edit of tracker.json bypasses the store and cannot be archived.",
       "created": "2026-07-28T11:12:54.619Z",
       "pushed": null,
       "shipped": null
@@ -476,6 +476,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T11:17:03.240Z",
+      "p": "shipward",
+      "msg": "SW-027 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T11:13:04.451Z",
       "p": "shipward",

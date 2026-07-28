@@ -278,7 +278,7 @@ export function feedLede(days, { capped = false } = {}) {
   // The cap is not a footnote. A view calling itself the whole history has to
   // say when it is not one, or it becomes a lie the first time the cap bites.
   const rolled = capped
-    ? ` This is the most recent ${FEED_CAP} — anything older has rolled off.`
+    ? ` This is the most recent ${FEED_CAP} — older entries live in .shipward/feed-archive.jsonl.`
     : '';
   return `${count} ${span}, ${who}.${rolled}`;
 }

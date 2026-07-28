@@ -39,9 +39,14 @@ before(async () => {
   // cwd matters since SW-033: the store prefers the tracker of the directory
   // you stand in over the install's own. This sandbox IS the repo under test,
   // so stand in it — spawning from the real repo would serve the real board.
+  // BOTH belt and braces after a real incident: during SW-033, this spawn
+  // briefly inherited the real repo as cwd, the new cwd-first resolution aimed
+  // it at the REAL tracker, and the PUT tests below replaced the live board
+  // with this seed. cwd points the sandbox at itself; the explicit env makes
+  // the target immune to any future change in resolution order.
   proc = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], {
     cwd: sandbox,
-    env: { ...process.env, SHIPWARD_PORT: '0' },
+    env: { ...process.env, SHIPWARD_PORT: '0', SHIPWARD_TRACKER: tracker },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   let stderr = '';
@@ -237,6 +242,7 @@ test('a second server on the same port fails loudly instead of dying silently', 
   const taken = Number(new URL(base).port);
   const clash = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], {
     cwd: sandbox,
+    env: { ...process.env, SHIPWARD_TRACKER: tracker },
     env: { ...process.env, SHIPWARD_PORT: String(taken) },
     stdio: ['ignore', 'ignore', 'pipe'],
   });

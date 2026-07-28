@@ -110,3 +110,5 @@
 {"t":"2026-07-28T13:20:22.896Z","p":"shipward","msg":"SW-032 moved to Review — give it a look","by":"claude"}
 {"t":"2026-07-28T13:20:23.394Z","p":"shipward","msg":"Reconciled with git — SW-032 review → pushed","by":"claude"}
 {"t":"2026-07-28T14:18:52.470Z","p":"shipward","msg":"SW-033 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-01T00:00:00Z","p":"test","msg":"seeded","by":"user"}
+{"t":"2026-07-28T14:23:55.668Z","p":"shipward","msg":"You added SW-034 to Backlog — it's on the list","by":"claude"}

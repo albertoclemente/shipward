@@ -1,12 +1,12 @@
 {
   "version": 1,
-  "activeProject": "test",
+  "activeProject": "shipward",
   "projects": [
     {
-      "id": "test",
-      "name": "Test",
-      "tag": "t",
-      "prefix": "TS"
+      "id": "shipward",
+      "name": "Shipward",
+      "tag": "the solo shipping desk",
+      "prefix": "SW"
     }
   ],
   "cards": [
@@ -21,45 +21,1766 @@
       "claude": null,
       "branch": null,
       "commit": null,
+      "created": "2026-07-28T14:26:46.531Z",
+      "pushed": null,
+      "shipped": null,
       "note": [
         {
-          "t": "2026-07-28T14:23:55.668Z",
+          "t": "2026-07-28T14:26:46.531Z",
           "kind": "brief",
-          "text": "The deferred half of SW-033. With per-repo trackers, Alberto_s choose-a-folder wish becomes: point the desk at ~/projects, scan depth-2 for .shipward/tracker.json, and render a fleet index — one row per project with its in-flight count, waiting count, last feed line and a link into that repo_s board. Deliberately NOT built with SW-033: serving N trackers from one process means per-tracker etags and PUT routing (/api/tracker is hardcoded today), and the single-repo flow had to prove itself first. DP-001 in the demo repo is that proof. Build this when two or more real projects are actually onboarded and switching between desks becomes the felt pain — let the failure pick the feature."
+          "text": "The deferred half of SW-033. With per-repo trackers, Alberto_s choose-a-folder wish becomes: point the desk at ~/projects, scan depth-2 for .shipward/tracker.json, and render a fleet index — one row per project with in-flight count, waiting count, last feed line and a link into that repo_s board. Deliberately deferred: serving N trackers from one process means per-tracker etags and PUT routing, and the single-repo flow had to prove itself first (DP-001 in the demo repo is that proof). Build when two or more real projects are onboarded and switching desks is the felt pain."
         }
-      ],
-      "created": "2026-07-28T14:23:55.668Z",
-      "pushed": null,
-      "shipped": null
+      ]
     },
     {
-      "id": "TS-001",
-      "p": "test",
-      "title": "A card",
-      "type": "feature",
+      "id": "SW-035",
+      "p": "shipward",
+      "title": "replace() warns when a write drops most of the board",
+      "type": "bug",
       "pri": "P2",
-      "effort": "M",
+      "effort": "S",
       "status": "backlog",
       "claude": null,
       "branch": null,
       "commit": null,
-      "created": "2026-07-01T00:00:00Z",
+      "created": "2026-07-28T14:26:46.531Z",
       "pushed": null,
+      "shipped": null,
+      "note": [
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "brief",
+          "text": "Born from the SW-033 clobber: a whole-document PUT replaced 32 cards with 1 and the store said nothing. The feed survived because SW-027 archives drops; the cards survived only because the tracker is committed to git. A write that removes more than half the existing cards should at least say so on stderr — visibility, not a gate, same doctrine as the feed archive: the desk legitimately replaces whole documents, but a massacre should never be silent."
+        }
+      ]
+    },
+    {
+      "id": "SW-033",
+      "p": "shipward",
+      "title": "setup.mjs — onboard any repo in one command",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/setup",
+      "commit": "1e12382",
+      "created": "2026-07-28T14:18:52.470Z",
+      "pushed": null,
+      "shipped": null,
+      "note": [
+        {
+          "t": "2026-07-28T14:18:52.470Z",
+          "kind": "brief",
+          "text": "Alberto wants Shipward for every future project. DESIGN CALL, made against the literal ask: NOT one shared tracker in a chosen folder — that would pool every repo into one contended file, pollute this repo_s git history with foreign cards, and break the premise that the tracker is THE REPO_S memory travelling with it. Instead: per-repo trackers + central code, one idempotent setup.mjs per repo, and a resolution ladder (env, then the repo you stand in, then this one) so every central tool finds the right board by where it runs. Fleet dashboard deferred to SW-034."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "decision",
+          "text": "DECIDED, against the literal ask: no shared tracker in a chosen folder. Per-repo trackers with central code, because the tracker is THE REPO_S memory — it commits and travels with the repo, foreign cards never pollute another project_s history, and hooks in N repos never contend for one lock."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "outcome",
+          "text": "SHIPPED. shipward/setup.mjs onboards a git repo in one idempotent run: seeds .shipward/ (tracker validated by the same validate() every write uses), merges hooks/statusline/.mcp.json with absolute central paths and inline SHIPWARD_TRACKER/SHIPWARD_REPO env, appends a marked protocol section to CLAUDE.md, never clobbers anything the target had. Refuses non-git targets and onboarding this repo onto itself. Resolution ladder in tracker-store and git.mjs: env, then cwd_s .shipward or .git, then the central default."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "finding",
+          "text": "THE LADDER BIT ITS OWN TAIL, HARD — the most important finding of the card. In the window between adding cwd-first resolution and re-pointing serve.test_s sandbox spawn, the sandboxed server inherited THIS repo as cwd, resolved the REAL tracker under the new ladder, and its PUT tests replaced the live board with a test seed: 32 cards and 111 feed entries gone from the file in one write. RECOVERED COMPLETELY from the system_s own redundancy: git held the cards (the tracker is committed — that is the card archive), and SW-027_s feed-archive.jsonl — built THIS MORNING — had caught all 112 dropped feed entries including the one newer than the last commit. The morning_s feature paid for itself against the afternoon_s bug. Belt added: serve.test spawns now pass SHIPWARD_TRACKER explicitly, so neither cwd nor ladder ordering can ever aim them at a real board again. Follow-up filed as SW-035: replace() should warn on stderr when a write drops most of the existing cards — the feed had an archive, the cards only had git."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "evidence",
+          "text": "VERIFIED end to end with a real headless Claude Code session in a throwaway onboarded repo: SessionStart standup arrived unasked describing the Demo Project empty board, the shipward MCP server connected and log allocated DP-001 into the demo_s own tracker (heartbeat written), CLAUDE.md carried the protocol — and this repo_s tracker held zero DP cards. 239 tests pass, 5 new. Test traps found: kept-messages contain the word wired so the idempotence regex needed a column anchor, and macOS spells one temp dir two ways (/var vs /private/var) so paths compare by realpath."
+        }
+      ]
+    },
+    {
+      "id": "SW-032",
+      "p": "shipward",
+      "title": "Pushed does not mean production — say what git can prove",
+      "type": "bug",
+      "pri": "P3",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "fix/pushed-copy",
+      "commit": "a801d1b",
+      "note": [
+        {
+          "t": "2026-07-28T13:19:36.099Z",
+          "kind": "brief",
+          "text": "Alberto flagged the Pushed column hint in production as wrong, and he is right: nothing in this system deploys anything. What pushed actually means here — and what the SW-024 reconciler literally verifies before moving a card there — is that the commit is an ancestor of main. Three strings make the production claim: the column hint, the moveMsg feed line, and the archive lede. All three change to say what git can prove: landed on main."
+        },
+        {
+          "t": "2026-07-28T13:20:22.896Z",
+          "kind": "outcome",
+          "text": "SHIPPED. Column hint in production → landed on main; empty copy The next push lands here → The next merge lands here; moveMsg pushed to production — nice work → landed on main — nice work; archiveLede likewise; CLAUDE.md status list now says pushed = landed on the trunk, the status the reconciler can prove and set on its own. Two test assertions updated with the copy. 234 tests pass. NOTE FOR THE LOG READER: feed entries written before this card still say pushed to production — a log records what was said at the time, and rewriting history is exactly what this tracker exists to not do."
+        },
+        {
+          "t": "2026-07-28T13:20:23.394Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — a801d1b is already on main (branch gone). The board said review."
+        }
+      ],
+      "created": "2026-07-28T13:19:36.099Z",
+      "pushed": "2026-07-28T13:20:23.394Z",
       "shipped": null
+    },
+    {
+      "id": "SW-031",
+      "p": "shipward",
+      "title": "Product-fit pass — elapsed time, resolve links, log filters, tabular figures",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/product-fit",
+      "commit": "6dbc14c",
+      "note": [
+        {
+          "t": "2026-07-28T13:06:33.565Z",
+          "kind": "brief",
+          "text": "The product-fit half of the ui-ux-pro-max assessment. (1) CLAUDE IS ON IT becomes CLAUDE IS ON IT · 14m — elapsed since the newest handed-to-Claude feed entry for that card, DERIVED not stored, because the feed already records every start and a schema field would duplicate it. (2) The Memory view answered-by flags and resolves markers become links that open the named card — the cross-card facts SW-028 added are navigation, not decoration. (3) The Log gains filters: All / Claude Code / You plus a text query, because just-show-me-what-Claude-did is the query the view exists for. (4) font-variant-numeric tabular-nums on stats and counts so numbers stop shimmying between repaints. DECIDED AGAINST here: the serif-for-memory-prose flavor — a font import in a zero-dep app for a look nobody asked for."
+        },
+        {
+          "t": "2026-07-28T13:10:09.893Z",
+          "kind": "outcome",
+          "text": "SHIPPED, all four; the serif flavor was declined as briefed. (1) claudeSince() derives the working clock from the feed_s handed-to-Claude entries — newest wins because a card can be re-taken, null when rolled off the cap so the badge shows no clock rather than a guess. elapsedShort() is a duration (14m / 3h / 2d), deliberately distinct from relTime_s ago-times, and renders nothing for a future start instead of a negative. (2) The Memory flags are buttons now — resolves X and answered by X both open the named card. (3) Log filters follow the SAME author rule the labels use (anything not user reads as Claude, because by is nullable in old entries) — the filter and the label can never disagree. Filtered empty state says nothing matches that filter, not nothing logged yet. (4) tabular-nums on stats, counts and tabs."
+        },
+        {
+          "t": "2026-07-28T13:10:09.893Z",
+          "kind": "evidence",
+          "text": "VERIFIED live: badge read Claude is on it · 2m against this card_s own start entry; the You filter returned 6 rows with the lede agreeing (every one written by you); query SW-028 under You isolated the single by:user dialog-append test entry, which is exactly right; answered by SW-012 opened SW-012_s dialog with the correct title; Claude Code filter over the full log read 100 entries over 3 days, every one written by Claude Code — the sentence the product was built to produce. 234 tests pass, 4 new (claudeSince newest-wins and cross-project blindness, elapsedShort thresholds, filterFeed author rule + query)."
+        },
+        {
+          "t": "2026-07-28T13:10:26.494Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 6dbc14c is already on main (branch gone). The board said review."
+        }
+      ],
+      "created": "2026-07-28T13:06:33.565Z",
+      "pushed": "2026-07-28T13:10:26.494Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-030",
+      "p": "shipward",
+      "title": "A11y pass — keyboard status moves, contrast, motion, announcements",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "fix/a11y-pass",
+      "commit": "22e6e33",
+      "note": [
+        {
+          "t": "2026-07-28T13:01:23.159Z",
+          "kind": "brief",
+          "text": "Items 1-4 of the ui-ux-pro-max assessment, the CRITICAL rows. (1) Drag is the only way to move a card — the skill rule says never rely on a gesture without a visible alternative; fix = a Status seg-group in the edit dialog going through the same applyTransition the drag uses. (2) Muted text measured at ~3.7:1 on the page background (neutral-600 at 10.5-12px) — below the 4.5:1 AA floor for small text; neutral-700 measures ~5.7:1. (3) The MCP dot blinks on an infinite 2.4s loop with no prefers-reduced-motion guard. (4) The activity strip repaints every 3s poll but is silent to screen readers — role=status; the global ::focus-visible outline was AUDITED and already covers tabs/cards/buttons, so that half of item 4 needs nothing."
+        },
+        {
+          "t": "2026-07-28T13:04:32.605Z",
+          "kind": "outcome",
+          "text": "SHIPPED, all four. (1) Status seg-group in the edit dialog — radios, so arrow keys walk the columns; the save routes through the SAME applyTransition the drag uses and emits the drag_s own moveMsg, so the Log cannot tell how a card travelled. Status changes are moves, not edits: moveMsg for the move, editMsg only for other fields. (2) .text-muted 55%→70% and component text neutral-600→neutral-700. (3) prefers-reduced-motion parks the MCP dot — the ONLY infinite animation; 150-300ms transitions stay because state feedback is meaning, not motion. (4) role=status on the activity strip."
+        },
+        {
+          "t": "2026-07-28T13:04:32.605Z",
+          "kind": "evidence",
+          "text": "MEASURED, not asserted: old muted text 3.67:1 against the page background (fails the 4.5 floor at 10.5-12px); new values 5.79:1 (page), 5.83:1 (neutral-700 on page), 5.38:1 (neutral-700 on card surface) — all pass. Round-tripped SW-030 itself through the dialog live: claude→review→claude, both directions produced the correct feed messages and the reverse move re-queued claude exactly as a drag would. 230 tests pass — view-layer only, applyTransition already covered."
+        },
+        {
+          "t": "2026-07-28T13:04:32.605Z",
+          "kind": "decision",
+          "text": "AUDITED AND LEFT ALONE: a global ::focus-visible outline (2px accent) already exists and covers tabs, cards, and buttons — item 4_s focus half needed nothing, and adding per-component rings would have duplicated it. KNOWN LIMIT, stated in a comment: render() replaces the strip node each paint, so role=status announcements depend on the SR treating the swapped region as an update; a persistent live node outside root would be surer and is not worth the plumbing until a real SR user hits it."
+        },
+        {
+          "t": "2026-07-28T13:04:47.045Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 22e6e33 is already on main (branch gone). The board said review."
+        }
+      ],
+      "created": "2026-07-28T13:01:23.159Z",
+      "pushed": "2026-07-28T13:04:47.045Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-027",
+      "p": "shipward",
+      "title": "Feed entries roll off the cap into an archive, not the void",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/feed-archive",
+      "commit": "6f3c67c",
+      "note": [
+        {
+          "t": "2026-07-28T11:12:54.619Z",
+          "kind": "brief",
+          "text": "The Log tab (SW-025) promoted the feed to a first-class history view, but FEED_CAP still deletes entry 201 forever — 87 entries in 3 days means history starts vanishing within weeks. The lede admits the cap; admitting is not fixing. DESIGN: archive at the ONLY write seam, tracker-store, so every writer is covered (browser PUT via replace, MCP+hooks via mutate, and normalize(), which also trims). Entries present on disk but absent from the incoming doc are appended to .shipward/feed-archive.jsonl, oldest first, BEFORE the write — a failed write can duplicate an archive line, but the alternative orphans it, and for an archive dupes beat loss. KNOWN LIMIT: a direct hand-edit of tracker.json bypasses the store and cannot be caught; CLAUDE.md already routes writes through the tools."
+        },
+        {
+          "t": "2026-07-28T11:12:54.619Z",
+          "kind": "finding",
+          "text": "SHIPPED. archiveDropped() at the one write seam, after normalize() because normalize is itself a trim site. Oldest-first JSONL; append BEFORE the write so failure duplicates rather than loses; unwritable archive warns on stderr and never blocks the tracker. THE BUG THE TESTS CAUGHT: mutate hands fn the LIVE document, so a callback that reassigns doc.feed (rather than unshifting in place) destroyed the only record of the previous feed — the diff compared the new feed to itself and archived nothing while entries vanished. The feed is now snapshotted before fn runs. My first cap test passed against the broken code purely because unshift mutates in place — the replace-style test is the one that failed honestly. Lede updated to name the archive file. 212 tests pass, 4 new. KNOWN LIMIT stands: a hand-edit of tracker.json bypasses the store and cannot be archived."
+        },
+        {
+          "t": "2026-07-28T11:29:45.647Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 6f3c67c is already on main (branch gone). The board said review."
+        }
+      ],
+      "created": "2026-07-28T11:12:54.619Z",
+      "pushed": "2026-07-28T11:29:45.647Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-028",
+      "p": "shipward",
+      "title": "Structured note entries — kinds and resolves become facts, not guesses",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "L",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/structured-notes",
+      "commit": "679736e",
+      "note": [
+        {
+          "t": "2026-07-28T11:12:54.619Z",
+          "kind": "brief",
+          "text": "Alberto ratified the fork SW-013 left open: card.note becomes an array of {t, kind, text, resolves?} entries instead of prose split on an unescaped delimiter. This kills all three parsing limits SW-013 documented on real data: mention-vs-use (SW-018 and SW-013 both sat on the standup as false opens for quoting marker words), the unescaped separator (a note mentioning the delimiter splits itself), and invisible cross-card resolution (SW-011 stayed open after SW-012 fixed the SPEC). resolves names a CARD id and settles that card_s open items — item 2 of the assessment folds in as a field. COMPAT: string notes remain valid in the schema and the parser, because CLAUDE.md documents hand-editing as a supported fallback; the classifier stays as the fallback for unlabelled text. Migration converts all existing cards via the existing splitter+classifier, hand-correcting the two known misclassifications, and files explicit resolves entries for SW-011 and SW-013."
+        },
+        {
+          "t": "2026-07-28T11:34:37.512Z",
+          "text": "Browser-side append test: this entry came from the desk dialog, not a tool."
+        },
+        {
+          "t": "2026-07-28T11:35:43.990Z",
+          "kind": "outcome",
+          "resolves": "SW-013",
+          "text": "SHIPPED, and this entry is itself the proof: resolves names SW-013, whose one open item was the structured-vs-prose fork — Alberto ratified structured on 2026-07-28, this card built it, and the open ledger goes to zero the moment this entry lands. All three SW-013 limits are dead: stated kinds beat mention-vs-use (both false opens fixed in migration, plus a THIRD caught the same day it was written — SW-028 own brief saying left open ABOUT the fork), entries cannot be split by quoting the separator (SW-013 note was found genuinely severed mid-sentence and was rejoined in migration), and resolves carries cross-card resolution (SW-011 now reads answered by SW-012, which is the truth)."
+        },
+        {
+          "t": "2026-07-28T11:35:43.990Z",
+          "kind": "finding",
+          "text": "TWO BUGS FOUND WHILE BUILDING. (1) const {noteAdd, ...fields} in saveCard TDZ-collided with a later const fields declared in the same block — the submit handler threw before the PUT, the dialog just sat there, and nothing hit the network; found by attaching an error listener in the live page after read_network_requests showed zero PUTs. (2) The dev server had been running since before validate() learned the array form, so the desk 500ed on the migrated tracker until restart — a reminder that a long-lived server pins old code against a new data shape."
+        },
+        {
+          "t": "2026-07-28T11:35:43.990Z",
+          "kind": "evidence",
+          "text": "VERIFIED: 224 tests pass, 13 new (explicit-kind wins, cross-card and same-card resolves, entry dates, prose coexistence, separator immunity, appendedNote conversion + non-mutation, noteText render, junk tolerance, validate on both forms). Live desk: Memory shows answered by SW-012, dialog renders entry history with stamps and appends via the textarea (the by:user browser-side entry on this card is that verification). MCP smoke over the real binary against the migrated tracker."
+        },
+        {
+          "t": "2026-07-28T11:40:10.856Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 679736e is already on main (branch gone). The board said review."
+        }
+      ],
+      "created": "2026-07-28T11:12:54.619Z",
+      "pushed": "2026-07-28T11:40:10.856Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-029",
+      "p": "shipward",
+      "title": "done() nudges when a note teaches the next session nothing",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/note-lint",
+      "commit": "fca311b",
+      "note": [
+        {
+          "t": "2026-07-28T11:12:54.619Z",
+          "kind": "brief",
+          "text": "The one rung of the ladder that stays good faith: hooks can force touching Shipward but nothing can force a note worth reading — done with fixed-it satisfies every check. A gate would be gamed and then resented, so this is a NUDGE in the done() result text, never a rejection: when the note is missing or thin (few words, no decision/gotcha/verification signal), the tool answers with what the next session will be missing. Mirrors the pre-edit hook philosophy: warn, never block."
+        },
+        {
+          "t": "2026-07-28T11:39:20.641Z",
+          "kind": "outcome",
+          "text": "SHIPPED as a reply-side nudge in done(), never a gate. Three tiers: no note at all; trivial (fixed it / done / works, under ~25 extra chars); short with none of the signal words a note worth reading tends to carry (because, decided, tradeoff, gotcha, verified, root cause…). The signal scan only weighs in UNDER the 25-word floor — length is its own evidence of care, so a long note is never nagged about vocabulary."
+        },
+        {
+          "t": "2026-07-28T11:39:20.641Z",
+          "kind": "decision",
+          "text": "DECIDED: the nudge never blocks and the thin note is still written. A gate would be gamed within a day (pad the note to length) and resented for longer, and a padded note is WORSE than a thin one — it costs reading time and teaches the same nothing. resolves-only closes are exempt because the assertion is the note. This stays the one rung of the ladder that runs on good faith; the nudge just makes the faith legible at the moment it is cheapest to act on."
+        },
+        {
+          "t": "2026-07-28T11:39:20.641Z",
+          "kind": "evidence",
+          "text": "VERIFIED: 230 tests pass, 6 new — no-note nudges and still moves the card, fixed-it named for what it is, short-no-signal gets the gentler line, short-with-because passes clean, long passes clean, resolves-only exempt."
+        },
+        {
+          "t": "2026-07-28T11:40:10.856Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — fca311b is already on main (branch gone). The board said review."
+        }
+      ],
+      "created": "2026-07-28T11:12:54.619Z",
+      "pushed": "2026-07-28T11:40:10.856Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-026",
+      "p": "shipward",
+      "title": "The desk overflows horizontally below ~444px",
+      "type": "bug",
+      "pri": "P3",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "fix/desk-overflow",
+      "commit": "91665ed",
+      "note": [
+        {
+          "t": "2026-07-28T10:39:47.595Z",
+          "kind": "finding",
+          "text": "Found while verifying the SW-025 log view at 375px. NOT a regression from that card — measured document.scrollWidth at 444px on ALL FOUR views (Board, Log, Memory, Archive) against a 375px client width, so the source is shared chrome, almost certainly the header: brand + project segmented control + MCP tag + New card button on one row with no wrap. Every view inherits it. LOW PRIORITY BY INTENT: this is a desk that runs on localhost next to an editor, and nobody has opened it on a phone. Logged because a measured number is worth more later than a vague memory that something looked cramped."
+        },
+        {
+          "t": "2026-07-28T10:48:18.004Z",
+          "kind": "finding",
+          "text": "SHIPPED. ONE SYMPTOM, TWO DIFFERENT CAUSES, and finding that out first is the whole story of this card — the original note guessed the header and was only half right. MEASURED BEFORE FIXING: walked every element and collected the ones whose right edge passed the 375px client width. Cause 1 = .nav and .activity, single-row flex containers with no wrap; New card landed at right:444 and activity-stats at 438. Cause 2, which the guess missed entirely = .board (a 4-column grid at 1fr each, ~87px per column: not merely overflowing but unreadable) and the 6-column archive table. TWO DIFFERENT FIXES, because they are two different problems. Chrome that has no business being one row now WRAPS — unconditionally, not behind a media query, because nothing wraps while there is room and an unconditional rule has no breakpoint to keep in sync with its contents. Content with a genuine minimum width SCROLLS INSIDE ITS OWN CONTAINER: .board-wrap gets overflow-x auto with grid columns at minmax(200px, 1fr), and the table gets a .table-scroll wrapper. The page body never scrolls sideways; a kanban that pans horizontally on a phone is how a kanban is supposed to behave. DESKTOP IS PROVABLY UNCHANGED, which was the real risk in touching layout CSS on a working desk: the minmax floor never binds above ~840px, so at 1280px the columns still measure 311px each and the board does not scroll, and nav and activity each sit on a single line. MEASUREMENT GOTCHA WORTH KEEPING: my first desktop regression check counted distinct child top values to detect wrapping and reported 3 rows for the nav — a false alarm. Under align-items:center, children of different heights have different TOPS on the SAME ROW. Compare vertical CENTRES, not tops, when asking whether a flex row wrapped. VERIFIED at 375px: document.scrollWidth equals clientWidth on Board, Log, Memory and Archive; both scroll containers confirmed genuinely scrollable (board 818 inside 375, table 640 inside 343) rather than clipping. 208 tests pass — CSS only, plus one wrapper element in renderArchive."
+        },
+        {
+          "t": "2026-07-28T10:48:18.004Z",
+          "kind": "outcome",
+          "text": "[git audit 2026-07-28] status → pushed — 91665ed is already on main (fix/desk-overflow). The board said review."
+        }
+      ],
+      "created": "2026-07-28T10:39:47.595Z",
+      "pushed": "2026-07-28T10:48:18.004Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-025",
+      "p": "shipward",
+      "title": "The feed is the product — a log, not one line",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/feed-view",
+      "commit": "701a0c2",
+      "note": [
+        {
+          "t": "2026-07-28T10:33:13.220Z",
+          "kind": "brief",
+          "text": "The (d) angle from the divergence exercise: time, not status. The feed is the product — a shipping LOG, not a shipping desk. THE OBSERVATION THAT MADE IT WORTH BUILDING: the tracker holds 80 feed entries and the desk renders exactly ONE. app.js calls latestFeed, which returns the newest and discards the rest. 76 of 80 are by:claude. That is two days of Claude Code working, already recorded, already paid for, thrown away at render time — and it is precisely what Alberto said he wanted to watch when he cut the Raw data view in SW-011. SCOPE: a fourth tab. Grouped by day with a per-day count, who did it, card ids pulled out of the message and rendered as chips so a line links back to the work. The projection lives in public/lib.js and is unit-tested, following SW-003 — archiveRows earned its place there so the shape is tested rather than eyeballed. HONESTY REQUIREMENT: the feed is capped at 200 entries (FEED_CAP). A view that calls itself the whole history has to say when it is not, or it quietly becomes a lie the first time the cap bites."
+        },
+        {
+          "t": "2026-07-28T10:40:40.282Z",
+          "kind": "finding",
+          "text": "SHIPPED. A fourth tab, Log · N. feedDays groups the stream by UTC day (Today / Yesterday / Sat Jul 25), each day headed with a count; every row carries time, who, and the message. feedLede states the totals and the split — 83 entries over 3 days, 80 by Claude Code, 3 by you. UTC ON PURPOSE, AND SAID OUT LOUD: grouping follows fmtDate rather than local getters, because grouping locally while displaying in UTC would file one entry under two different dates in the same view. A time of day is a moment someone lived through, so the view now prints Times in UTC rather than leaving a reader east of Greenwich to work out why 10:33 was not when it happened. DESIGN FIX MID-BUILD: the first cut appended a card-id chip after each line, so a row read SW-025 logged and taken — the feed becomes a view  SW-025. The same id twice, once as prose and once as a button, in a view whose whole job is reading cleanly. messageParts now splits the message around its ids and the id IN the sentence is the link. Tested with a rejoin assertion — the parts must reconstruct the message character for character, so the split can never drop or duplicate text. ID MATCHING IS CHECKED, NOT TRUSTED: SW-024 and UTF-8 are the same shape and only one is a card, so matches are filtered against the ids that actually exist. An id-shaped token that is not a card stays as text rather than becoming a button that opens nothing. A TEST I WROTE THAT CODIFIED A BUG: the first feedLede assertion locked in 1 entries in one day — the exact thing archiveLede has a comment warning against. Fixed the lede, not the assertion. THE CAP IS NOT A FOOTNOTE: the feed holds 200 entries maximum, so a view calling itself the whole history says so in the lede once the cap bites, rather than quietly becoming a lie. VERIFIED in the browser: 3 day groups totalling 83 rows, 3 rows marked as yours matching the lede, clicking an inline id opens that card. 208 tests pass, 12 new. FOUND WHILE VERIFYING, logged as SW-026: the desk overflows horizontally below ~444px — on every view, not this one, so it is shared chrome and not a regression here."
+        },
+        {
+          "t": "2026-07-28T10:40:40.282Z",
+          "kind": "outcome",
+          "text": "[git audit 2026-07-28] status → pushed — 701a0c2 is already on main (feat/feed-view). The board said review."
+        }
+      ],
+      "created": "2026-07-28T10:33:13.220Z",
+      "pushed": "2026-07-28T10:40:40.282Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-024",
+      "p": "shipward",
+      "title": "Git is authoritative — reconcile instead of report",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/git-authoritative",
+      "commit": "2205d79",
+      "note": [
+        {
+          "t": "2026-07-28T10:20:42.665Z",
+          "kind": "finding",
+          "text": "The narrowed (b) angle: git stops being a witness the board consults and becomes the authority for the facts it can prove. SW-022 built the detection, SW-023 wired it into session start as a REPORT — diagnosis without cure. Today the system can tell you the board is lying and then waits for someone to agree. WHY NARROWED, not the pure version: deleting the columns would delete information git cannot hold. backlog is intent and leaves no commits. review means waiting on a human, which no git object represents in a repo that merges branches directly. shipped is a filing action. Those stay hand-held. THREE TIERS, replacing the loose fix!=null proxy that sync uses today:   certain  — git is the witness and the correction is a fact, so it applies WITHOUT being asked: merged-not-pushed (the commit is provably an ancestor of the trunk) and missing-commit (filling a blank the branch already answers).   proposed — git proves the board is wrong but the correction is an inference: started-without-saying proves backlog is FALSE, but claude vs review is a guess. Needs the explicit apply.   reported — git can only raise a question: not-on-trunk, no-branch, untracked-branch. Never written. SAFETY PROPERTY WORTH KEEPING: the reconciler is MONOTONIC. Every certain rule only ever confirms progress git can prove — in-flight to pushed, blank to sha. Nothing walks a card backwards, so a human who moves a card ahead of git is never overruled by it. The single-writer lesson from SW-023 applies again: the classification and the plan are pure and live in git.mjs, one writer in reconcile.mjs, and the hook and the sync tool both go through it. Two implementations of what git means for the board would eventually disagree, and the hook is the one nobody would think to re-check. Every auto-correction appends a dated line to the card note rather than adding a schema field, so the reason git moved it is in the memory a future session reads instead of a marker only the desk can render."
+        },
+        {
+          "t": "2026-07-28T10:40:40.282Z",
+          "kind": "outcome",
+          "text": "[git audit 2026-07-28] commit → 2084a8c — feat/git-authoritative is at 2084a8c. The board said no commit recorded."
+        },
+        {
+          "t": "2026-07-28T10:40:40.282Z",
+          "kind": "finding",
+          "text": "SHIPPED. Three certainty tiers replace the fix!=null proxy sync used to apply on. certain = merged-not-pushed and missing-commit, written at session start without being asked. proposed = started-without-saying, waiting for sync apply:true. reported = not-on-trunk, no-branch, untracked-branch, never written by anything. shipward/reconcile.mjs is the single writer; git.mjs holds the pure reconcilePlan. The hook and the sync tool both go through them, which is SW-023 lesson applied a second time. ORDERING BUG CAUGHT IN DESIGN: sessionStart rendered the standup and then awaited drift in the same template literal, so a reconciled card would have been described in its old column and corrected two paragraphs later. It now reconciles first and re-reads only if something moved. GOTCHA, FOUND IN MY OWN OUTPUT: the first feed line read SW-024 → claude for a fix that only filled in a sha. feedMsg was built from the status alone. describeApplied and feedMsg now share changeText and report only fields that actually changed. The misleading entry is still in the feed on purpose — a log records what happened, including what a bug wrote. A TEST THAT PASSED FOR THE WRONG REASON: the monotonicity assertion staged a pushed card with commit 0000000 and asserted it was left alone. It was — but no finding was ever generated, because a sha git has never heard of resolves to null, not false, and rule 1 requires false. Correct behaviour (we do not know is not never landed) hiding a vacuous test. TS-003 now carries a real commit that exists and is not an ancestor of the trunk, so the reported tier is genuinely exercised. MEASUREMENT GOTCHA: promisify(execFile) has no input option — that is execFileSync. Passing one leaves stdin open, the hook waits out its own 2000ms stdin timeout, and session start measures 2333ms instead of 313ms. Close the child stdin explicitly when timing a hook. COST: session start 313ms median, up from 260ms in SW-023; the extra buys the write. Budget is still 2500ms and unreached. VERIFIED end to end through the real MCP binary against a repo staged with one card per tier: certain applied, proposed held until asked, reported refused even on an explicit apply. The reconciler also corrected THIS card mid-build, filling in its own missing sha at session start. 197 tests pass, 8 new. NOT DONE, deliberately: the desk does not mark which statuses were derived. The card note carries the reason and the feed carries the event, which is where a future session looks; a badge only the browser can render is a worse place for it."
+        },
+        {
+          "t": "2026-07-28T10:40:40.282Z",
+          "kind": "outcome",
+          "text": "[git audit 2026-07-28] status → pushed — 2205d79 is already on main (feat/git-authoritative). The board said review."
+        }
+      ],
+      "created": "2026-07-28T10:20:42.665Z",
+      "pushed": "2026-07-28T10:40:40.282Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-023",
+      "p": "shipward",
+      "title": "SessionStart reports board-vs-git drift",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "shipped",
+      "claude": "done",
+      "branch": null,
+      "commit": "1fdd7ca",
+      "note": [
+        {
+          "t": "2026-07-28T08:41:50.437Z",
+          "kind": "finding",
+          "text": "Deferred at the end of SW-022 on cost grounds, then done once the cost was fixed. MADE IT AFFORDABLE FIRST: the audit cost 239ms, of which 134ms was one git process per card asking whether a commit had landed. Parallelising changed NOTHING — spawning is the cost, not the query — so a single rev-list of the trunk now answers for every card at once: ~130ms, and it no longer grows with card count. A sha outside the bounded 5000-commit window still falls back to asking directly, so the shortcut cannot produce a false 'never landed'. BUDGETED at 2.5s anyway, because this repo is not every repo; past the budget, or if git cannot be read, the opener says NOTHING about git. Silence, never a false all-clear — 'we do not know' must not render as 'nothing is wrong'. Session start measures ~260ms here, once, and the per-turn prompt hook deliberately does not audit. auditBoard moved into git.mjs so the hook and the sync tool share one implementation; two answers to 'what does git say about the board' would eventually disagree, and the hook is the one nobody would think to re-check. git.mjs gained SHIPWARD_REPO mirroring SHIPWARD_TRACKER — without it the only way to exercise a finding in a test was to break the real board. TEST GOTCHA: my clean-board test failed because I had assumed the staged repo was clean when it carried a branch no card claimed. The rule was right and the test was wrong; fixed the test. Also corrected CLAUDE.md, which still said five MCP tools when there are six. 189 tests pass, 4 new; the drift test was verified to fail against the pre-change hook."
+        },
+        {
+          "t": "2026-07-28T08:42:10.509Z",
+          "kind": "outcome",
+          "text": "SHIPPED — see the commit and the brief. Card logged after the work as an honest record; the protocol wants it before, and this one slipped because the change grew out of the tail of SW-022 rather than starting as its own request."
+        }
+      ],
+      "created": "2026-07-28T08:41:50.437Z",
+      "pushed": "2026-07-28T08:42:10.509Z",
+      "shipped": "2026-07-28T08:42:10.509Z"
+    },
+    {
+      "id": "SW-022",
+      "p": "shipward",
+      "title": "sync reads git itself — derive status instead of asserting it",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/sync-reads-git",
+      "commit": "e9c5369",
+      "note": [
+        {
+          "t": "2026-07-28T07:42:32.102Z",
+          "kind": "evidence",
+          "text": "The (b) angle from the divergence exercise, narrowest useful slice. sync today applies fixes but requires Claude to work out the truth from git and hand it over, so it only corrects drift someone already noticed. THREE PIECES OF EVIDENCE FROM 2026-07-27, all real slips not hypotheticals: SW-008 carried a null commit for two days until the merge sync backfilled it by hand; the SPEC accumulated nine false statements in a single day and only got fixed when Alberto asked; and I built the entire MCP server against a card still sitting in Backlog because I forgot to call start, caught by accident while running standup for something else. Every one is drift. Hooks only nag — they cannot tell you the board is WRONG. Git can, because git does not drift. DESIGN: shipward/git.mjs does the I/O and nothing else; the rules live in a pure deriveFindings(cards, facts) so they are testable without a repo, the same split lib.js uses. Six rules, each from a real slip: a commit that is not an ancestor of main on a pushed card; a missing commit where the branch has one; a merged branch on a card still in claude or review; a branch with commits against a backlog card (my SW-005 slip); a claude card with no branch at all; and a feat/fix/chore branch no card references. SAFE BY DEFAULT: fromGit is a DRY RUN and reports; apply:true is required to write, because a tool that can mass-mutate the board on a wrong inference should need to be asked twice."
+        },
+        {
+          "t": "2026-07-28T07:46:52.718Z",
+          "kind": "evidence",
+          "text": "SHIPPED. shipward/git.mjs reads the repository and derives six kinds of drift; sync gains fromGit (dry run, reports) and apply (writes). Structure mirrors lib.js — readGit does I/O and nothing else, deriveFindings is pure — so the rules are tested exhaustively with hand-built facts and readGit is tested once against a real throwaway repo, because a mock of git would only prove I can predict git, which is the thing in doubt. DRY RUN BY DEFAULT: a tool that can rewrite the whole board off an inference should have to be asked twice. Explicit updates beat derived ones — git is the better witness but the caller may know something git cannot see. THE BEST THING THAT HAPPENED: the tool's FIRST real run produced a false positive about the very card being written on it. Rule 3 used `git branch --merged`, and a branch cut from the trunk tip has no commits of its own so git lists it as merged — 'no work yet' and 'work landed' are indistinguishable by that signal. Rewrote it to key off a recorded commit proven to be an ancestor of the trunk, which is unambiguous AND keeps working after the branch is deleted, the normal state after a merge. A tool that audits drift finding its own bug on first contact is the strongest argument for it that I could have asked for. VERIFIED end to end against a repo staged with all three of yesterday's real slips (SW-005 backlog-with-commits, SW-008 missing sha, merged-not-pushed): found all three plus a fourth it correctly refused to fix. 185 tests pass, 12 new. NOT DONE: the SessionStart hook does not run the audit — git calls cost ~50ms each and session start is already 374ms; worth doing only if drift turns out to be frequent in practice."
+        }
+      ],
+      "created": "2026-07-28T07:42:32.102Z",
+      "pushed": "2026-07-28T07:46:52.718Z",
+      "shipped": "2026-07-28T07:46:52.718Z"
+    },
+    {
+      "id": "SW-021",
+      "p": "shipward",
+      "title": "MCP cancellation is accepted and ignored",
+      "type": "bug",
+      "pri": "P3",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/mcp-cancellation",
+      "commit": "708aeb9",
+      "note": [
+        {
+          "t": "2026-07-27T18:57:43.529Z",
+          "kind": "brief",
+          "text": "Deferred from SW-020, deliberately. notifications/cancelled is accepted and then ignored: the cancelled call keeps running, still writes, and still holds the write queue behind it. Real cancellation means carrying an AbortSignal from the notification through callTool into mutate() and the cross-process file lock, and deciding what a half-applied mutation means — a lock holder cannot simply be abandoned. That is a larger change than the finding warrants, and bodging it would be worse than the honest gap. The blast radius today is small: a client that cancels gets no reply and the write lands anyway."
+        },
+        {
+          "t": "2026-07-28T07:26:14.536Z",
+          "kind": "finding",
+          "text": "IMPLEMENTED, and the deferral reasoning in the brief above turned out to be answerable rather than blocking. THE SHAPE: cancellation is best-effort with a DEFINED COMMIT POINT, which is the only honest version of it. A queued call never runs. A running one is abandoned inside mutate() just before the write, lock released and file untouched. While waiting for the lock, acquire() checks the signal on each retry, so a cancelled call stops occupying the write queue instead of blocking whatever is behind it — that was the part I had assumed needed a big change and did not. Past the rename the write is durable, so the work finishes; cancelling there would mean inventing an undo. Either way NO response is sent, per the protocol. DESIGN CALL: CancelledError is its own type, not a tool failure — nothing went wrong and nothing was written, so it must not surface as an errored result the model would read and retry. An unknown or already-finished requestId is ignored, because a reply and a cancellation crossing is the normal race. TESTING GOTCHA WORTH KEEPING: my first cancellation test PASSED against the pre-fix server, which nearly let a non-test through. It was racing the write it was meant to catch — it used tools/list as its barrier, and SW-020 had just made protocol frames stop waiting on the write queue, so the barrier no longer barred anything. Serialising behind a tools/call fixed it, and both tests then failed against the old code as they should. A test that passes before the fix is not a test. 173 tests pass, 4 new."
+        }
+      ],
+      "created": "2026-07-27T18:57:43.529Z",
+      "pushed": "2026-07-28T07:26:14.536Z",
+      "shipped": "2026-07-28T07:26:14.536Z"
+    },
+    {
+      "id": "SW-020",
+      "p": "shipward",
+      "title": "MCP server: the Blind Hunter's 13 findings",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "L",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "fix/mcp-review",
+      "commit": "fbabf77",
+      "note": [
+        {
+          "t": "2026-07-27T18:37:50.675Z",
+          "kind": "evidence",
+          "text": "THREE SERIOUS. (1) DATA-LOSS: no tool argument is ever checked against its own inputSchema, and validate() in tracker-store checks every card field EXCEPT note — while schema.json declares note as a string. So log({note:42}) is accepted, written verbatim, and then permanently bricks the entire memory surface: standup and recall both throw, the session-start hook emits ZERO BYTES so the session silently gets no standup, and status.mjs drops its count. Cards cannot be deleted by protocol, so recovery needs a hand-edit. (2) SESSION-BREAKING: the startup heartbeat is queued AHEAD of the handshake, so initialize cannot answer until a tracker WRITE completes — measured 5.8s behind a held lock and 62s when the lock is never released. A handshake bounded by LOCK_TIMEOUT is a server the client declares dead. (3) SESSION-BREAKING: process.exit(0) on stdin end discards unflushed stdout, so any reply over the 64KiB pipe buffer is truncated mid-JSON with exit code 0 — measured, last frame exactly 65525 bytes and unparseable. recall({query:'e',limit:50}) is already 32775 bytes against the real tracker, half the cliff. THE REST: a non-numeric limit prints a total then lists nothing; sync(create) bypasses the empty-title guard log enforces and writes permanent junk cards; the 1000th card of a prefix makes log fail forever with an opaque schema error; requests with no id (or id:null) get invalid frames back and a tools/call notification still WRITES; done({pushed:true}) on an already-pushed card claims a stamp it never wrote, so it never counts as shipped; sync files its single feed entry under the default project even when every card it touched is in another; the provenance stamp carries no year so a three-year-old note looks like yesterday; the idempotent start path still tells Claude to create a branch that already exists; and we advertise protocol revisions in which batching is legal, then refuse batches."
+        },
+        {
+          "t": "2026-07-28T07:21:06.062Z",
+          "kind": "finding",
+          "text": "FIXED, 12 of 13. THE DATA-LOSS ROOT CAUSE was one missing line: validate() checked every card field EXCEPT note, the one field the whole memory surface reads and one schema.json already required to be a string. Tool arguments were never checked against their own inputSchema either, so both halves were open. THE HANDSHAKE FIX is architectural rather than a patch: there are two chains now, because tools/call takes the lock and must queue, while initialize/ping/tools/list must never wait on the tracker at all — a handshake bounded by LOCK_TIMEOUT is a server the client declares dead. Output drains before exit, the same defect and the same fix as the hooks in SW-018. Batches are now HANDLED rather than refused, because we negotiate revisions in which they are legal and refusing them was advertising a version we did not implement. NOT FIXED, deliberately: notifications/cancelled is still accepted and ignored, so a cancelled call keeps running and still writes. Real cancellation needs the tool layer to carry an abort signal through mutate() and the file lock, which is a bigger change than the finding warrants today — filed rather than bodged. TESTING NOTE WORTH KEEPING: I could not verify these tests against the pre-fix code the way I did for SW-017/18/19, because the pre-fix suite HANGS rather than fails — 8m20s with no result. That is itself the confirmation for the hang-class findings, but it means the other nine rest on the reviewer's reproductions plus the fixed-state tests, not on a watched red-to-green transition. 169 tests pass, 9 new."
+        },
+        {
+          "t": "2026-07-28T07:21:06.062Z",
+          "kind": "outcome",
+          "text": "Merged to main. Cancellation is NOT fixed and is tracked as SW-021."
+        }
+      ],
+      "created": "2026-07-27T18:37:50.675Z",
+      "pushed": "2026-07-28T07:21:06.062Z",
+      "shipped": "2026-07-28T07:21:06.062Z"
+    },
+    {
+      "id": "SW-019",
+      "p": "shipward",
+      "title": "Tracker lock: the layer under the SW-010 fix",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "L",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "fix/memory-lib-hardening",
+      "commit": "01d13a8",
+      "note": [
+        {
+          "t": "2026-07-27T18:31:21.568Z",
+          "kind": "finding",
+          "text": "Edge Case Hunter over tracker-store.mjs. FIRST, THE FIX HOLDS: 1600/1600 writes landed with 0 lost, and 2083/2100 on a harder run where ~4 losses were expected at the old rate. The one-observation inspect() and link-a-complete-scratch publish() genuinely closed SW-010. TEN FINDINGS UNDER IT. F1 lost-write, SILENT: held() is checked before atomicWrite, but the commit is open+write+fsync+chmod+rename — measured p50 5.17ms and max 16.17ms on a realistic 43KB tracker, the same order as LOCK_RETRY_MS, not microseconds. A card vanished with no error raised anywhere. F2 corruption: breakLock renames the lock to a grave BEFORE checking the inode, so a third process can publish into the freed path and the link-back then unlinks that innocent holder lock; F2 is F1 trigger. F3 permanent deadlock: alive(pid) makes a lock unbreakable FOREVER — a lock 24h old held by pid 1 timed out at 60s and never becomes breakable. The lock lives in the repo working directory so it survives a reboot, after which the pid is very likely someone else. F4 permanent deadlock: release() swallows unlink errors, so one transient EACCES leaks a lock carrying a LIVE pid and wedges that daemon for its whole lifetime. F5 permanent deadlock: age<0 means NEW with no upper bound, so an mtime one hour in the future is immortal and any backwards clock step immortalizes every existing lock. F6: the heartbeat utimes a PATH, so a dispossessed holder keeps a corpse fresh forever and a third writer fails at 60s. F7: a provably dead holder still costs 30s, and LOCK_TIMEOUT is only 2x LOCK_STALE, so two crashes inside one waiter deadline is a guaranteed failure — 2 of 4 clean writers hard-failed. F8: no fairness, 17 of 2100 writes timed out and ALL 17 were the same starved process. F9: withLock is not re-entrant, a nested mutate is a silent 60s hang. F10: graves are never swept, neither sweep regex matches .lock.dead.<uuid>. NEGATIVE RESULTS WORTH KEEPING: 4000 create/delete cycles produced 4000 distinct inodes on APFS so the F2 guard is sound here, but ext4/HFS+ recycle aggressively and it would false-negative there; publish() partial writes are not reproducible; link() on FAT/network mounts is untested and would fail with a raw errno and no diagnosis."
+        },
+        {
+          "t": "2026-07-28T07:21:06.062Z",
+          "kind": "finding",
+          "text": "FIXED, 9 of 10. THE PRINCIPLE THAT CHANGED: liveness is a hint, the heartbeat is the evidence. A living holder refreshes its mtime every second, so silence past LOCK_ABANDONED_MS (5 min) is abandonment whatever the pid says — that single reframing closed F3 (a live pid made a lock unbreakable FOREVER, and the lock survives a reboot after which the pid is someone else's) without reopening SW-010's slow-but-alive bug. F1, the silent lost write: held() now runs at the last instant before rename rather than before a 5-16ms commit, so nothing is published by a holder that no longer holds. F5: a future mtime is bounded at 5s — beyond that it is a broken clock, not sub-millisecond precision, and unbounded it made locks immortal. F7: a provably dead holder costs 2s not 30, because the pid check already proved it gone; at the old grace two crashes inside one waiter deadline was a guaranteed failure. F4: release retries and then warns loudly instead of swallowing. F2: breakLock re-reads and aborts if the lock is no longer the inode it condemned. F6: the heartbeat verifies the token before touching, so a dispossessed holder can no longer keep a corpse fresh. F9: a nested mutate throws immediately. F10: graves are swept on age. F8 partially — jittered backoff spreads the cost but is still not a queue; a true FIFO would need a ticket file and that is a bigger change than the starvation warrants. NEGATIVE RESULT WORTH KEEPING: the inode guard is sound on APFS (4000 create/delete cycles, 4000 distinct inodes) but ext4 and HFS+ recycle aggressively and it would false-negative there; link() on FAT or a network mount is untested and would fail with a raw errno and no diagnosis. 160 tests pass, 5 new. Contention stress re-run clean at 2700 writes with 0 lost."
+        },
+        {
+          "t": "2026-07-28T07:21:06.062Z",
+          "kind": "outcome",
+          "text": "Merged to main. F8 (fairness) is only partly addressed — jittered backoff spreads the starvation but is still not a queue. Named here rather than left implied."
+        }
+      ],
+      "created": "2026-07-27T18:31:21.568Z",
+      "pushed": "2026-07-28T07:21:06.062Z",
+      "shipped": "2026-07-28T07:21:06.062Z"
+    },
+    {
+      "id": "SW-018",
+      "p": "shipward",
+      "title": "Status line and hooks: terminal injection, truncation, and a hang",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "fix/memory-lib-hardening",
+      "commit": "6180905",
+      "note": [
+        {
+          "t": "2026-07-27T18:16:18.639Z",
+          "kind": "brief",
+          "text": "The Blind Hunter BROKE the invariant I claimed for the status line, on its first try. FINDING 1, worst of the day: status.mjs interpolates card text straight into stdout with nothing stripped, so tracker data becomes terminal control. Proven with real output — a title containing \\u001b]0;PWNED\\u0007 rewrites the terminal/tab title, \\u001b[2J\\u001b[H clears the screen, \\u001b[?1049h switches to the alternate screen buffer, a bare \\r overwrites the line just drawn, and a newline turns a one-line status line into three. TITLE_BUDGET is no mitigation: the clear-screen payload is 7 characters. Worse, the card ID is never clipped at all and status.mjs never calls validate(), so ID_RE does not apply to it. U+202E RTL override passes through too. CLAUDE.md blesses hand-editing and log() takes free text, so this is data the tool invites. FINDING 2: emit() in the hooks writes then calls process.exit(0), which drops whatever has not flushed — a hard cliff at exactly 65536 bytes on a pipe. One card with a 70KiB title makes every hook emit unparseable truncated JSON, and past ~1000 cards the write is lost entirely so the STOP HOOK SILENTLY STOPS BLOCKING. It fails open, which is the wrong direction. FINDING 3: the stdin read has no timeout, so a pipe held open hangs the hook until the runtime kills it — on UserPromptSubmit that is a stall every single turn; 600MiB of stdin was also buffered in full. FINDING 4: the PreToolUse matcher includes NotebookEdit but the handler reads tool_input.file_path, and NotebookEdit passes notebook_path, so it can never warn. Also: clip() splits emoji into lone surrogates; openItems() does an uncapped memory scan on every render (390ms at 1000 cards); and activeLine() injects card text into the model context every turn with no framing that it is data."
+        },
+        {
+          "t": "2026-07-28T07:21:06.062Z",
+          "kind": "finding",
+          "text": "FIXED. Every value that reaches the terminal is scrubbed of C0, DEL, C1, the bidi overrides and the line separators, and the card ID is now bounded like the title — it was neither clipped nor validated, since status.mjs never calls validate(). Hook output is bounded BEFORE the write and drained before exit: over the bound it says less correctly instead of more corruptly, and the Stop hook can no longer fall silent, which was how it failed OPEN. GOTCHA WORTH KEEPING: my first stdin-timeout fix used AbortSignal.timeout and did nothing — a for-await blocked on the next chunk never reaches a condition it could check; the stream has to be DESTROYED on a deadline. The regression test caught that, which is the only reason I know. SECOND GOTCHA, on the nose: the tool refused to run my own command for containing raw control characters while I was writing the tests for control characters — the payloads are now built from String.fromCharCode so no literal control byte exists in the repo. Also fixed: NotebookEdit was in the PreToolUse matcher but the handler only read tool_input.file_path while NotebookEdit passes notebook_path, so it could never warn; the open-item scan is skipped past 400 cards (390ms at 1000, 1.6s at 5000) rather than stalling the render; clips no longer split an emoji into a lone surrogate; and activeLine now labels card text as tracker data, because a card can be logged from an issue body and its title reached the model context unframed on every turn. 155 tests pass; 8 new, each verified to fail against the pre-fix code."
+        }
+      ],
+      "created": "2026-07-27T18:16:18.639Z",
+      "pushed": "2026-07-28T07:21:06.062Z",
+      "shipped": "2026-07-28T07:21:06.062Z"
+    },
+    {
+      "id": "SW-017",
+      "p": "shipward",
+      "title": "Harden memory-lib against the edge-case review",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "L",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "fix/memory-lib-hardening",
+      "commit": "534c06a",
+      "note": [
+        {
+          "t": "2026-07-27T17:59:45.296Z",
+          "kind": "open",
+          "text": "Edge Case Hunter returned 15 CONFIRMED findings against public/memory-lib.js, every one reproduced with a script. THREE ARE SERIOUS. (1) resolves() matches RESOLUTION markers by substring with no polarity check, so 'Not yet fixed — parked until he answers' marks an open item SUPERSEDED: the card says the question is open and the module reports zero open, dropping it from stillOpen, standup, recall and the status line. The module's stated purpose, inverted. (2) A non-string note throws — validate() in tracker-store.mjs never checks `note`, and CLAUDE.md explicitly calls hand-editing supported, so note:12345 passes readRaw and then kills standup, the memory view and both MCP tools; status.mjs swallows it and prints '◇ no card', which is a lie. (3) PATH_RE backtracks quadratically: 24k chars took 2.9s, 120k did not finish in 120 SECONDS. Reachable by pasting a data URI or base64 blob into a note, and it runs on the browser main thread and in every standup. The rest: markerIndex desyncs when toUpperCase changes string length (ß, ﬁ) and files an open item under 'What shipped'; markers match inside URLs and filenames, so a link to a repo called todo-list becomes a permanent open item; ⚠ without the variation selector never matches ⚠️; hits() is a bare endsWith so the 1-char token 't' matches commit(), reachable because tokensFor feeds recall every declared name; recall returns NOTHING when every token is generic even with file given — the exact failure the code comments claim was fixed, only fixed on the path where the basename is in tokens; basename indexing conflates two different index.js; and a batch of library-level throws and NaN/limit/surrogate boundary bugs."
+        },
+        {
+          "t": "2026-07-28T07:21:06.062Z",
+          "kind": "finding",
+          "text": "See the commit — 15 findings fixed, each with a regression test verified to fail against the pre-fix module first."
+        }
+      ],
+      "created": "2026-07-27T17:59:45.296Z",
+      "pushed": "2026-07-28T07:21:06.062Z",
+      "shipped": "2026-07-28T07:21:06.062Z"
+    },
+    {
+      "id": "SW-016",
+      "p": "shipward",
+      "title": "Ambient status line — know without looking",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/ambient-statusline",
+      "commit": "72e8294",
+      "note": [
+        {
+          "t": "2026-07-27T17:26:07.950Z",
+          "kind": "brief",
+          "text": "The ambient angle from the 2026-07-27 divergence exercise. THE OBSERVATION THAT MADE IT WORTH BUILDING: the UserPromptSubmit hook is already an ambient surface and is the highest-frequency Shipward surface that exists — it fires on every single prompt, while the board gets opened a few times a day. You do not want to LOOK AT the board, you want to know without looking. A Claude Code statusLine is the terminal-native version of that: always visible, nothing to open, no window to arrange. SCOPE: shipward/status.mjs prints one line — the active card, what is waiting on the human, and how many memory items are still open — wired into .claude/settings.json as statusLine, and runnable standalone so it also works in a tmux or shell prompt. CONSTRAINT THAT SHAPES THE WHOLE THING: it is re-rendered constantly, so it must be FAST and must never break a terminal. That rules out importing tracker-store.mjs (crypto, full schema validation) — a plain readFileSync and JSON.parse is the whole data path — and it means every error prints nothing and exits 0."
+        },
+        {
+          "t": "2026-07-27T17:30:19.492Z",
+          "kind": "finding",
+          "text": "SHIPPED. shipward/status.mjs prints one line — card in flight, what is waiting, how many memory items are still open — wired as statusLine in .claude/settings.json and runnable standalone for a shell prompt or tmux. MEASURED, because 'fast' was the whole constraint: 121ms per render, of which 107ms is bare Node startup; the script itself costs 14ms and 10 of those are the memory pass. That is why it does NOT import tracker-store.mjs — hashing, full schema validation and crypto are pointless for a read-only glance; readFileSync plus JSON.parse is the entire data path. MEASUREMENT GOTCHA: a shell for-loop first reported 1.1s per render, which sent me looking for a blocking call that did not exist. Timing ten spawns from inside node gave 121ms. Do not trust a shell loop for sub-second benchmarks. DESIGN CALLS: the mark carries the state without colour (filled diamond in flight, hollow idle) so a terminal that drops colour still reads; counts render only when non-zero, because a line that always says '0 review · 0 backlog' is furniture and furniture stops being read; only the title is ever clipped, never the id or the counts; NO_COLOR is honoured. HARMLESS RULE, tested by spawning: a missing tracker, an unparseable tracker and a document with no projects each print NOTHING and exit 0 — a status line that throws leaves a broken terminal and no explanation. 133 tests pass, 10 new. WHY THIS ANGLE: the UserPromptSubmit hook was already an ambient surface and the highest-frequency one in the product; this is the same idea given a permanent place. NOT YET SEEN IN THE RUNTIME — like the hooks, it needs a session rooted at shipward_app to render for real."
+        }
+      ],
+      "created": "2026-07-27T17:26:07.950Z",
+      "pushed": "2026-07-27T17:30:19.492Z",
+      "shipped": "2026-07-27T17:30:19.492Z"
+    },
+    {
+      "id": "SW-015",
+      "p": "shipward",
+      "title": "Hooks — make the Shipward protocol continuous, not aspirational",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/shipward-hooks",
+      "commit": "180fde5",
+      "note": [
+        {
+          "t": "2026-07-27T16:18:46.568Z",
+          "kind": "evidence",
+          "text": "WHY, with evidence from this very session: CLAUDE.md, the MCP instructions field and the tool descriptions are three layers of ADVICE and nothing checks. Proof they are not enough — I built the entire MCP server for SW-005 without ever calling start; the card sat in Backlog while 500 lines were written against it, and I only noticed by running standup for an unrelated reason. If the author of the protocol, holding it in active context, drifts inside one session, advice is not a mechanism. FOUR HOOKS: SessionStart injects a standup so a session begins already knowing; UserPromptSubmit injects one line naming the active card EVERY TURN, which is the actual continuous part because drift cannot accumulate; PreToolUse on Edit/Write warns when source is about to change with no card in claude/working — WARNS, never blocks, because a hook that gets disabled protects nothing; Stop refuses to end while a card is still working with no done. DESIGN RULES: a hook must never be able to break a session, so every one exits 0 silently on any error; the Stop hook honours stop_hook_active so it cannot loop; and the standup text is extracted into a shared module so the hook and the MCP tool cannot drift apart. KNOWN LIMIT stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note — done with 'fixed it' satisfies every one of them and teaches the next session nothing."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "finding",
+          "text": "SHIPPED. .claude/settings.json wires four hooks to .claude/hooks/shipward.mjs: SessionStart injects a standup unasked; UserPromptSubmit injects one line naming the active card EVERY turn (the continuous part — drift cannot accumulate); PreToolUse on Edit/Write/NotebookEdit warns when source changes with no card in claude/working; Stop refuses to end while a card is still working with no done. TWO RULES THE HOOK FILE MUST NEVER BREAK, both covered by tests: (1) a hook can never break a session — every path exits 0 and any failure (missing tracker, unparseable tracker, unknown subcommand) exits silently, because a broken hook that bricks the project is worse than no hook; (2) pre-edit WARNS and never denies — permissionDecision is always 'allow' — because a hook that gets in the way gets switched off and a switched-off hook protects nothing. Stop honours stop_hook_active or it would refuse the session forever. pre-edit exempts .shipward/, .claude/, _bmad-output/, .git/ and CLAUDE.md/README.md: touching those proves nothing about the protocol, so nagging is pure noise. REFACTOR THAT CAME WITH IT: standupText/line/stamp/PERISHABLE moved out of mcp.mjs into shipward/standup.mjs so the SessionStart hook and the MCP tool render from ONE implementation — two renderings of the same board would tell a session two different stories. 123 tests pass, 11 new, spawning the real script the way the runtime does (payload on stdin, JSON on stdout). MEASURED COST: ~90ms per prompt hook, dominated by node startup rather than reading the tracker; paid on every turn. NOT YET VERIFIED IN THE RUNTIME — the hooks are unit-tested against the documented wire shapes but have never actually fired inside Claude Code. That needs a session rooted at shipward_app plus hook approval. KNOWN LIMIT, stated up front: hooks can make Claude TOUCH Shipward, they cannot make it write a good note; done with 'fixed it' satisfies all four and teaches the next session nothing."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "outcome",
+          "text": "NOT YET PROVEN IN THE RUNTIME even though it is now on main: the hooks are unit-tested against the documented wire shapes but have never fired inside Claude Code. First session rooted at shipward_app will need to approve them."
+        }
+      ],
+      "created": "2026-07-27T16:18:46.568Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-014",
+      "p": "shipward",
+      "title": "Close the memory loop — standup carries it, recall retrieves it",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/memory-recall",
+      "commit": "c8ba627",
+      "note": [
+        {
+          "t": "2026-07-27T16:01:56.626Z",
+          "kind": "evidence",
+          "text": "THE GAP, measured: the tracker holds 27 memory entries / 4044 words, and standup returns 0 of them. The only path back is start, one card at a time, so Claude retrieves memory about the ticket it is opening and never about the code it is about to touch. From the agent's side this store is write-only. FIX: (1) standup gains a bounded memory section — decisions not to reverse, and still-open items, each with its card id and date; (2) a new recall tool takes file / kind / query and returns the entries attached, ranked by what it would cost to miss. DESIGN RULES: every entry arrives with its date and card so a session can judge rather than believe; evidence is labelled as a claim about a PAST state, because 'tests pass' rots (45 was true this morning, it is 96 now); nothing is silently truncated — recall says what it dropped and how to get it. Standup stays readable: entries are clipped with the card id kept so the full text is one recall away."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "finding",
+          "text": "SHIPPED. standup now carries a bounded memory section (still-open items + decisions not to reverse, each stamped with card and date, clipped so the full text is one recall away) and a new recall({file|kind|query}) tool retrieves the rest, ranked by what it would cost to miss, always reporting what it dropped. TWO THINGS THAT ONLY SHOWED UP ON REAL DATA: (1) BRIDGING FILE TO PROSE — SW-010's note, the most valuable in this repo, names NO file at all; it names isStale(), breakLock(), sweepTmp(), because that is how you write down what went wrong. recall({file}) therefore reads the file off disk and asks about every name declared inside it, not just the filename. Before the bridge, recall({file:'tracker-store'}) returned one irrelevant hit; after, six with both SW-010 findings ranked first. (2) DROPPING GENERIC NAMES — tracker-store.mjs declares 73 names and most are now()/read()/line(), so matching any of them returned the whole tracker and the top hits were unrelated. Tokens appearing across more than a quarter of the memory are now dropped before scoring, and entries rank by how many distinct names they match. GOTCHA IN THAT FIX: the share filter then ate EVERY token on a small corpus, because with two entries one hit is already 50 percent — recall returned nothing at all. Nothing counts as generic until it has turned up at least 4 times; regression test covers the young-repo case. Evidence entries are labelled 'as of then, not a claim about now' at the point of use, because '45 tests pass' was true this morning and is 112 now. Excerpts lead with the marker that classified them rather than the first 200 characters, which were usually provenance preamble. CLAUDE.md gains step 0: recall before editing an unfamiliar file. 112 tests pass, 16 new."
+        }
+      ],
+      "created": "2026-07-27T16:01:56.626Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-013",
+      "p": "shipward",
+      "title": "Memory view — render what Claude knows, not just what is in flight",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/memory-view",
+      "commit": "0a090f6",
+      "note": [
+        {
+          "t": "2026-07-27T15:48:59.429Z",
+          "kind": "brief",
+          "text": "EXPLORATION, not a commitment: the memory-first angle from the 2026-07-27 divergence exercise. EVIDENCE THAT MOTIVATED IT, measured on the real tracker: notes are 22355 of 33836 file bytes = 66% of the tracker, and the UI renders them in a textarea inside a dialog behind a click, while a status field nobody rereads gets a whole column. The notes have also grown a grammar with nothing in the schema asking for one — SHIPPED x6, VERIFIED x5, REPRODUCED x3, DECIDED x2, TRADEOFF x2, plus ROOT CAUSE / GOTCHA / LESSON / NEEDS ALBERTO / SUPERSEDED / LEFT STALE and 17 other markers across 23 distinct kinds — and 33 distinct file paths already embedded in prose as untyped text. DESIGN: no schema change. A derived view parses the existing prose, classifies each ' || '-separated segment by marker lexicon, and groups by KIND rather than by card, because what a new session needs is 'every decision taken here' and 'what is still open', not 'SW-010's note'. Classification is a lens, shown as detected, never rewriting the note. Ships as a tab, NOT the default view, so it has to earn the home screen the way the Raw data view failed to."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "open",
+          "text": "BUILT as a tab, not the default. public/memory-lib.js parses the existing prose; no schema change. THE FINDING THAT MATTERED MOST was not the classifier but SUPERSESSION: openness is a property of the card's latest state, not of the segment that raised it. SW-008's note opens 'NEEDS ALBERTO' and two segments later says 'DECIDED' then 'SHIPPED' — counting that as open would send a fresh session to re-ask an answered question. An open item settled later on the same card is dimmed and labelled 'answered later on this card', not hidden, because 'this got resolved here' is itself worth reading. Took the open count 5 to 2. THREE HONEST LIMITS OF PARSING PROSE, all reproduced on real data: (1) MENTION VS USE — SW-013's own brief lists the marker vocabulary and so classified itself as open; a heuristic cannot tell naming a marker from using one. (2) CROSS-CARD RESOLUTION is invisible — SW-011's 'LEFT STALE: SPEC CAP-5' was closed by SW-012, and only within-card supersession is detectable. (3) THE SEPARATOR IS UNESCAPED — this very note's mention of the segment separator splits the note in half, visible in the UI as a sentence cut off at 'classifies each'. All three vanish if note becomes structured entries {t, kind, text, resolves} rather than prose with a delimiter; that is the real fork in the road and it is Alberto's call, not mine. 96 tests pass, 15 of them new. VERIFIED in the browser on real data: 26 entries across 5 groups, file filter 26->7 for lib.js, search 'mtime' -> 2 entries with SW-010 first, focus retained while typing, group headline and lede and tab all agreeing on 2."
+        }
+      ],
+      "created": "2026-07-27T15:48:59.429Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-012",
+      "p": "shipward",
+      "title": "Update the SPEC to match what was built",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "chore/spec-catch-up",
+      "commit": "0edc2f6",
+      "note": [
+        {
+          "t": "2026-07-27T15:42:05.896Z",
+          "kind": "outcome",
+          "text": "The SPEC contract has drifted from the product across a day of building. Known drift: (1) non-goal 'No MCP server is built' is false — SW-005 shipped one; (2) CAP-5 Raw data describes a view removed in SW-011; (3) all four Open Questions were answered at checkpoints but never written back; (4) constraint 'last write wins' is false — SW-008 added If-Match/ETag optimistic concurrency with 428/409; (5) assumption 'No optimistic concurrency on PUT' likewise; (6) CAP-9 and interaction-rules Live reload still name the raw view; (7) ephemeral UI state still lists view raw and copied; (8) data-contract has no mcp heartbeat key and still says 'Last write wins'; (9) constraint says the server is ~60 lines, which stopped being true. ALSO RATIFY: two additions I made to interaction-rules.md mid-implementation without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both document behaviour the prototype and the code already implement, and Alberto is being told rather than asked-after-the-fact this time."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "finding",
+          "text": "DONE. Nine false statements corrected. SPEC.md: CAP-5 WITHDRAWN not deleted (renumbering would silently change what CAP-6..CAP-10 mean in the cards and artifacts citing them); CAP-11 MCP server and CAP-12 honest MCP tag added; CAP-9 and Live reload stop naming the raw view; non-goal 'No MCP server is built' becomes 'No MCP SDK, stdio only'; the '~60 lines' server figure dropped; constraints gained the single-store cross-process lock, the one-module rule for shared logic, and the If-Match/ETag contract; the 'last write wins' assumption RETIRED WITH ITS REASON KEPT ON THE RECORD rather than deleted, because a future reader needs to know an audit trail of a destroyed card was once thought sufficient; all four Open Questions moved to Resolved decisions with their answers. data-contract.md: mcp heartbeat documented including the git-dirtiness tradeoff, feed cap stated as truncating not rejecting, stat precedence resolved to shipped ?? pushed and pinned to UTC, MCP status derivation added, write rules rewritten. interaction-rules.md: ephemeral state now matches the real state object, sequential polling recorded, offline vs error kept distinct. RATIFIED AND NAMED IN THE MEMLOG: the two additions I made to interaction-rules.md during SW-001 without asking (the 'Clearing claude on the way out' paragraph and the 'sent back to Backlog' feed row) — both only document behaviour the prototype's moveMsg/applyTransition and the shipped code already implement. The process failure was mine; a SPEC companion is Ask First. LESSON ON THE RECORD: spec drift is cheap to create and expensive to find — re-derive at the end of any day that ships more than two cards."
+        },
+        {
+          "t": "2026-07-28T11:28:28.251Z",
+          "kind": "outcome",
+          "resolves": "SW-011",
+          "text": "Cross-card resolution, stated now that notes can carry it: this card already fixed what SW-011 left stale — SPEC.md marks CAP-5 WITHDRAWN 2026-07-27 and data-contract.md strikes the Raw data entry. Re-verified by grep during the SW-028 migration."
+        }
+      ],
+      "created": "2026-07-27T15:42:05.896Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-011",
+      "p": "shipward",
+      "title": "Remove the Raw data view",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "chore/remove-raw-data",
+      "commit": "1a6d32a",
+      "note": [
+        {
+          "t": "2026-07-27T15:35:16.401Z",
+          "kind": "decision",
+          "text": "Alberto's call 2026-07-27: the point of Shipward is watching Claude Code work, and Raw data is the view that earns its place least — useful once to prove the board is only a view of the file, rarely after. Board stays (it is the point), Archive stays. SUPERSEDES SW-004, which is in Review claiming the raw view shipped. Remove: renderRaw/copyRaw/copyTimer and the copy icon from app.js, the raw tab entry and view dispatch, rawJson/rawCard from public/lib.js, the three rawJson tests, and .view-body-raw/.view-lede-raw/.raw-pre from app.css. NOTE FOR ALBERTO: this makes SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md stale — not editing those without a ratified decision, since the SPEC is the contract."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "open",
+          "text": "REMOVED. app.js loses renderRaw/copyRaw/copyTimer, the copy icon, the copied/copyFailed state flags, the raw tab entry and its dispatch branch; lib.js loses rawJson/rawCard; three tests and three CSS rules go with them. render() already falls back to the board for an unrecognised view, so nothing can land on a view that no longer exists. 81 tests pass. VERIFIED in the browser against the real tracker: two tabs (Board, Archive), Archive still renders its table, zero stray pre elements or Copy buttons, no console errors. GOTCHA WORTH REMEMBERING: my first pass sliced app.css between two markers and silently deleted 70 lines — the whole board/column/card block sat between the raw rules and the end of the file. The screenshot caught it; the tests did not, because CSS has no tests. Reverted and removed the exact block verbatim instead. Slice-between-markers is not safe on a file you did not just write. LEFT STALE FOR ALBERTO: SPEC CAP-5 and the 'Raw data' derived-state entry in data-contract.md still describe a view that no longer exists — not editing the SPEC without a ratified decision."
+        }
+      ],
+      "created": "2026-07-27T15:35:16.401Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-010",
+      "p": "shipward",
+      "title": "A live lock is broken as stale — silent lost write",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "fix/live-lock-broken",
+      "commit": "988f8be",
+      "created": "2026-07-27T14:50:54.528Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z",
+      "note": [
+        {
+          "t": "2026-07-27T14:50:54.528Z",
+          "kind": "finding",
+          "text": "REPRODUCED while fixing SW-009. The 12-writer store test fails about 1 run in 6 under full-suite load: 11 of 12 cards land, every child exits 0, nothing is logged. A high-cycle harness (6 processes x 150 mutations) loses ~1 write per 900 reliably. ROOT CAUSE: isStale() judges the lock from TWO separate observations of the path — readHolder() then lstat() — and the lock can be replaced between them. When readHolder() hits the lock in its momentary absence (normal, between one holder release and the next publish) it returns null, and lstat() then measures a DIFFERENT, brand-new lock. That new lock trips `if (age < 0) return true` — the line commented \"clock skew: as broken as too old\". Measured: st.mtimeMs carries sub-millisecond precision while Date.now() truncates to whole ms, so a freshly created lock reads as up to 0.62ms in the FUTURE in 1085 of 2000 observations. Over half of all new locks are therefore condemned the instant that race is hit. Trace confirms the full chain: break-won by a waiter, then 6ms later the true holder gets release-skip (its lock is gone) and its atomic-write chmod fails ENOENT because breakLock -> sweepTmp deleted the live holder’s in-flight .tmp. Two writers in the critical section, one write silently overwritten. THREE DEFECTS: (1) isStale reads stat and content from different observations; (2) age < 0 is treated as death when it actually means brand new; (3) sweepTmp unlinks temp and lock-scratch files belonging to LIVE processes."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "finding",
+          "text": "FIXED. inspect() now reads mtime, inode and holder from ONE open handle, so a stat and a read can never land on two different locks. A future mtime means new, not dead (the old 'age < 0 = as broken as too old' line was the trigger). breakLock() compares the grave's inode against the snapshot it judged and puts an innocent lock back. sweepTmp() only collects files whose pid is dead. withLock() hands callers a held() guard checked immediately before the commit, so a lost lock raises LockLostError instead of overwriting whoever holds it now. EVIDENCE: before, ~1 write lost per 900 under sustained contention (2 of 4 trials) and the 12-writer test failed ~1 run in 6 under full-suite load; after, 12960 contended writes across 14 trials with zero lost and six consecutive clean suite runs. 49 tests pass. Three new regression tests were each run against the PREVIOUS store and all three fail there: future-dated lock read as a corpse, sweep eating a live process's in-flight temp, and a mid-write lock loss writing anyway."
+        }
+      ]
+    },
+    {
+      "id": "SW-001",
+      "p": "shipward",
+      "title": "Build the Shipward desk core (server + board)",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "L",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/shipward-tracker-app",
+      "commit": "b0f75b3",
+      "note": [
+        {
+          "t": "2026-07-25T12:29:17Z",
+          "kind": "decision",
+          "text": "SCOPE NARROWED at the quick-dev step-01 checkpoint to the desk core: CAP-1,2,3,6,7,8,9 — serve.mjs, board with drag & drop, card dialog, activity strip, 3s live poll. Archive (SW-003), Raw data (SW-004) and the MCP server (SW-005) split out as separate cards. Built via bmad-quick-dev against _bmad-output/specs/spec-shipward/SPEC.md. Recreate the hi-fi prototype at design_handoff_shipward/design-reference/Shipward-Modernist.dc.html as a static no-build web app in shipward/public, served by shipward/serve.mjs (~60 lines, zero deps, port 4747): GET /api/tracker reads .shipward/tracker.json, PUT /api/tracker does an atomic write (tmp + rename). UI polls GET ~3s so Claude Code's direct file edits appear live. Four views: Board (4 columns + drag & drop), Archive, Raw data, Card dialog. Tokens in design_handoff_shipward/design-reference/assets/modernist-scoped.css — strip the #sw-1a scoping prefix. Radius 0 everywhere. .shipward/schema.json is normative. Full spec: design_handoff_shipward/README.md."
+        }
+      ],
+      "created": "2026-07-25T12:29:17Z",
+      "pushed": "2026-07-27T16:29:20.432Z",
+      "shipped": "2026-07-27T16:29:20.432Z"
+    },
+    {
+      "id": "SW-002",
+      "p": "shipward",
+      "title": "Distill the design handoff into a SPEC contract",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-25T12:47:00Z",
+          "kind": "decision",
+          "text": "Ran bmad-spec on design_handoff_shipward/. Output: _bmad-output/specs/spec-shipward/ — SPEC.md (10 capabilities), companions data-contract.md + interaction-rules.md, adopted companions README.md + CLAUDE.md, sources tracker.seed.json + seed.js. Both self-validate passes PASS. Decision: README adopted rather than transcribed, so the token table and screen specs stay single-sourced. Four open questions left for Alberto — MCP tag has no MCP behind it, card-delete contradicts CLAUDE.md 'never delete', shipped-this-month field precedence, projects[] editability. Skill was invoked by loading SKILL.md directly: the session skill registry is rooted at /Users/alberto/projects, so project-local .claude/skills are not callable via the Skill tool."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "outcome",
+          "text": "Merged to main 2026-07-27 in the bd75f11 fast-forward. No commit of its own: this card produced the SPEC under _bmad-output/, which landed inside the desk-core commit."
+        }
+      ],
+      "created": "2026-07-25T12:47:00Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-003",
+      "p": "shipward",
+      "title": "Archive view — shipped cards table",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/archive-view-shipped",
+      "commit": "dba5128",
+      "note": [
+        {
+          "t": "2026-07-25T13:18:00Z",
+          "kind": "outcome",
+          "text": "SPEC CAP-4. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Shipped & archived' + muted lede, .table sorted by shipped desc: Shipped (Mon D) / ID (mono 12px) / What went out / Type / Effort / Commit (mono). Tab label carries the count. Read-only projection over state the desk core already builds."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "evidence",
+          "text": "SHIPPED: archiveRows() and archiveLede() live in public/lib.js so the projection is unit-tested rather than eyeballed; app.js renders the table and the tabs are live (Board/Archive switch, aria-current set). Sorted by shipped desc; an entry with a missing or unparseable shipped date sinks to the bottom rather than scrambling the order, because Claude Code hand-writes this file; a card with no sha gets an em dash; the lede reads '1 entry' not '1 entries'. .table ported from modernist-scoped.css with the #sw-1a prefix stripped. VERIFIED in the browser against a seeded sandbox tracker (never the real one): three shipped cards render newest-first with the undated one last, header row matches the contract, the board is replaced, tab count reads 'Archive · 3'. 53 tests pass."
+        }
+      ],
+      "created": "2026-07-25T13:18:00Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-004",
+      "p": "shipward",
+      "title": "Raw data view — JSON with copy button",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/raw-data-view",
+      "commit": "b61fd61",
+      "note": [
+        {
+          "t": "2026-07-25T13:18:00Z",
+          "kind": "outcome",
+          "text": "SPEC CAP-5. Split from SW-001 at the quick-dev step-01 multi-goal check. h3 'Raw board data', secondary Copy JSON button whose label flips to 'Copied — feed it to a machine' for 2s, then a <pre> (surface bg, 1px divider border, mono 12px/1.55, max-height 560px). Field order fixed in data-contract.md: id, title, type, priority, effort, status, claude, branch, commit, created, pushed, shipped — note pri is emitted as 'priority' and p is dropped."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "finding",
+          "text": "SHIPPED: rawJson() in public/lib.js writes the twelve contract keys explicitly so the field order is the contract in one visible place, not an emergent property of a key loop. pri is emitted as priority; p is dropped (the view is already project-scoped); note is dropped too — it is not in the contract's list and it is Claude's working context, not board data. Nulls are kept rather than the keys omitted, so a machine reading it gets a stable shape. Copy JSON flips to 'Copied — feed it to a machine' for 2s, but ONLY when the clipboard write actually resolves; a denied write says 'Could not copy — select it instead' instead of claiming success. The flag lives in state because the 3s poll re-renders underneath the timer. VERIFIED in the browser: tab switches, pre renders 4 cards at mono 12px with max-height 560px, key order matches the contract exactly, the failure label appeared under the headless profile's denied clipboard and reverted after 2s, and with writeText stubbed the success label appeared and the copied text was byte-identical to the pre. 56 tests pass."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "decision",
+          "text": "SUPERSEDED 2026-07-27 by SW-011 — Alberto removed the Raw data view. This card's work is no longer in the product; the commit b61fd61 stays in history. Keeping the card rather than deleting it: ids are never reused, and the reasoning above is still the record of why the projection was shaped the way it was."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "outcome",
+          "text": "Merged to main, but the code it added was already removed by SW-011. What is in main is its removal; b61fd61 stays in history."
+        }
+      ],
+      "created": "2026-07-25T13:18:00Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-005",
+      "p": "shipward",
+      "title": "MCP server so Claude Code reaches the tracker over MCP (stage B)",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "L",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/mcp-server-stage-b",
+      "commit": "ed72dcf",
+      "note": [
+        {
+          "t": "2026-07-25T13:18:00Z",
+          "kind": "decision",
+          "text": "SCOPE NARROWED to stage B at the step-02 token check (~2757 tokens vs a 1600 ceiling). Stage A shipped as SW-006. Remaining: shipward/mcp.mjs — zero-dep stdio JSON-RPC 2.0, protocol 2025-11-25, five verb tools (standup, log, start, done, sync) importing the rules from public/lib.js so the UI and Claude cannot drift; .mcp.json registration; mcp.test.mjs over a real pipe. Writes go through tracker-store.mjs, which is now cross-process safe. NO @modelcontextprotocol/sdk — zero-dep is an Always constraint; hand-roll the protocol."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "finding",
+          "text": "SHIPPED stage B. shipward/mcp.mjs is newline-delimited JSON-RPC 2.0 over stdio, protocol 2025-11-25, zero deps, no SDK. Five tools mirror the five slash commands (standup/log/start/done/sync); each does the tracker half and leaves git plus the work itself to Claude. All rules — id allocation, branch naming, status transitions, feed copy — are imported from public/lib.js so the desk and Claude cannot drift; addMsg/editMsg/deleteMsg were moved into lib.js for that and app.js now calls them. .mcp.json registers it as the shipward server. DESIGN CALLS: an unknown tool name returns a readable errored RESULT rather than -32601, because it is the model mistake to correct not a protocol failure; an unknown card id lists what IS startable; start is idempotent so a re-run after a crash re-reports context instead of refusing; done APPENDS to the note rather than replacing it; sync applies every update and creation in ONE locked write with ONE feed entry. BUG FOUND BY SMOKE-TESTING THE REAL BINARY: stdin end called process.exit immediately and killed a call still in flight — losing a write that had taken the tracker lock and never answering. Every test held stdin open so none of them saw it; now the queue drains first, and the regression test was verified to fail against the old code. 24 MCP tests over a real pipe (split frames, two messages in one chunk, notifications, malformed input, batch refusal, stdout purity); 80 tests in total. This card was itself started and finished THROUGH the MCP server."
+        }
+      ],
+      "created": "2026-07-25T13:18:00Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-006",
+      "p": "shipward",
+      "title": "Cross-process safe tracker writes — shared store + lock",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "feat/mcp-tracker-server",
+      "commit": "b390868",
+      "note": [
+        {
+          "t": "2026-07-25T15:06:49.615Z",
+          "kind": "brief",
+          "text": "Stage A of SW-005. Extracted read/validate/atomic-write into shipward/tracker-store.mjs behind an O_EXCL advisory lock spanning the whole read-modify-write; serve.mjs is now a client and its in-process promise chain is gone. That chain only protected same-process writes — the MCP server and Claude Code direct edits both sit outside it. Lock records pid+timestamp, aged out after 5s so a crashed holder cannot deadlock the desk. 34 tests pass: store.test.mjs spawns real child processes (12 concurrent writers all land, stale locks broken, fresh locks waited for not stolen, invalid mutations write nothing and still release); desk-core suite passes unchanged as the regression gate. ⚠️ PULLED BACK FROM REVIEW 2026-07-25: adversarial review REPRODUCED five failures — the lock does not hold. (1) Contended stale-break: 4 processes vs one stale lock, 9/25 trials LOST WRITES, because detect-and-break is three non-atomic steps and each breaker unlinks the previous winner’s fresh lock. (2) A 6s mutation gets its lock stolen at 5s; both processes exit 0 and one write vanishes silently. (3) A dangling symlink at the lock path spins acquire() forever at 100% CPU — two of three loop paths skip the deadline check. (4) replace() (every card drag) never re-reads under the lock, so a desk PUT erased a Claude write that had committed correctly. (5) rename resets file mode 600→644. Also: feed at exactly 200 makes validate() reject every subsequent write and freezes the tracker; lost in-process FIFO ordering; GET re-serializes instead of returning raw bytes. 34 tests passed throughout — none of them covered contention."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "evidence",
+          "text": "REWORKED after review: the lock was redesigned, not patched. Publish via write-scratch-then-link(): link is atomic AND never leaves an empty lock visible, which open(wx) did — under contention a process starved between create and stamp, waiters read a bodyless lock and broke a LIVE holder’s. Break a dead lock by rename (one atomic step) so two breakers cannot both win and delete each other’s fresh lock. Ownership token: a holder only ever releases the lock it took. Liveness (process.kill(pid,0)) over age, plus a utimes heartbeat — utimes not writeFile, because rewriting the body truncates it and reopens the same window. Every retry path now checks the deadline and sleeps (two used to spin at 100% CPU). Also: feed cap truncates instead of rejecting (rejection froze the tracker permanently at 200 entries); file mode preserved across rename; fsync before rename; read() distinguishes ENOENT from EACCES; GET returns raw bytes not a re-serialization; in-process FIFO queue restored in front of the lock; err.name instead of instanceof; orphan tmp and lock-scratch files swept on break. 41 tests pass. Stress: 25 trials x 4 contended writers against a stale lock = 0 lost writes, 0 leftovers (was 9/25 losing writes). 12-writer repro 12/12 across three runs."
+        }
+      ],
+      "created": "2026-07-25T15:06:49.615Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-007",
+      "p": "shipward",
+      "title": "Prefer MCP in CLAUDE.md and make the header tag live",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "chore/prefer-mcp-claude-md",
+      "commit": "4deef72",
+      "note": [
+        {
+          "t": "2026-07-25T15:06:49.615Z",
+          "kind": "decision",
+          "text": "Stage C of SW-005, depends on SW-005 stage B. Rewrite CLAUDE.md so the protocol prefers the MCP tools with direct file edits as the documented fallback (Alberto authorised this Ask First change at the SW-005 step-01 checkpoint). Drive the header MCP CONNECTED tag from an mcp.lastSeen heartbeat, stale after 150s, with a muted non-blinking disconnected variant. schema.json sets no additionalProperties, so the mcp key needs no schema change — verified. KNOWN TRADEOFF: a 60s heartbeat makes the committed tracker.json dirty in git about once a minute; the alternative is a .shipward/mcp-status.json sidecar."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "decision",
+          "text": "SHIPPED stage C. CLAUDE.md now leads with the five MCP tools and keeps direct file edits as the documented fallback for when no server is connected, with the rules stated once so they apply to both routes. The MCP CONNECTED tag was HARDCODED — lit whether or not anything was listening, which made it decoration on a product whose premise is that Claude really is on the other end. It now reads doc.mcp.lastSeen via mcpStatus() in lib.js, stamped by the MCP server every 60s, dark after 150s (MCP_STALE_MS). Offline is muted with no animation: a blinking light that means nothing trains you to ignore the one that means something. A future-dated heartbeat reads as live rather than infinitely stale — a disagreeing clock is not a dead server. TRADEOFF TAKEN AS DECIDED: the heartbeat lives in tracker.json, so a committed tracker goes dirty in git about once a minute during a session; the .shipward/mcp-status.json sidecar alternative was rejected because one occasionally dirty file beats two files that can disagree. The heartbeat is best-effort and never fails a session. VERIFIED end to end: with no mcp key the tag read MCP OFFLINE, muted, animation none; starting a real mcp.mjs against that tracker flipped it to MCP CONNECTED, accent colour, swm-blink, title 'last seen just now', within one 3s poll. Test note: the server writes on startup, so the read-only assertions now compare board state with the mcp key stripped rather than raw bytes. 84 tests pass."
+        }
+      ],
+      "created": "2026-07-25T15:06:49.615Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-008",
+      "p": "shipward",
+      "title": "PUT /api/tracker is last-write-wins — decide if it should be",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "fix/put-optimistic-concurrency",
+      "commit": "649ca73",
+      "note": [
+        {
+          "t": "2026-07-25T15:25:44.607Z",
+          "kind": "open",
+          "text": "REPRODUCED by adversarial review against a live server: desk GETs at T0, Claude Code appends a card via mutate() at T1 (correctly locked, committed), desk PUTs its T0 snapshot at T2 — PUT 200 and Claude’s card is GONE. The lock worked perfectly and the data was still destroyed, because replace() never re-reads under the lock: its base document came from an unlocked GET seconds earlier. This is the primary remaining loss path. It is also a CONTRADICTION between two live contracts. spec-mcp-tracker-server.md Always says two processes must never start a mutation from the same base document; spec-shipward-desk-core.md accepts no optimistic concurrency on PUT, last write wins, as a documented assumption. NEEDS ALBERTO: either add optimistic concurrency (If-Match on a version or etag, 409 on conflict, UI re-reads and retries) which is an Ask First change to the HTTP surface, or narrow the stage-A Always to say the lock protects mutate() callers only and PUT stays last-write-wins by design. Referenced from a comment in tracker-store.mjs replace()."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "decision",
+          "text": "DECIDED by Alberto: add optimistic concurrency. GET returns an ETag (content hash); PUT requires If-Match and answers 409 with the current document when it does not match; the UI re-applies its mutation to the fresh document and retries once. This is the authorised Ask First change to the HTTP surface. [committed by Claude at T1]"
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "evidence",
+          "text": "SHIPPED: GET returns an ETag (sha256 of the file bytes, 16 hex chars, quoted). PUT requires If-Match — 428 without it — and the store compares it INSIDE the lock against what is on disk. Mismatch answers 409 carrying the document that actually won plus its ETag, so the client can re-apply rather than guess. The UI recovers automatically: commit() takes a mutation, not a snapshot, so on 409 it re-applies the same intent to the winning document and retries once; a second conflict adopts the winner and says so. VERIFIED end to end against the live server by replaying the exact scenario the review used to destroy data: desk GETs at T0, Claude commits via mutate() at T1, desk PUTs its T0 snapshot at T2 — now HTTP 409 and Claude’s write SURVIVES. In the browser: drag sends a well-formed If-Match; a forced stale etag produced 409 then 200 with the external write intact and no error shown. 45 tests pass. The old \"concurrent writes never corrupt the file\" test was rewritten — it asserted six concurrent PUTs from one base all succeed, which was the bug; it now asserts exactly one wins and the rest get 409."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "outcome",
+          "text": "Commit backfilled during the merge sync — the card had carried a null sha since it was closed."
+        }
+      ],
+      "created": "2026-07-25T15:25:44.607Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-009",
+      "p": "shipward",
+      "title": "serve.test.mjs binds a fixed port and cannot run concurrently",
+      "type": "chore",
+      "pri": "P3",
+      "effort": "S",
+      "status": "shipped",
+      "claude": "done",
+      "branch": "chore/test-port-zero",
+      "commit": "8bf611f",
+      "note": [
+        {
+          "t": "2026-07-25T15:25:44.607Z",
+          "kind": "brief",
+          "text": "The sandbox server in serve.test.mjs hard-codes port 4749. A leftover server from an earlier or parallel run holds the port, the new server fails to bind, and the tests silently assert against the STALE server — observed here as three phantom failures (GET returning 200 for a missing tracker). Fix: bind port 0, read the assigned port back from the server, pass it to the tests. The sandbox server should also log bind failures rather than dying silently."
+        },
+        {
+          "t": "2026-07-27T16:29:20.433Z",
+          "kind": "finding",
+          "text": "SHIPPED: serve.mjs now reads SHIPWARD_PORT (default 4747) and logs the port it actually bound; the test spawns it with SHIPWARD_PORT=0 and parses the port back out of stdout, so the suite no longer rewrites serve.mjs source to patch the constant. A bind failure logs to stderr and exits 1 — covered by a test that starts a second server on the taken port and asserts exit 1 plus 'already in use'. 46 tests pass. FOUND WHILE DOING THIS: the 12-writer store test failed intermittently (~1 run in 6 under full-suite load, 11/12 cards). Not flaky — a real silent lost write. Root cause traced and filed as SW-010."
+        }
+      ],
+      "created": "2026-07-25T15:25:44.607Z",
+      "pushed": "2026-07-27T16:29:20.433Z",
+      "shipped": "2026-07-27T16:29:20.433Z"
     }
   ],
   "feed": [
     {
-      "t": "2026-07-28T14:23:55.668Z",
+      "t": "2026-07-28T14:26:46.531Z",
       "p": "shipward",
-      "msg": "You added SW-034 to Backlog — it's on the list",
+      "msg": "Tracker restored after the serve.test clobber — cards from git (204b735), feed from feed-archive.jsonl, nothing lost",
       "by": "claude"
     },
     {
-      "t": "2026-07-01T00:00:00Z",
-      "p": "test",
-      "msg": "seeded",
+      "t": "2026-07-28T14:26:46.531Z",
+      "p": "shipward",
+      "msg": "You added SW-034 and SW-035 to Backlog",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T14:26:46.531Z",
+      "p": "shipward",
+      "msg": "SW-033 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T14:18:52.470Z",
+      "p": "shipward",
+      "msg": "SW-033 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:20:23.394Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-032 review → pushed",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:20:22.896Z",
+      "p": "shipward",
+      "msg": "SW-032 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:19:36.099Z",
+      "p": "shipward",
+      "msg": "SW-032 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:10:26.494Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-031 review → pushed",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:10:09.893Z",
+      "p": "shipward",
+      "msg": "SW-031 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:06:33.565Z",
+      "p": "shipward",
+      "msg": "SW-031 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:04:47.045Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-030 review → pushed",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:04:32.605Z",
+      "p": "shipward",
+      "msg": "SW-030 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T13:03:29.611Z",
+      "p": "shipward",
+      "msg": "SW-030 handed to Claude Code — queued",
       "by": "user"
+    },
+    {
+      "t": "2026-07-28T13:03:19.883Z",
+      "p": "shipward",
+      "msg": "SW-030 moved to Review — give it a look",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-28T13:01:23.159Z",
+      "p": "shipward",
+      "msg": "SW-030 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:40:10.856Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 2 cards corrected from the repository",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:39:20.641Z",
+      "p": "shipward",
+      "msg": "SW-029 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:35:56.397Z",
+      "p": "shipward",
+      "msg": "SW-029 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:35:43.990Z",
+      "p": "shipward",
+      "msg": "SW-028 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:34:37.514Z",
+      "p": "shipward",
+      "msg": "SW-028 edited — note",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-28T11:29:45.647Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-027 review → pushed",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:28:28.251Z",
+      "p": "shipward",
+      "msg": "Notes migrated to structured entries — 29 cards, kinds stated, one severed note repaired (SW-028)",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:17:36.031Z",
+      "p": "shipward",
+      "msg": "SW-028 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:17:03.240Z",
+      "p": "shipward",
+      "msg": "SW-027 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:13:04.451Z",
+      "p": "shipward",
+      "msg": "SW-027 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:12:54.619Z",
+      "p": "shipward",
+      "msg": "You added SW-027, SW-028 and SW-029 to Backlog — the assessment becomes work",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:48:18.004Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-026 review → pushed",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:47:56.921Z",
+      "p": "shipward",
+      "msg": "SW-026 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:44:05.807Z",
+      "p": "shipward",
+      "msg": "SW-026 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:40:40.282Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 2 cards corrected from the repository",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:40:12.263Z",
+      "p": "shipward",
+      "msg": "SW-025 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:39:47.595Z",
+      "p": "shipward",
+      "msg": "You added SW-026 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:33:13.220Z",
+      "p": "shipward",
+      "msg": "SW-025 logged and taken — the feed becomes a view",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:32:47.418Z",
+      "p": "shipward",
+      "msg": "SW-024 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:27:39.143Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-024 → claude",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:20:42.665Z",
+      "p": "shipward",
+      "msg": "SW-024 logged and taken — git becomes authoritative for what it can prove",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:12:33.014Z",
+      "p": "shipward",
+      "msg": "23 cards filed to the archive — the board is clear",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-28T08:42:10.509Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-023 merged — session opener audits git",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T08:42:01.351Z",
+      "p": "shipward",
+      "msg": "SW-023 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T08:41:50.437Z",
+      "p": "shipward",
+      "msg": "You added SW-023 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:46:52.718Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-022 merged to main — sync now reads git",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:46:52.361Z",
+      "p": "shipward",
+      "msg": "SW-022 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:42:32.411Z",
+      "p": "shipward",
+      "msg": "SW-022 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:42:32.102Z",
+      "p": "shipward",
+      "msg": "You added SW-022 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:26:14.536Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-021 merged to main — cancellation honoured",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:26:14.188Z",
+      "p": "shipward",
+      "msg": "SW-021 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:23:12.152Z",
+      "p": "shipward",
+      "msg": "SW-021 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:21:06.062Z",
+      "p": "shipward",
+      "msg": "Synced with git — the four review-fix cards are on main at fa881cd; SW-021 stays in backlog, it is not done",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:57:43.529Z",
+      "p": "shipward",
+      "msg": "You added SW-021 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:57:43.331Z",
+      "p": "shipward",
+      "msg": "SW-020 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:37:50.902Z",
+      "p": "shipward",
+      "msg": "SW-020 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:37:50.675Z",
+      "p": "shipward",
+      "msg": "You added SW-020 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:35:34.356Z",
+      "p": "shipward",
+      "msg": "SW-019 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:31:44.694Z",
+      "p": "shipward",
+      "msg": "SW-019 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:31:21.568Z",
+      "p": "shipward",
+      "msg": "You added SW-019 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:23:44.926Z",
+      "p": "shipward",
+      "msg": "SW-017 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:23:44.544Z",
+      "p": "shipward",
+      "msg": "SW-018 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:16:20.635Z",
+      "p": "shipward",
+      "msg": "SW-018 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:16:18.639Z",
+      "p": "shipward",
+      "msg": "You added SW-018 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T18:00:03.356Z",
+      "p": "shipward",
+      "msg": "SW-017 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T17:59:45.296Z",
+      "p": "shipward",
+      "msg": "You added SW-017 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T17:30:19.492Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-016 merged to main — ambient status line",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T17:29:57.293Z",
+      "p": "shipward",
+      "msg": "SW-016 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T17:26:08.253Z",
+      "p": "shipward",
+      "msg": "SW-016 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T17:26:07.950Z",
+      "p": "shipward",
+      "msg": "You added SW-016 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:29:20.433Z",
+      "p": "shipward",
+      "msg": "Synced with git — all 15 review cards merged to main as bd75f11 — fast-forward, no merge commits, 123 tests green on main",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:22:45.656Z",
+      "p": "shipward",
+      "msg": "SW-015 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:18:51.337Z",
+      "p": "shipward",
+      "msg": "SW-015 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:18:46.568Z",
+      "p": "shipward",
+      "msg": "You added SW-015 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:09:27.605Z",
+      "p": "shipward",
+      "msg": "SW-014 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:02:06.211Z",
+      "p": "shipward",
+      "msg": "SW-014 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T16:01:56.627Z",
+      "p": "shipward",
+      "msg": "You added SW-014 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:55:48.397Z",
+      "p": "shipward",
+      "msg": "SW-013 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:48:59.686Z",
+      "p": "shipward",
+      "msg": "SW-013 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:48:59.429Z",
+      "p": "shipward",
+      "msg": "You added SW-013 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:45:14.620Z",
+      "p": "shipward",
+      "msg": "SW-012 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:42:06.203Z",
+      "p": "shipward",
+      "msg": "SW-012 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:42:05.896Z",
+      "p": "shipward",
+      "msg": "You added SW-012 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:38:03.950Z",
+      "p": "shipward",
+      "msg": "SW-004 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:37:52.975Z",
+      "p": "shipward",
+      "msg": "SW-011 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:35:24.769Z",
+      "p": "shipward",
+      "msg": "SW-011 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:35:16.401Z",
+      "p": "shipward",
+      "msg": "You added SW-011 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:28:59.597Z",
+      "p": "shipward",
+      "msg": "SW-007 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:25:10.652Z",
+      "p": "shipward",
+      "msg": "SW-007 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:24:48.746Z",
+      "p": "shipward",
+      "msg": "SW-005 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:24:22.275Z",
+      "p": "shipward",
+      "msg": "SW-005 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:11:31.359Z",
+      "p": "shipward",
+      "msg": "SW-004 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:09:04.383Z",
+      "p": "shipward",
+      "msg": "SW-004 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:09:00.383Z",
+      "p": "shipward",
+      "msg": "SW-003 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:04:45.788Z",
+      "p": "shipward",
+      "msg": "SW-003 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T15:04:10.319Z",
+      "p": "shipward",
+      "msg": "SW-010 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T14:50:57.780Z",
+      "p": "shipward",
+      "msg": "SW-010 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T14:50:54.528Z",
+      "p": "shipward",
+      "msg": "You added SW-010 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T14:50:38.188Z",
+      "p": "shipward",
+      "msg": "SW-009 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-27T14:33:55.973Z",
+      "p": "shipward",
+      "msg": "SW-009 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T16:05:07.948Z",
+      "p": "shipward",
+      "msg": "SW-008 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T16:04:33.907Z",
+      "p": "shipward",
+      "msg": "SW-003 sent back to Backlog",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-25T16:04:15.190Z",
+      "p": "shipward",
+      "msg": "SW-003 handed to Claude Code — queued",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-25T16:00:25.458Z",
+      "p": "shipward",
+      "msg": "SW-008 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:25:44.607Z",
+      "p": "shipward",
+      "msg": "SW-006 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:25:44.607Z",
+      "p": "shipward",
+      "msg": "You added SW-008 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:25:44.607Z",
+      "p": "shipward",
+      "msg": "You added SW-009 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:15:42.539Z",
+      "p": "shipward",
+      "msg": "SW-006 sent back to Backlog",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:06:49.615Z",
+      "p": "shipward",
+      "msg": "SW-006 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:06:49.615Z",
+      "p": "shipward",
+      "msg": "You added SW-007 to Backlog — it is on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:06:49.615Z",
+      "p": "shipward",
+      "msg": "SW-005 sent back to Backlog",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T15:02:00Z",
+      "p": "shipward",
+      "msg": "SW-005 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T14:41:00Z",
+      "p": "shipward",
+      "msg": "SW-001 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T13:18:00Z",
+      "p": "shipward",
+      "msg": "You added SW-005 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T13:18:00Z",
+      "p": "shipward",
+      "msg": "You added SW-004 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T13:18:00Z",
+      "p": "shipward",
+      "msg": "You added SW-003 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T13:04:00Z",
+      "p": "shipward",
+      "msg": "SW-001 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T12:52:00Z",
+      "p": "shipward",
+      "msg": "SW-002 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T12:47:00Z",
+      "p": "shipward",
+      "msg": "You added SW-002 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-25T12:29:17Z",
+      "p": "shipward",
+      "msg": "You added SW-001 to Backlog — it's on the list",
+      "by": "claude"
     }
-  ]
+  ],
+  "mcp": {
+    "lastSeen": "2026-07-28T13:18:03.689Z",
+    "pid": 87930
+  }
 }

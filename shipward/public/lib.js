@@ -190,3 +190,95 @@ export const latestFeed = (feed, projectId) =>
   feed
     .filter((f) => f.p === projectId && !Number.isNaN(Date.parse(f.t)))
     .sort((a, b) => Date.parse(b.t) - Date.parse(a.t))[0] || null;
+
+/* ── the log ─────────────────────────────────────────────── */
+// The board answers "where does this stand". The log answers "what happened",
+// which is the only one of the two that can show you a day you were not there
+// for. The tracker has been keeping this the whole time and the desk rendered
+// exactly one line of it.
+
+const DAY_NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// UTC, like fmtDate and for the same reason: grouping in local time while
+// displaying in UTC would file an entry under one date and label it another.
+const dayKey = (d) => `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
+const two = (n) => String(n).padStart(2, '0');
+
+function dayLabel(d, now) {
+  if (dayKey(d) === dayKey(now)) return 'Today';
+  if (dayKey(d) === dayKey(new Date(now.getTime() - 86400000))) return 'Yesterday';
+  return `${DAY_NAMES[d.getUTCDay()]} ${MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+// Card ids inside a feed message, so a line can point back at the work. Matched
+// against the ids that actually exist rather than trusted from the pattern:
+// "SW-024" and "UTF-8" are the same shape, and only one of them is a card.
+const ID_SHAPE = /\b[A-Z][A-Z0-9]{0,5}-\d{1,6}\b/g;
+
+// The message split around its ids, so the id ALREADY IN the sentence becomes
+// the link. The first cut of this appended a chip after each line, which
+// rendered "SW-025 logged and taken — …  SW-025": the same id twice, once as
+// prose and once as a button, in a view whose whole job is reading cleanly.
+export function messageParts(msg, keep = null) {
+  const text = String(msg);
+  const parts = [];
+  let last = 0;
+  for (const m of text.matchAll(ID_SHAPE)) {
+    if (keep && !keep.has(m[0])) continue;
+    if (m.index > last) parts.push({ text: text.slice(last, m.index) });
+    parts.push({ id: m[0] });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ text: text.slice(last) });
+  return parts;
+}
+
+export function feedDays(feed, projectId, { now = new Date(), ids = null } = {}) {
+  const entries = feed
+    .filter((f) => f.p === projectId && !Number.isNaN(Date.parse(f.t)))
+    .sort((a, b) => Date.parse(b.t) - Date.parse(a.t));
+
+  const days = [];
+  let current = null;
+  for (const f of entries) {
+    const d = new Date(f.t);
+    const key = dayKey(d);
+    if (!current || current.key !== key) {
+      current = { key, label: dayLabel(d, now), date: fmtDate(f.t), entries: [] };
+      days.push(current);
+    }
+    const parts = messageParts(f.msg, ids);
+    current.entries.push({
+      t: f.t,
+      time: `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}`,
+      by: f.by === 'user' ? 'You' : 'Claude Code',
+      mine: f.by === 'user',
+      msg: f.msg,
+      parts,
+      ids: [...new Set(parts.filter((p) => p.id).map((p) => p.id))],
+    });
+  }
+  return days;
+}
+
+export function feedLede(days, { capped = false } = {}) {
+  const all = days.flatMap((d) => d.entries);
+  if (!all.length) return 'Nothing logged yet. This fills itself as work moves — you never write to it.';
+
+  const mine = all.filter((e) => e.mine).length;
+  const theirs = all.length - mine;
+  const one = all.length === 1;
+  // "1 entries" reads like a bug in a product whose whole pitch is care —
+  // the same reason archiveLede spells this out.
+  const count = one ? '1 entry' : `${all.length} entries`;
+  const span = days.length === 1 ? 'in one day' : `over ${days.length} days`;
+  const who = !mine ? (one ? 'written by Claude Code' : 'every one written by Claude Code')
+    : !theirs ? (one ? 'written by you' : 'every one written by you')
+      : `${theirs} by Claude Code, ${mine} by you`;
+  // The cap is not a footnote. A view calling itself the whole history has to
+  // say when it is not one, or it becomes a lie the first time the cap bites.
+  const rolled = capped
+    ? ` This is the most recent ${FEED_CAP} — anything older has rolled off.`
+    : '';
+  return `${count} ${span}, ${who}.${rolled}`;
+}

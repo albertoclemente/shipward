@@ -11,17 +11,33 @@
   ],
   "cards": [
     {
+      "id": "SW-026",
+      "p": "shipward",
+      "title": "The desk overflows horizontally below ~444px",
+      "type": "bug",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "Found while verifying the SW-025 log view at 375px. NOT a regression from that card — measured document.scrollWidth at 444px on ALL FOUR views (Board, Log, Memory, Archive) against a 375px client width, so the source is shared chrome, almost certainly the header: brand + project segmented control + MCP tag + New card button on one row with no wrap. Every view inherits it. LOW PRIORITY BY INTENT: this is a desk that runs on localhost next to an editor, and nobody has opened it on a phone. Logged because a measured number is worth more later than a vague memory that something looked cramped.",
+      "created": "2026-07-28T10:39:47.595Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-025",
       "p": "shipward",
       "title": "The feed is the product — a log, not one line",
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/feed-view",
-      "commit": null,
-      "note": "The (d) angle from the divergence exercise: time, not status. The feed is the product — a shipping LOG, not a shipping desk. THE OBSERVATION THAT MADE IT WORTH BUILDING: the tracker holds 80 feed entries and the desk renders exactly ONE. app.js calls latestFeed, which returns the newest and discards the rest. 76 of 80 are by:claude. That is two days of Claude Code working, already recorded, already paid for, thrown away at render time — and it is precisely what Alberto said he wanted to watch when he cut the Raw data view in SW-011. SCOPE: a fourth tab. Grouped by day with a per-day count, who did it, card ids pulled out of the message and rendered as chips so a line links back to the work. The projection lives in public/lib.js and is unit-tested, following SW-003 — archiveRows earned its place there so the shape is tested rather than eyeballed. HONESTY REQUIREMENT: the feed is capped at 200 entries (FEED_CAP). A view that calls itself the whole history has to say when it is not, or it quietly becomes a lie the first time the cap bites.",
+      "commit": "701a0c2",
+      "note": "The (d) angle from the divergence exercise: time, not status. The feed is the product — a shipping LOG, not a shipping desk. THE OBSERVATION THAT MADE IT WORTH BUILDING: the tracker holds 80 feed entries and the desk renders exactly ONE. app.js calls latestFeed, which returns the newest and discards the rest. 76 of 80 are by:claude. That is two days of Claude Code working, already recorded, already paid for, thrown away at render time — and it is precisely what Alberto said he wanted to watch when he cut the Raw data view in SW-011. SCOPE: a fourth tab. Grouped by day with a per-day count, who did it, card ids pulled out of the message and rendered as chips so a line links back to the work. The projection lives in public/lib.js and is unit-tested, following SW-003 — archiveRows earned its place there so the shape is tested rather than eyeballed. HONESTY REQUIREMENT: the feed is capped at 200 entries (FEED_CAP). A view that calls itself the whole history has to say when it is not, or it quietly becomes a lie the first time the cap bites. || SHIPPED. A fourth tab, Log · N. feedDays groups the stream by UTC day (Today / Yesterday / Sat Jul 25), each day headed with a count; every row carries time, who, and the message. feedLede states the totals and the split — 83 entries over 3 days, 80 by Claude Code, 3 by you. UTC ON PURPOSE, AND SAID OUT LOUD: grouping follows fmtDate rather than local getters, because grouping locally while displaying in UTC would file one entry under two different dates in the same view. A time of day is a moment someone lived through, so the view now prints Times in UTC rather than leaving a reader east of Greenwich to work out why 10:33 was not when it happened. DESIGN FIX MID-BUILD: the first cut appended a card-id chip after each line, so a row read SW-025 logged and taken — the feed becomes a view  SW-025. The same id twice, once as prose and once as a button, in a view whose whole job is reading cleanly. messageParts now splits the message around its ids and the id IN the sentence is the link. Tested with a rejoin assertion — the parts must reconstruct the message character for character, so the split can never drop or duplicate text. ID MATCHING IS CHECKED, NOT TRUSTED: SW-024 and UTF-8 are the same shape and only one is a card, so matches are filtered against the ids that actually exist. An id-shaped token that is not a card stays as text rather than becoming a button that opens nothing. A TEST I WROTE THAT CODIFIED A BUG: the first feedLede assertion locked in 1 entries in one day — the exact thing archiveLede has a comment warning against. Fixed the lede, not the assertion. THE CAP IS NOT A FOOTNOTE: the feed holds 200 entries maximum, so a view calling itself the whole history says so in the lede once the cap bites, rather than quietly becoming a lie. VERIFIED in the browser: 3 day groups totalling 83 rows, 3 rows marked as yours matching the lede, clicking an inline id opens that card. 208 tests pass, 12 new. FOUND WHILE VERIFYING, logged as SW-026: the desk overflows horizontally below ~444px — on every view, not this one, so it is shared chrome and not a regression here.",
       "created": "2026-07-28T10:33:13.220Z",
       "pushed": null,
       "shipped": null
@@ -412,6 +428,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T10:40:12.263Z",
+      "p": "shipward",
+      "msg": "SW-025 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:39:47.595Z",
+      "p": "shipward",
+      "msg": "You added SW-026 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T10:33:13.220Z",
       "p": "shipward",

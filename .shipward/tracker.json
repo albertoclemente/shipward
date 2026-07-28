@@ -11,6 +11,92 @@
   ],
   "cards": [
     {
+      "id": "SW-034",
+      "p": "shipward",
+      "title": "Fleet view — one page over every onboarded board",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-07-28T14:26:46.531Z",
+      "pushed": null,
+      "shipped": null,
+      "note": [
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "brief",
+          "text": "The deferred half of SW-033. With per-repo trackers, Alberto_s choose-a-folder wish becomes: point the desk at ~/projects, scan depth-2 for .shipward/tracker.json, and render a fleet index — one row per project with in-flight count, waiting count, last feed line and a link into that repo_s board. Deliberately deferred: serving N trackers from one process means per-tracker etags and PUT routing, and the single-repo flow had to prove itself first (DP-001 in the demo repo is that proof). Build when two or more real projects are onboarded and switching desks is the felt pain."
+        }
+      ]
+    },
+    {
+      "id": "SW-035",
+      "p": "shipward",
+      "title": "replace() warns when a write drops most of the board",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-07-28T14:26:46.531Z",
+      "pushed": null,
+      "shipped": null,
+      "note": [
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "brief",
+          "text": "Born from the SW-033 clobber: a whole-document PUT replaced 32 cards with 1 and the store said nothing. The feed survived because SW-027 archives drops; the cards survived only because the tracker is committed to git. A write that removes more than half the existing cards should at least say so on stderr — visibility, not a gate, same doctrine as the feed archive: the desk legitimately replaces whole documents, but a massacre should never be silent."
+        }
+      ]
+    },
+    {
+      "id": "SW-033",
+      "p": "shipward",
+      "title": "setup.mjs — onboard any repo in one command",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/setup",
+      "commit": "09965c3",
+      "created": "2026-07-28T14:18:52.470Z",
+      "pushed": null,
+      "shipped": null,
+      "note": [
+        {
+          "t": "2026-07-28T14:18:52.470Z",
+          "kind": "brief",
+          "text": "Alberto wants Shipward for every future project. DESIGN CALL, made against the literal ask: NOT one shared tracker in a chosen folder — that would pool every repo into one contended file, pollute this repo_s git history with foreign cards, and break the premise that the tracker is THE REPO_S memory travelling with it. Instead: per-repo trackers + central code, one idempotent setup.mjs per repo, and a resolution ladder (env, then the repo you stand in, then this one) so every central tool finds the right board by where it runs. Fleet dashboard deferred to SW-034."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "decision",
+          "text": "DECIDED, against the literal ask: no shared tracker in a chosen folder. Per-repo trackers with central code, because the tracker is THE REPO_S memory — it commits and travels with the repo, foreign cards never pollute another project_s history, and hooks in N repos never contend for one lock."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "outcome",
+          "text": "SHIPPED. shipward/setup.mjs onboards a git repo in one idempotent run: seeds .shipward/ (tracker validated by the same validate() every write uses), merges hooks/statusline/.mcp.json with absolute central paths and inline SHIPWARD_TRACKER/SHIPWARD_REPO env, appends a marked protocol section to CLAUDE.md, never clobbers anything the target had. Refuses non-git targets and onboarding this repo onto itself. Resolution ladder in tracker-store and git.mjs: env, then cwd_s .shipward or .git, then the central default."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "finding",
+          "text": "THE LADDER BIT ITS OWN TAIL, HARD — the most important finding of the card. In the window between adding cwd-first resolution and re-pointing serve.test_s sandbox spawn, the sandboxed server inherited THIS repo as cwd, resolved the REAL tracker under the new ladder, and its PUT tests replaced the live board with a test seed: 32 cards and 111 feed entries gone from the file in one write. RECOVERED COMPLETELY from the system_s own redundancy: git held the cards (the tracker is committed — that is the card archive), and SW-027_s feed-archive.jsonl — built THIS MORNING — had caught all 112 dropped feed entries including the one newer than the last commit. The morning_s feature paid for itself against the afternoon_s bug. Belt added: serve.test spawns now pass SHIPWARD_TRACKER explicitly, so neither cwd nor ladder ordering can ever aim them at a real board again. Follow-up filed as SW-035: replace() should warn on stderr when a write drops most of the existing cards — the feed had an archive, the cards only had git."
+        },
+        {
+          "t": "2026-07-28T14:26:46.531Z",
+          "kind": "evidence",
+          "text": "VERIFIED end to end with a real headless Claude Code session in a throwaway onboarded repo: SessionStart standup arrived unasked describing the Demo Project empty board, the shipward MCP server connected and log allocated DP-001 into the demo_s own tracker (heartbeat written), CLAUDE.md carried the protocol — and this repo_s tracker held zero DP cards. 239 tests pass, 5 new. Test traps found: kept-messages contain the word wired so the idempotence regex needed a column anchor, and macOS spells one temp dir two ways (/var vs /private/var) so paths compare by realpath."
+        }
+      ]
+    },
+    {
       "id": "SW-032",
       "p": "shipward",
       "title": "Pushed does not mean production — say what git can prove",
@@ -1002,6 +1088,30 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T14:26:46.531Z",
+      "p": "shipward",
+      "msg": "Tracker restored after the serve.test clobber — cards from git (204b735), feed from feed-archive.jsonl, nothing lost",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T14:26:46.531Z",
+      "p": "shipward",
+      "msg": "You added SW-034 and SW-035 to Backlog",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T14:26:46.531Z",
+      "p": "shipward",
+      "msg": "SW-033 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T14:18:52.470Z",
+      "p": "shipward",
+      "msg": "SW-033 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T13:20:23.394Z",
       "p": "shipward",

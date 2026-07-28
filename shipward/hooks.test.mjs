@@ -368,3 +368,21 @@ test('the audit runs only at session start, never on a per-turn hook', async () 
     await rm(repo, { recursive: true, force: true });
   }
 });
+
+test('a commit-only correction is not announced as a status change', async () => {
+  // The feed line was first built from the status alone, so filling in a
+  // missing sha was recorded as "TS-001 → backlog" — a move that never
+  // happened, in the log whose whole job is saying what did.
+  const repo = await repoWithDrift();
+  try {
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
+    ])));
+    await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    assert.match(onDisk.feed[0].msg, /TS-001 commit [0-9a-f]{7}/);
+    assert.doesNotMatch(onDisk.feed[0].msg, /→/, 'nothing moved column, so nothing claims to have');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});

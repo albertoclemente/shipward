@@ -147,8 +147,10 @@ async function drift(doc, project) {
         + 'Already written and recorded in the feed; each card note says why. Nothing else was touched.'
       : '';
 
-    // What is left over: real, but not git's call to settle.
-    const rest = out.held.filter((f) => f.id || f.rule === 'untracked-branch');
+    // What is left over: real, but not git's call to settle. Everything held is
+    // shown — a rule that silently dropped findings it did not recognise would
+    // be indistinguishable from a board with nothing wrong with it.
+    const rest = out.held;
     if (!rest.length) return { text: fixed, changed: out.applied.length > 0 };
 
     const shown = rest.slice(0, DRIFT_SHOWN);

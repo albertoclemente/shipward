@@ -25,8 +25,20 @@ import { applyTransition, feedAdd } from './public/lib.js';
 // of then, and an undated one is indistinguishable from a fresh assertion.
 export const today = (d = new Date()) => d.toISOString().slice(0, 10);
 
+// What actually moved on one card. Shared with describeApplied deliberately:
+// the first version of this built the feed line from the status alone, so a
+// commit-only fix was announced as "SW-024 → claude" — a status change that
+// never happened, written into the log that exists to say what did.
+const changeText = (a) => {
+  const bits = [];
+  if (a.to !== a.was) bits.push(`${a.was} → ${a.to}`);
+  if (a.commit) bits.push(`commit ${a.commit}`);
+  if (a.branch) bits.push(`branch ${a.branch}`);
+  return bits.join(', ');
+};
+
 const feedMsg = (applied) => (applied.length === 1
-  ? `Reconciled with git — ${applied[0].id} → ${applied[0].to}`
+  ? `Reconciled with git — ${applied[0].id} ${changeText(applied[0])}`
   : `Reconciled with git — ${applied.length} cards corrected from the repository`);
 
 // Never throws. A reconciliation that cannot run must read as "we did not
@@ -87,12 +99,8 @@ export async function reconcile(cards, projectId, { cwd = REPO, level = 'certain
 }
 
 // One line per correction, for a human or a session opener.
-export const describeApplied = (applied) => applied.map((a) => {
-  const bits = [];
-  if (a.to !== a.was) bits.push(`${a.was} → ${a.to}`);
-  if (a.commit) bits.push(`commit ${a.commit}`);
-  if (a.branch) bits.push(`branch ${a.branch}`);
-  return `  ${a.id} ${bits.join(', ')} (${a.rules.join(', ')})`;
-}).join('\n');
+export const describeApplied = (applied) => applied
+  .map((a) => `  ${a.id} ${changeText(a)} (${a.rules.join(', ')})`)
+  .join('\n');
 
 export { summarise };

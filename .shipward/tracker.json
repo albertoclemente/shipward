@@ -17,15 +17,25 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/product-fit",
-      "commit": null,
+      "commit": "6dbc14c",
       "note": [
         {
           "t": "2026-07-28T13:06:33.565Z",
           "kind": "brief",
           "text": "The product-fit half of the ui-ux-pro-max assessment. (1) CLAUDE IS ON IT becomes CLAUDE IS ON IT · 14m — elapsed since the newest handed-to-Claude feed entry for that card, DERIVED not stored, because the feed already records every start and a schema field would duplicate it. (2) The Memory view answered-by flags and resolves markers become links that open the named card — the cross-card facts SW-028 added are navigation, not decoration. (3) The Log gains filters: All / Claude Code / You plus a text query, because just-show-me-what-Claude-did is the query the view exists for. (4) font-variant-numeric tabular-nums on stats and counts so numbers stop shimmying between repaints. DECIDED AGAINST here: the serif-for-memory-prose flavor — a font import in a zero-dep app for a look nobody asked for."
+        },
+        {
+          "t": "2026-07-28T13:10:09.893Z",
+          "kind": "outcome",
+          "text": "SHIPPED, all four; the serif flavor was declined as briefed. (1) claudeSince() derives the working clock from the feed_s handed-to-Claude entries — newest wins because a card can be re-taken, null when rolled off the cap so the badge shows no clock rather than a guess. elapsedShort() is a duration (14m / 3h / 2d), deliberately distinct from relTime_s ago-times, and renders nothing for a future start instead of a negative. (2) The Memory flags are buttons now — resolves X and answered by X both open the named card. (3) Log filters follow the SAME author rule the labels use (anything not user reads as Claude, because by is nullable in old entries) — the filter and the label can never disagree. Filtered empty state says nothing matches that filter, not nothing logged yet. (4) tabular-nums on stats, counts and tabs."
+        },
+        {
+          "t": "2026-07-28T13:10:09.893Z",
+          "kind": "evidence",
+          "text": "VERIFIED live: badge read Claude is on it · 2m against this card_s own start entry; the You filter returned 6 rows with the lede agreeing (every one written by you); query SW-028 under You isolated the single by:user dialog-append test entry, which is exactly right; answered by SW-012 opened SW-012_s dialog with the correct title; Claude Code filter over the full log read 100 entries over 3 days, every one written by Claude Code — the sentence the product was built to produce. 234 tests pass, 4 new (claudeSince newest-wins and cross-project blindness, elapsedShort thresholds, filterFeed author rule + query)."
         }
       ],
       "created": "2026-07-28T13:06:33.565Z",
@@ -955,6 +965,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T13:10:09.893Z",
+      "p": "shipward",
+      "msg": "SW-031 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T13:06:33.565Z",
       "p": "shipward",

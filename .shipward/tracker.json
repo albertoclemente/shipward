@@ -17,12 +17,12 @@
       "type": "feature",
       "pri": "P3",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/fleet-view",
       "commit": "3d6809b",
       "created": "2026-07-28T14:26:46.531Z",
-      "pushed": null,
+      "pushed": "2026-07-28T14:36:27.883Z",
       "shipped": null,
       "note": [
         {
@@ -44,6 +44,11 @@
           "t": "2026-07-28T14:36:27.352Z",
           "kind": "evidence",
           "text": "VERIFIED live over the session scratchpad: the scan honestly surfaced 11 boards — the two staged demos PLUS every leftover sandbox from today_s work, which is exactly what pointing at a real folder does. Demo Project sorted first with 1 working; its link served the right tracker (curl on the child port returned Demo Project, DP-001). Fleet tests kill the fleet and assert the children are dead by pid. 247 tests pass, 5 new; the real tracker measured byte-identical across the suite. TEST TRAP, same species as SW-033_s: the page COMMENT says never innerHTML, so the no-innerHTML assertion had to match the assignment, not the vocabulary."
+        },
+        {
+          "t": "2026-07-28T14:36:27.883Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 3d6809b is already on main (branch gone). The board said review."
         }
       ]
     },
@@ -54,12 +59,12 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/replace-guard",
       "commit": "6a81fd4",
       "created": "2026-07-28T14:26:46.531Z",
-      "pushed": null,
+      "pushed": "2026-07-28T14:36:27.883Z",
       "shipped": null,
       "note": [
         {
@@ -71,6 +76,11 @@
           "t": "2026-07-28T14:32:01.032Z",
           "kind": "outcome",
           "text": "SHIPPED. warnCardLoss() at BOTH write seams — replace (the incident_s path) and mutate (a callback can eat a board just as silently). Fires only when the board has ≥4 cards and the write keeps fewer than half: dropping 1 of 8 is an edit, 20 of 32 is an event, and the desk_s own test seeds (1-2 cards) never trip it. stderr only, the write always lands — a gate would have blocked the desk_s legitimate whole-document PUTs and been ripped out within a week. Message names the tracker path and points at git for the previous state. 242 tests pass, 3 new, including the replayed incident shape: 8 cards → 1 warns and still writes."
+        },
+        {
+          "t": "2026-07-28T14:36:27.883Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 6a81fd4 is already on main (branch gone). The board said review."
         }
       ]
     },
@@ -1113,6 +1123,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T14:36:27.883Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 2 cards corrected from the repository",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:36:27.352Z",
       "p": "shipward",

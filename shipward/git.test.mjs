@@ -10,7 +10,10 @@ import { promisify } from 'node:util';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { readGit, isOnTrunk, deriveFindings, summarise } from './git.mjs';
+import {
+  readGit, isOnTrunk, deriveFindings, summarise,
+  reconcilePlan, CERTAIN, PROPOSED, REPORTED,
+} from './git.mjs';
 
 const run = promisify(execFile);
 
@@ -118,12 +121,87 @@ test('an unreadable repository yields no findings rather than false ones', () =>
   assert.deepEqual(deriveFindings([card()], null), []);
 });
 
-test('the summary counts what can actually be applied', () => {
+test('the summary counts each tier separately', () => {
   const found = deriveFindings([
-    card({ id: 'SW-001', status: 'review', branch: 'fix/a' }),          // fixable
-    card({ id: 'SW-002', status: 'pushed', commit: 'dead', onTrunk: false }), // needs a human
-  ], facts({ 'fix/a': { ahead: 1, head: 'bbb2222' } }));
-  assert.match(summarise(found), /2 discrepancies .*, 1 of them applicable automatically/);
+    card({ id: 'SW-001', status: 'review', branch: 'fix/a' }),                 // certain
+    card({ id: 'SW-002', status: 'backlog', branch: 'fix/b', commit: 'ccc' }), // proposed
+    card({ id: 'SW-003', status: 'pushed', commit: 'dead', onTrunk: false }),  // needs a human
+  ], facts({
+    'fix/a': { ahead: 1, head: 'bbb2222' },
+    'fix/b': { ahead: 2, head: 'ccc3333' },
+  }));
+  const text = summarise(found);
+  assert.match(text, /3 discrepancies/);
+  assert.match(text, /1 git can settle on its own/);
+  assert.match(text, /1 it can propose/);
+  assert.match(text, /1 needing a human/);
+});
+
+/* ── the tiers, and what may be written without being asked ── */
+
+test('only the two provable rules are certain', () => {
+  const found = deriveFindings([
+    card({ id: 'SW-001', status: 'review', branch: 'fix/a' }),                       // missing-commit
+    card({ id: 'SW-002', status: 'review', commit: 'abc1234', onTrunk: true }),      // merged-not-pushed
+    card({ id: 'SW-003', status: 'backlog', branch: 'fix/c', commit: 'ddd' }),       // started-without-saying
+    card({ id: 'SW-004', status: 'pushed', commit: 'dead', onTrunk: false }),        // not-on-trunk
+    card({ id: 'SW-005', status: 'claude' }),                                        // no-branch
+  ], facts({ 'fix/a': { ahead: 1, head: 'bbb2222' }, 'fix/c': { ahead: 2, head: 'ccc3333' } }));
+
+  const tier = Object.fromEntries(found.map((f) => [f.rule, f.certainty]));
+  assert.equal(tier['missing-commit'], CERTAIN);
+  assert.equal(tier['merged-not-pushed'], CERTAIN);
+  assert.equal(tier['started-without-saying'], PROPOSED);
+  assert.equal(tier['not-on-trunk'], REPORTED);
+  assert.equal(tier['no-branch'], REPORTED);
+});
+
+test('the certain tier is monotonic — nothing in it walks a card backwards', () => {
+  // The property that makes writing without being asked safe. not-on-trunk is
+  // the only rule that could retract a claim a human made, and it is the one
+  // rule deliberately kept out of every writable tier.
+  const found = deriveFindings([
+    card({ id: 'SW-001', status: 'pushed', commit: 'dead', onTrunk: false }),
+  ], facts());
+  const { updates, held } = reconcilePlan(found, { level: 'all' });
+  assert.deepEqual(updates, [], 'a card is never demoted out of pushed by an audit');
+  assert.equal(held.length, 1);
+});
+
+test('the plan writes only its level, and says why on the card', () => {
+  const found = deriveFindings([
+    card({ id: 'SW-001', status: 'review', commit: 'abc1234', onTrunk: true }),
+    card({ id: 'SW-002', status: 'backlog', branch: 'fix/c', commit: 'ddd' }),
+  ], facts({ 'fix/c': { ahead: 2, head: 'ccc3333' } }));
+
+  const certain = reconcilePlan(found, { level: 'certain', on: '2026-07-28' });
+  assert.deepEqual(certain.updates.map((u) => u.id), ['SW-001']);
+  assert.deepEqual(certain.held.map((f) => f.rule), ['started-without-saying']);
+  assert.match(certain.updates[0].note, /^\[git audit 2026-07-28\] status → pushed —/);
+  assert.match(certain.updates[0].note, /The board said review\.$/);
+
+  const all = reconcilePlan(found, { level: 'all' });
+  assert.deepEqual(all.updates.map((u) => u.id), ['SW-001', 'SW-002']);
+  assert.deepEqual(all.held, []);
+
+  assert.deepEqual(reconcilePlan(found, { level: 'none' }).updates, []);
+});
+
+test('a card tripping two rules gets one update carrying both reasons', () => {
+  // A backlog card with commits and no sha fires missing-commit AND
+  // started-without-saying. Two updates for one id would append the note twice
+  // and read like two separate audits.
+  const found = deriveFindings([
+    card({ id: 'SW-001', status: 'backlog', branch: 'fix/a' }),
+  ], facts({ 'fix/a': { ahead: 2, head: 'bbb2222' } }));
+  assert.equal(found.length, 2);
+
+  const { updates } = reconcilePlan(found, { level: 'all' });
+  assert.equal(updates.length, 1);
+  assert.deepEqual(updates[0].rules, ['missing-commit', 'started-without-saying']);
+  assert.equal(updates[0].commit, 'bbb2222');
+  assert.equal(updates[0].status, 'claude');
+  assert.equal(updates[0].note.match(/\[git audit/g).length, 2);
 });
 
 /* ── the I/O half, against a real repository ─────────────── */

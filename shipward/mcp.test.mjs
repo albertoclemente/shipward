@@ -41,9 +41,9 @@ function mkCard(over = {}) {
 }
 
 // A minimal MCP client: frames out, frames in, matched by id.
-function connect() {
+function connect(extraEnv = {}) {
   const proc = spawn(process.execPath, [SERVER], {
-    env: { ...process.env, SHIPWARD_TRACKER: tracker },
+    env: { ...process.env, SHIPWARD_TRACKER: tracker, ...extraEnv },
     stdio: ['pipe', 'pipe', 'pipe'],
   });
   const pending = new Map();
@@ -729,4 +729,99 @@ test('an uncancelled call still answers normally', async () => {
   const r = await c.call('log', { title: 'not cancelled' });
   assert.equal(r.isError, false);
   assert.ok((await doc()).cards.some((x) => x.title === 'not cancelled'));
+});
+
+/* ── sync against a real repository (SW-024) ─────────────── */
+
+// Stages one card per tier against a throwaway repo. A mock of git would only
+// prove I can predict git, which is the thing in doubt.
+async function repoWithAllThreeTiers() {
+  const { execFile } = await import('node:child_process');
+  const sh = (await import('node:util')).promisify(execFile);
+  const repo = await mkdtemp(join(tmpdir(), 'shipward-mcpgit-'));
+  const g = (...a) => sh('git', a, { cwd: repo });
+  await g('init', '-q', '-b', 'main');
+  await g('config', 'user.email', 't@e.com');
+  await g('config', 'user.name', 'T');
+  await writeFile(join(repo, 'a'), '1'); await g('add', '-A'); await g('commit', '-qm', 'first');
+
+  await g('checkout', '-qb', 'feat/landed');
+  await writeFile(join(repo, 'b'), '2'); await g('add', '-A'); await g('commit', '-qm', 'landed');
+  const landed = (await g('rev-parse', '--short', 'HEAD')).stdout.trim();
+  await g('checkout', '-q', 'main');
+  await g('merge', '-q', '--no-ff', '-m', 'merge', 'feat/landed');
+
+  await g('checkout', '-qb', 'feat/started');
+  await writeFile(join(repo, 'c'), '3'); await g('add', '-A'); await g('commit', '-qm', 'work');
+  const unlanded = (await g('rev-parse', '--short', 'HEAD')).stdout.trim();
+  await g('checkout', '-q', 'main');
+  return { repo, landed, unlanded };
+}
+
+const tierBoard = (landed, unlanded) => ({
+  version: 1,
+  activeProject: 'test',
+  projects: [{ id: 'test', name: 'Test', tag: 'a test', prefix: 'TS' }],
+  cards: [
+    mkCard({ id: 'TS-001', title: 'Landed, board says review', status: 'review', branch: 'feat/landed', commit: landed }),
+    mkCard({ id: 'TS-002', title: 'Work exists, board says backlog', status: 'backlog', branch: 'feat/started' }),
+    mkCard({ id: 'TS-003', title: 'Claims pushed, never landed', status: 'pushed', commit: unlanded }),
+  ],
+  feed: [],
+});
+
+// handshake(), but against a staged repository.
+async function handshakeIn(repo) {
+  const c = connect({ SHIPWARD_REPO: repo });
+  await c.request('initialize', { protocolVersion: PROTOCOL, capabilities: {}, clientInfo: { name: 'test', version: '0' } });
+  c.send({ jsonrpc: '2.0', method: 'notifications/initialized' });
+  return c;
+}
+
+test('the dry run names which tier each finding is in', async () => {
+  const { repo, landed, unlanded } = await repoWithAllThreeTiers();
+  try {
+    await writeFile(tracker, JSON.stringify(tierBoard(landed, unlanded), null, 2) + '\n');
+    const c = await handshakeIn(repo);
+    const { text } = await c.call('sync', { summary: 'audit', fromGit: true });
+
+    assert.match(text, /4 discrepancies/);
+    assert.match(text, /2 git can settle on its own, 1 it can propose, 1 needing a human/);
+    assert.match(text, /status=pushed; git settles this itself at session start/);
+    assert.match(text, /would set status=claude on apply:true/);
+    assert.match(text, /needs a human; git can only raise the question/);
+
+    // A dry run is a dry run.
+    const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    assert.equal(onDisk.cards.find((x) => x.id === 'TS-001').status, 'review');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('apply:true accepts the inferences and still refuses to demote a card', async () => {
+  const { repo, landed, unlanded } = await repoWithAllThreeTiers();
+  try {
+    await writeFile(tracker, JSON.stringify(tierBoard(landed, unlanded), null, 2) + '\n');
+    const c = await handshakeIn(repo);
+    await c.call('sync', { summary: 'accepted', fromGit: true, apply: true });
+
+    const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    const by = (id) => onDisk.cards.find((x) => x.id === id);
+    assert.equal(by('TS-001').status, 'pushed', 'certain: the commit is on main');
+    assert.equal(by('TS-002').status, 'claude', 'proposed: accepted because it was asked for');
+    assert.ok(by('TS-002').commit, 'and the certain half of the same card landed too');
+
+    // The monotonicity guarantee. TS-003's commit is on no branch anywhere, but
+    // an audit that could retract a human's claim is an audit nobody would let
+    // run unattended.
+    assert.equal(by('TS-003').status, 'pushed', 'reported: never written, even on an explicit apply');
+    assert.equal(by('TS-003').note, '', 'and not annotated either — nothing happened to it');
+
+    // One card, two rules, two reasons, one note.
+    assert.equal(by('TS-002').note.match(/\[git audit/g).length, 2);
+    assert.equal(onDisk.feed.length, 1, 'one entry for the audit, not one per card');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
 });

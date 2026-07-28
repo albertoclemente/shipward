@@ -11,6 +11,38 @@
   ],
   "cards": [
     {
+      "id": "SW-025",
+      "p": "shipward",
+      "title": "The feed is the product — a log, not one line",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/feed-view",
+      "commit": null,
+      "note": "The (d) angle from the divergence exercise: time, not status. The feed is the product — a shipping LOG, not a shipping desk. THE OBSERVATION THAT MADE IT WORTH BUILDING: the tracker holds 80 feed entries and the desk renders exactly ONE. app.js calls latestFeed, which returns the newest and discards the rest. 76 of 80 are by:claude. That is two days of Claude Code working, already recorded, already paid for, thrown away at render time — and it is precisely what Alberto said he wanted to watch when he cut the Raw data view in SW-011. SCOPE: a fourth tab. Grouped by day with a per-day count, who did it, card ids pulled out of the message and rendered as chips so a line links back to the work. The projection lives in public/lib.js and is unit-tested, following SW-003 — archiveRows earned its place there so the shape is tested rather than eyeballed. HONESTY REQUIREMENT: the feed is capped at 200 entries (FEED_CAP). A view that calls itself the whole history has to say when it is not, or it quietly becomes a lie the first time the cap bites.",
+      "created": "2026-07-28T10:33:13.220Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-024",
+      "p": "shipward",
+      "title": "Git is authoritative — reconcile instead of report",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/git-authoritative",
+      "commit": "2205d79",
+      "note": "The narrowed (b) angle: git stops being a witness the board consults and becomes the authority for the facts it can prove. SW-022 built the detection, SW-023 wired it into session start as a REPORT — diagnosis without cure. Today the system can tell you the board is lying and then waits for someone to agree. WHY NARROWED, not the pure version: deleting the columns would delete information git cannot hold. backlog is intent and leaves no commits. review means waiting on a human, which no git object represents in a repo that merges branches directly. shipped is a filing action. Those stay hand-held. THREE TIERS, replacing the loose fix!=null proxy that sync uses today:   certain  — git is the witness and the correction is a fact, so it applies WITHOUT being asked: merged-not-pushed (the commit is provably an ancestor of the trunk) and missing-commit (filling a blank the branch already answers).   proposed — git proves the board is wrong but the correction is an inference: started-without-saying proves backlog is FALSE, but claude vs review is a guess. Needs the explicit apply.   reported — git can only raise a question: not-on-trunk, no-branch, untracked-branch. Never written. SAFETY PROPERTY WORTH KEEPING: the reconciler is MONOTONIC. Every certain rule only ever confirms progress git can prove — in-flight to pushed, blank to sha. Nothing walks a card backwards, so a human who moves a card ahead of git is never overruled by it. The single-writer lesson from SW-023 applies again: the classification and the plan are pure and live in git.mjs, one writer in reconcile.mjs, and the hook and the sync tool both go through it. Two implementations of what git means for the board would eventually disagree, and the hook is the one nobody would think to re-check. Every auto-correction appends a dated line to the card note rather than adding a schema field, so the reason git moved it is in the memory a future session reads instead of a marker only the desk can render. || [git audit 2026-07-28] commit → 2084a8c — feat/git-authoritative is at 2084a8c. The board said no commit recorded. || SHIPPED. Three certainty tiers replace the fix!=null proxy sync used to apply on. certain = merged-not-pushed and missing-commit, written at session start without being asked. proposed = started-without-saying, waiting for sync apply:true. reported = not-on-trunk, no-branch, untracked-branch, never written by anything. shipward/reconcile.mjs is the single writer; git.mjs holds the pure reconcilePlan. The hook and the sync tool both go through them, which is SW-023 lesson applied a second time. ORDERING BUG CAUGHT IN DESIGN: sessionStart rendered the standup and then awaited drift in the same template literal, so a reconciled card would have been described in its old column and corrected two paragraphs later. It now reconciles first and re-reads only if something moved. GOTCHA, FOUND IN MY OWN OUTPUT: the first feed line read SW-024 → claude for a fix that only filled in a sha. feedMsg was built from the status alone. describeApplied and feedMsg now share changeText and report only fields that actually changed. The misleading entry is still in the feed on purpose — a log records what happened, including what a bug wrote. A TEST THAT PASSED FOR THE WRONG REASON: the monotonicity assertion staged a pushed card with commit 0000000 and asserted it was left alone. It was — but no finding was ever generated, because a sha git has never heard of resolves to null, not false, and rule 1 requires false. Correct behaviour (we do not know is not never landed) hiding a vacuous test. TS-003 now carries a real commit that exists and is not an ancestor of the trunk, so the reported tier is genuinely exercised. MEASUREMENT GOTCHA: promisify(execFile) has no input option — that is execFileSync. Passing one leaves stdin open, the hook waits out its own 2000ms stdin timeout, and session start measures 2333ms instead of 313ms. Close the child stdin explicitly when timing a hook. COST: session start 313ms median, up from 260ms in SW-023; the extra buys the write. Budget is still 2500ms and unreached. VERIFIED end to end through the real MCP binary against a repo staged with one card per tier: certain applied, proposed held until asked, reported refused even on an explicit apply. The reconciler also corrected THIS card mid-build, filling in its own missing sha at session start. 197 tests pass, 8 new. NOT DONE, deliberately: the desk does not mark which statuses were derived. The card note carries the reason and the feed carries the event, which is where a future session looks; a badge only the browser can render is a worse place for it.",
+      "created": "2026-07-28T10:20:42.665Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-023",
       "p": "shipward",
       "title": "SessionStart reports board-vs-git drift",
@@ -380,6 +412,30 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T10:33:13.220Z",
+      "p": "shipward",
+      "msg": "SW-025 logged and taken — the feed becomes a view",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:32:47.418Z",
+      "p": "shipward",
+      "msg": "SW-024 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:27:39.143Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-024 → claude",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T10:20:42.665Z",
+      "p": "shipward",
+      "msg": "SW-024 logged and taken — git becomes authoritative for what it can prove",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T10:12:33.014Z",
       "p": "shipward",
@@ -856,7 +912,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-28T10:02:44.079Z",
-    "pid": 9953
+    "lastSeen": "2026-07-28T10:28:45.520Z",
+    "pid": 19028
   }
 }

@@ -112,41 +112,74 @@ async function tracker() {
 // must delay a session by a bounded amount, or not at all.
 const AUDIT_BUDGET_MS = 2500;
 const DRIFT_SHOWN = 6;
+const NO_DRIFT = { text: '', changed: false };
 
+// SW-024 turned this from a report into a correction. What git can PROVE is
+// applied here, before the session sees the board, so a session never opens on
+// a card git already knows is in the wrong column. Only the `certain` tier is
+// written — a monotonic set that fills blanks and confirms landed work — so the
+// worst case is a card that moves forward slightly early, never one that loses
+// a claim a human made.
+//
+// It still exits silently on every failure, and it still says NOTHING rather
+// than "all clear" when git cannot be read.
 async function drift(doc, project) {
   try {
-    const git = await import(join(ROOT, 'shipward', 'git.mjs'));
+    const [git, rec] = await Promise.all([
+      import(join(ROOT, 'shipward', 'git.mjs')),
+      import(join(ROOT, 'shipward', 'reconcile.mjs')),
+    ]);
     // Default the repo rather than passing ROOT: git.mjs honours SHIPWARD_REPO,
     // and overriding it here would silently defeat that.
-    const audit = git.auditBoard(doc.cards, project.id);
+    const work = rec.reconcile(doc.cards, project.id);
     const timeout = new Promise((resolve) => {
       const t = setTimeout(() => resolve(null), AUDIT_BUDGET_MS);
       t.unref?.();
     });
-    const out = await Promise.race([audit, timeout]);
+    const out = await Promise.race([work, timeout]);
     // Timed out, or git could not be read. Silence, not a guess: "we do not
     // know" must never render as "nothing is wrong".
-    if (!out || out.reason || !out.findings.length) return '';
+    if (!out || !out.ok) return NO_DRIFT;
 
-    const shown = out.findings.slice(0, DRIFT_SHOWN);
+    const fixed = out.applied.length
+      ? `\n\nThe board disagreed with git, so the board was corrected — git is the witness for what it can prove.\n`
+        + `${rec.describeApplied(out.applied)}\n`
+        + 'Already written and recorded in the feed; each card note says why. Nothing else was touched.'
+      : '';
+
+    // What is left over: real, but not git's call to settle. Everything held is
+    // shown — a rule that silently dropped findings it did not recognise would
+    // be indistinguishable from a board with nothing wrong with it.
+    const rest = out.held;
+    if (!rest.length) return { text: fixed, changed: out.applied.length > 0 };
+
+    const shown = rest.slice(0, DRIFT_SHOWN);
     const lines = shown.map((f) => `  ${f.id || '(no card)'} [${f.rule}] board says ${f.says}; git says ${f.git}`);
-    if (out.findings.length > shown.length) {
-      lines.push(`  …and ${out.findings.length - shown.length} more`);
-    }
-    return `\n\nThe board and git disagree. ${git.summarise(out.findings)}\n${lines.join('\n')}\n`
-      + 'Nothing has been changed. sync({fromGit:true}) shows the full picture; add apply:true to write the safe fixes.';
+    if (rest.length > shown.length) lines.push(`  …and ${rest.length - shown.length} more`);
+
+    return {
+      text: `${fixed}\n\nStill unsettled, because git can prove these are wrong but not what is right.`
+        + ` ${git.summarise(rest)}\n${lines.join('\n')}\n`
+        + 'Nothing has been changed here. sync({fromGit:true}) shows the full picture; add apply:true to accept the inferences.',
+      changed: out.applied.length > 0,
+    };
   } catch {
-    return '';                     // an audit is never worth a session
+    return NO_DRIFT;               // an audit is never worth a session
   }
 }
 
 async function sessionStart() {
-  const { doc, project, standup } = await tracker();
+  const first = await tracker();
+  // Reconcile BEFORE rendering, and re-read if anything moved. Describing the
+  // board and then correcting it in the same breath would hand the session two
+  // answers and no way to tell which one is now.
+  const { text, changed } = await drift(first.doc, first.project);
+  const { doc, project, standup } = changed ? await tracker() : first;
   context('SessionStart',
     `Shipward — the tracker is your memory for this repo, and this is its current state. `
     + `You did not ask for it because a session that has to remember to look is a session that will not.\n\n`
     + `${standup.standupText(doc, project)}`
-    + `${await drift(doc, project)}\n\n`
+    + `${text}\n\n`
     + `Before editing a file you have not touched yet, call recall({file:"…"}).`);
 }
 

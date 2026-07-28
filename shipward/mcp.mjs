@@ -23,7 +23,8 @@ import {
 } from './public/lib.js';
 import { memoryEntries, recall as recallEntries, ALL_KINDS } from './public/memory-lib.js';
 import { standupText, line } from './standup.mjs';
-import { auditBoard, summarise, REPO } from './git.mjs';
+import { auditBoard, summarise, reconcilePlan, CERTAIN, REPO } from './git.mjs';
+import { today } from './reconcile.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -205,7 +206,7 @@ const TOOLS = [
     name: 'sync',
     title: 'Sync with reality',
     description:
-      'Reconcile the tracker with git. Call it with fromGit:true to have it read the repository itself — branches, commits, what is merged — and report every place the board disagrees; that is a DRY RUN and changes nothing. Call it again with fromGit:true, apply:true and a summary to write the fixes it can make safely. You can also pass your own updates and create entries, which always win over anything derived.',
+      'Reconcile the tracker with git. Call it with fromGit:true to have it read the repository itself — branches, commits, what is merged — and report every place the board disagrees; that is a DRY RUN and changes nothing. Anything git can PROVE (a commit already on the trunk, a missing sha the branch answers) is applied automatically at session start and will usually not appear here. What remains is what git can prove wrong but not prove right, so apply:true accepts those inferences. Your own updates and create entries always win over anything derived.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -418,12 +419,18 @@ async function auditAgainstGit(doc, project) {
   return { findings, note: reason ? `git could not be read — ${reason}` : null };
 }
 
-const renderFindings = (findings, trunk) => findings.map((f) => {
+// The tier is part of the report, not decoration: "git would set this" and "git
+// has already settled this" are different claims, and a reader who cannot tell
+// them apart has to re-derive the distinction to know what apply:true would do.
+const renderFindings = (findings) => findings.map((f) => {
   const head = f.id ? `${f.id} [${f.rule}]` : `(no card) [${f.rule}]`;
-  const fix = f.fix
-    ? `→ would set ${Object.entries(f.fix).map(([k, v]) => `${k}=${v}`).join(', ')}`
-    : '→ needs a human';
-  return `  ${head}\n      board: ${f.says}\n      git:   ${f.git}\n      ${fix}`;
+  const sets = f.fix ? Object.entries(f.fix).map(([k, v]) => `${k}=${v}`).join(', ') : null;
+  const outcome = !sets
+    ? '→ needs a human; git can only raise the question'
+    : f.certainty === CERTAIN
+      ? `→ ${sets}; git settles this itself at session start`
+      : `→ would set ${sets} on apply:true — git proves the board wrong, but is inferring the fix`;
+  return `  ${head}\n      board: ${f.says}\n      git:   ${f.git}\n      ${outcome}`;
 }).join('\n');
 
 async function syncCards({ summary, updates = [], create = [], fromGit = false, apply = false, project: wanted }, signal) {
@@ -436,8 +443,9 @@ async function syncCards({ summary, updates = [], create = [], fromGit = false, 
     if (note) return note;
     if (!findings.length) return summarise(findings);
     return `${summarise(findings)}\n\n${renderFindings(findings)}\n\n`
-      + 'Nothing has been changed. Call sync again with apply:true and a summary to write the applicable ones, '
-      + 'or pass your own updates if git is wrong.';
+      + 'Nothing has been changed here. Anything git can settle on its own is applied at session start without '
+      + 'being asked, so what is left for apply:true is the inferences — call sync again with apply:true and a '
+      + 'summary to accept them, or pass your own updates if git is wrong.';
   }
 
   const headline = asText(summary, 'summary').trim();
@@ -461,7 +469,11 @@ async function syncCards({ summary, updates = [], create = [], fromGit = false, 
     const project = projectOf(doc, wanted);
     const { findings, note } = await auditAgainstGit(doc, project);
     if (note) throw new ToolError(note);
-    derived = findings.filter((f) => f.fix && f.id).map((f) => ({ id: f.id, ...f.fix }));
+    // Same planner the SessionStart reconciler uses, at the level an explicit
+    // ask buys: certain AND proposed. Being asked twice is exactly what pays
+    // for the inference tier. The note it attaches says why the card moved, so
+    // a derived change is not silently indistinguishable from a hand-made one.
+    derived = reconcilePlan(findings, { level: 'all', on: today() }).updates;
     const byId = new Map(updates.map((u) => [u.id, u]));
     updates = [...derived.filter((d) => !byId.has(d.id)), ...updates];
   }

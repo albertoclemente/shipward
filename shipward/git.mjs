@@ -101,6 +101,27 @@ export async function isOnTrunk(sha, trunk, cwd = REPO) {
 
 /* ── the rules ───────────────────────────────────────────── */
 // Each one exists because it actually happened.
+//
+// Every finding carries a CERTAINTY, because "we found a fix object" is not the
+// same claim as "git is right about this". The three tiers decide who is
+// allowed to write, and they are the whole difference between a tool that
+// reports drift and one that removes it:
+//
+//   certain   git is the witness AND the correction is a fact, so it is applied
+//             without being asked. Only two rules qualify.
+//   proposed  git proves the board is WRONG but the correction is an inference.
+//             A branch with commits proves `backlog` is false; it cannot say
+//             whether the card is claude or review. Needs an explicit apply.
+//   reported  git can only raise a question. Never written by anything.
+//
+// THE PROPERTY THAT MAKES AUTOMATIC APPLICATION SAFE: every `certain` rule is
+// monotonic. It fills a blank, or it confirms progress git can prove — in
+// flight to pushed, no sha to a sha. Nothing in this tier walks a card
+// backwards, so a human who moves a card ahead of git is never overruled by it.
+// Anything that could retract a claim (not-on-trunk) is deliberately `reported`.
+export const CERTAIN = 'certain';
+export const PROPOSED = 'proposed';
+export const REPORTED = 'reported';
 
 const BRANCH_RE = /^(feat|fix|chore)\//;
 
@@ -117,7 +138,7 @@ export function deriveFindings(cards, facts) {
     // 1. The card says it shipped, git says it never landed.
     if ((card.status === 'pushed' || card.status === 'shipped') && onTrunk === false) {
       findings.push({
-        id: card.id, rule: 'not-on-trunk', severity: 'wrong',
+        id: card.id, rule: 'not-on-trunk', severity: 'wrong', certainty: REPORTED,
         says: `${card.status}, commit ${card.commit}`,
         git: `${card.commit} is not an ancestor of ${facts.trunk}`,
         fix: null,      // needs a human: the board may be right and the branch rewritten
@@ -128,7 +149,9 @@ export function deriveFindings(cards, facts) {
     //    null commit for two days.
     if (branch && branch.ahead > 0 && !card.commit) {
       findings.push({
-        id: card.id, rule: 'missing-commit', severity: 'incomplete',
+        // Certain: this fills a blank the branch already answers, rather than
+        // overwriting anything the board claims.
+        id: card.id, rule: 'missing-commit', severity: 'incomplete', certainty: CERTAIN,
         says: 'no commit recorded',
         git: `${branch.name} is at ${branch.head}`,
         fix: { commit: branch.head },
@@ -146,7 +169,9 @@ export function deriveFindings(cards, facts) {
     // branch is deleted, which is the normal state after a merge.
     if (onTrunk === true && (card.status === 'claude' || card.status === 'review')) {
       findings.push({
-        id: card.id, rule: 'merged-not-pushed', severity: 'stale',
+        // Certain: an ancestor of the trunk is not an opinion, and the move is
+        // forwards. This is the rule the whole reconciler exists for.
+        id: card.id, rule: 'merged-not-pushed', severity: 'stale', certainty: CERTAIN,
         says: card.status,
         git: `${card.commit} is already on ${facts.trunk}${branch ? ` (${branch.name})` : ' (branch gone)'}`,
         fix: { status: 'pushed' },
@@ -157,7 +182,12 @@ export function deriveFindings(cards, facts) {
     //    five hundred lines written while the card sat in Backlog.
     if (branch && branch.ahead > 0 && card.status === 'backlog') {
       findings.push({
-        id: card.id, rule: 'started-without-saying', severity: 'wrong',
+        // Proposed, not certain: git proves `backlog` is false, and stops
+        // there. Whether the work is still in progress or finished and waiting
+        // is a fact about a person, and no commit records it. `claude` is the
+        // safer of the two guesses — understating progress cannot close a card
+        // nobody looked at — but it is still a guess, so it waits to be asked.
+        id: card.id, rule: 'started-without-saying', severity: 'wrong', certainty: PROPOSED,
         says: 'backlog',
         git: `${branch.name} has ${branch.ahead} commit${branch.ahead === 1 ? '' : 's'} beyond ${facts.trunk}`,
         fix: { status: 'claude' },
@@ -167,7 +197,7 @@ export function deriveFindings(cards, facts) {
     // 5. In progress with nothing to show for it.
     if (card.status === 'claude' && !branch) {
       findings.push({
-        id: card.id, rule: 'no-branch', severity: 'suspicious',
+        id: card.id, rule: 'no-branch', severity: 'suspicious', certainty: REPORTED,
         says: card.branch ? `working on ${card.branch}` : 'working, no branch named',
         git: card.branch ? `${card.branch} does not exist` : 'no branch on the card',
         fix: null,      // it may simply not have been created yet
@@ -179,7 +209,7 @@ export function deriveFindings(cards, facts) {
   for (const [name, branch] of facts.branches) {
     if (claimed.has(name) || !BRANCH_RE.test(name) || branch.ahead === 0) continue;
     findings.push({
-      id: null, rule: 'untracked-branch', severity: 'missing',
+      id: null, rule: 'untracked-branch', severity: 'missing', certainty: REPORTED,
       says: 'no card references this branch',
       git: `${name} has ${branch.ahead} commit${branch.ahead === 1 ? '' : 's'} beyond ${facts.trunk}`,
       fix: null,      // a card needs a title, and only a human or Claude can write one
@@ -210,9 +240,58 @@ export async function auditBoard(cards, projectId, cwd = REPO) {
   return { facts, findings: deriveFindings(resolved, facts), reason: null };
 }
 
+/* ── the plan ────────────────────────────────────────────── */
+
+// Findings in, card updates out. Pure, and deliberately so: this is the
+// function that decides what gets written to the board without anyone asking,
+// which makes it the one that most needs testing without a repository in the
+// way.
+//
+// `level` is who is asking. The SessionStart hook asks at 'certain' and writes
+// silently. sync({apply:true}) asks at 'all', because being asked twice is what
+// buys the inference tier. Nothing reaches 'reported'.
+const LEVELS = { certain: [CERTAIN], all: [CERTAIN, PROPOSED], none: [] };
+
+const fixText = (fix) => Object.entries(fix).map(([k, v]) => `${k} → ${v}`).join(', ');
+
+// Why the card moved, in the card's own note. A schema field would have been
+// less work and worse: a marker only the desk can render tells a future session
+// nothing, and the note is the thing that gets read. Dated because the board is
+// a claim about now and the note is a record of then.
+export const reason = (f, on = '') =>
+  `[git audit${on ? ` ${on}` : ''}] ${fixText(f.fix)} — ${f.git}. The board said ${f.says}.`;
+
+export function reconcilePlan(findings, { level = 'certain', on = '' } = {}) {
+  const allow = new Set(LEVELS[level] ?? LEVELS.certain);
+  const byId = new Map();
+  const held = [];
+  for (const f of findings) {
+    if (!f.id || !f.fix || !allow.has(f.certainty)) { held.push(f); continue; }
+    // One update per card, not one per rule: a backlog card with commits and no
+    // sha trips two rules at once, and two updates for the same id would append
+    // the note twice and read like two separate audits.
+    const prev = byId.get(f.id);
+    if (prev) {
+      Object.assign(prev, f.fix);
+      prev.note += ` ${reason(f, on)}`;
+      prev.rules.push(f.rule);
+    } else {
+      byId.set(f.id, { id: f.id, ...f.fix, note: reason(f, on), rules: [f.rule] });
+    }
+  }
+  return { updates: [...byId.values()], held };
+}
+
 export const summarise = (findings) => {
   if (!findings.length) return 'The board matches git.';
-  const fixable = findings.filter((f) => f.fix).length;
-  return `${findings.length} discrepanc${findings.length === 1 ? 'y' : 'ies'} between the board and git, `
-    + `${fixable} of them applicable automatically.`;
+  const count = (t) => findings.filter((f) => f.certainty === t && f.fix).length;
+  const settled = count(CERTAIN);
+  const proposed = count(PROPOSED);
+  const human = findings.length - settled - proposed;
+  const parts = [];
+  if (settled) parts.push(`${settled} git can settle on its own`);
+  if (proposed) parts.push(`${proposed} it can propose`);
+  if (human) parts.push(`${human} needing a human`);
+  return `${findings.length} discrepanc${findings.length === 1 ? 'y' : 'ies'} between the board and git`
+    + `${parts.length ? ` — ${parts.join(', ')}` : ''}.`;
 };

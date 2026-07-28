@@ -13,7 +13,7 @@ An MCP server exposes the tracker as six tools. **Prefer them** — they hold a 
 | `log` | add a backlog card the moment work is discovered or promised |
 | `start` | take a card — sets `claude`/`working`, names a branch, hands back the note |
 | `done` | hand a card back — `review` (or `pushed`), sets `commit`, appends to the note |
-| `sync` | reconcile the board with git — `fromGit:true` reads the repository itself and reports the drift; add `apply:true` to write the fixes |
+| `sync` | reconcile the board with git — `fromGit:true` reads the repository itself and reports the drift; add `apply:true` to write the fixes it can only infer |
 
 Registered in `.mcp.json`. Run it standalone with `node shipward/mcp.mjs`; it logs to stderr and speaks JSON-RPC on stdout.
 
@@ -39,7 +39,7 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 3. **While working:** append decisions and gotchas to the card's `note`. Update `commit` with the latest short sha after each meaningful commit.
 4. **Finishing a task:** call `done` (sets `review`, `claude: "done"`, `commit`, appends your note). Only the human moves `review` → `pushed`, unless they tell you to. When something is deployed, pass `pushed: true`.
 5. **Discovering work:** any bug found, TODO left, or follow-up promised gets a `log` immediately — nothing lives only in your head or in code comments.
-5b. **When the board and git might disagree** — after a merge, or at the start of a session that follows one — call `sync({fromGit: true})`. It reads the repository and reports what does not match. It changes nothing until you ask again with `apply: true`.
+5b. **When the board and git might disagree** — after a merge, or at the start of a session that follows one — call `sync({fromGit: true})`. It reads the repository and reports what does not match. It changes nothing until you ask again with `apply: true`. Note that the drift git can *prove* has usually already been fixed before you get there (see below), so what this reports is mostly what git cannot settle alone.
 6. **Session end:** every card you touched reflects reality; add one `feed` entry summarizing the session.
 7. **Every write** to a card also appends a `feed` entry (`by: "claude"`), newest first, cap 200. The MCP tools do this for you; a direct edit must do it by hand.
 
@@ -56,7 +56,7 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 
 | Hook | Does |
 |---|---|
-| `SessionStart` | injects a standup before you ask for one, plus any place the board and git disagree |
+| `SessionStart` | injects a standup before you ask for one — and first **corrects** the board wherever git can prove it wrong |
 | `UserPromptSubmit` | injects one line naming the active card, every turn |
 | `PreToolUse` on edits | **warns** — never blocks — when source changes with no card in progress |
 | `Stop` | refuses to end the session while a card is still `working` with no `done` |
@@ -64,6 +64,20 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 The same file also wires a **status line** — `node shipward/status.mjs`, one line showing the card in flight and what is waiting. It runs standalone too, for a shell prompt or tmux. ~120ms per render, almost all of it Node startup.
 
 They read the same `tracker.json` everything else does, they exit silently on any error, and they never deny a tool call. They can make you *touch* Shipward; they cannot make you write a note worth reading. `done` with `"fixed it"` satisfies all four and teaches the next session nothing.
+
+## Where git outranks the board
+
+The tracker records what someone remembered to write down. Git records what happened. Where the two disagree, git wins **for the things it can prove** — and it does not wait to be asked:
+
+| Tier | Example | Who writes it |
+|---|---|---|
+| **certain** | the card's commit is already an ancestor of `main`; the card names a branch but records no sha | applied automatically at session start |
+| **proposed** | a branch has commits while the card still says `backlog` — git proves `backlog` is false, but `claude` vs `review` is a guess | `sync({fromGit:true, apply:true})` |
+| **reported** | a `pushed` card whose commit is nowhere on the trunk; a branch no card claims | a human, always |
+
+Every automatic correction appends a dated `[git audit …]` line to the card's note saying why, and writes one feed entry. The rules live in `shipward/git.mjs`; the single writer is `shipward/reconcile.mjs`.
+
+**The certain tier is monotonic** — it fills blanks and confirms landed work, and nothing in it moves a card backwards. So if you move a card ahead of what git can see, the audit will never overrule you. What it cannot do is invent `backlog`, `review` or a priority: those are intent, and no commit records intent.
 
 ## The app
 

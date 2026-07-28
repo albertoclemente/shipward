@@ -49,7 +49,7 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/structured-notes",
       "commit": "679736e",
@@ -78,10 +78,15 @@
           "t": "2026-07-28T11:35:43.990Z",
           "kind": "evidence",
           "text": "VERIFIED: 224 tests pass, 13 new (explicit-kind wins, cross-card and same-card resolves, entry dates, prose coexistence, separator immunity, appendedNote conversion + non-mutation, noteText render, junk tolerance, validate on both forms). Live desk: Memory shows answered by SW-012, dialog renders entry history with stamps and appends via the textarea (the by:user browser-side entry on this card is that verification). MCP smoke over the real binary against the migrated tracker."
+        },
+        {
+          "t": "2026-07-28T11:40:10.856Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 679736e is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T11:12:54.619Z",
-      "pushed": null,
+      "pushed": "2026-07-28T11:40:10.856Z",
       "shipped": null
     },
     {
@@ -91,7 +96,7 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/note-lint",
       "commit": "fca311b",
@@ -115,10 +120,15 @@
           "t": "2026-07-28T11:39:20.641Z",
           "kind": "evidence",
           "text": "VERIFIED: 230 tests pass, 6 new — no-note nudges and still moves the card, fixed-it named for what it is, short-no-signal gets the gentler line, short-with-because passes clean, long passes clean, resolves-only exempt."
+        },
+        {
+          "t": "2026-07-28T11:40:10.856Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — fca311b is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T11:12:54.619Z",
-      "pushed": null,
+      "pushed": "2026-07-28T11:40:10.856Z",
       "shipped": null
     },
     {
@@ -881,6 +891,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T11:40:10.856Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 2 cards corrected from the repository",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T11:39:20.641Z",
       "p": "shipward",

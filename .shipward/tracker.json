@@ -49,10 +49,10 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/structured-notes",
-      "commit": null,
+      "commit": "679736e",
       "note": [
         {
           "t": "2026-07-28T11:12:54.619Z",
@@ -62,6 +62,22 @@
         {
           "t": "2026-07-28T11:34:37.512Z",
           "text": "Browser-side append test: this entry came from the desk dialog, not a tool."
+        },
+        {
+          "t": "2026-07-28T11:35:43.990Z",
+          "kind": "outcome",
+          "resolves": "SW-013",
+          "text": "SHIPPED, and this entry is itself the proof: resolves names SW-013, whose one open item was the structured-vs-prose fork — Alberto ratified structured on 2026-07-28, this card built it, and the open ledger goes to zero the moment this entry lands. All three SW-013 limits are dead: stated kinds beat mention-vs-use (both false opens fixed in migration, plus a THIRD caught the same day it was written — SW-028 own brief saying left open ABOUT the fork), entries cannot be split by quoting the separator (SW-013 note was found genuinely severed mid-sentence and was rejoined in migration), and resolves carries cross-card resolution (SW-011 now reads answered by SW-012, which is the truth)."
+        },
+        {
+          "t": "2026-07-28T11:35:43.990Z",
+          "kind": "finding",
+          "text": "TWO BUGS FOUND WHILE BUILDING. (1) const {noteAdd, ...fields} in saveCard TDZ-collided with a later const fields declared in the same block — the submit handler threw before the PUT, the dialog just sat there, and nothing hit the network; found by attaching an error listener in the live page after read_network_requests showed zero PUTs. (2) The dev server had been running since before validate() learned the array form, so the desk 500ed on the migrated tracker until restart — a reminder that a long-lived server pins old code against a new data shape."
+        },
+        {
+          "t": "2026-07-28T11:35:43.990Z",
+          "kind": "evidence",
+          "text": "VERIFIED: 224 tests pass, 13 new (explicit-kind wins, cross-card and same-card resolves, entry dates, prose coexistence, separator immunity, appendedNote conversion + non-mutation, noteText render, junk tolerance, validate on both forms). Live desk: Memory shows answered by SW-012, dialog renders entry history with stamps and appends via the textarea (the by:user browser-side entry on this card is that verification). MCP smoke over the real binary against the migrated tracker."
         }
       ],
       "created": "2026-07-28T11:12:54.619Z",
@@ -850,6 +866,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T11:35:43.990Z",
+      "p": "shipward",
+      "msg": "SW-028 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T11:34:37.514Z",
       "p": "shipward",

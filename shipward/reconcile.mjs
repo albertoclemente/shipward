@@ -20,6 +20,7 @@
 import { auditBoard, reconcilePlan, summarise, REPO } from './git.mjs';
 import { mutate } from './tracker-store.mjs';
 import { applyTransition, feedAdd } from './public/lib.js';
+import { appendedNote } from './public/memory-lib.js';
 
 // YYYY-MM-DD, for the note. The board is a claim about now; a note is a record
 // of then, and an undated one is indistinguishable from a fresh assertion.
@@ -77,7 +78,11 @@ export async function reconcile(cards, projectId, { cwd = REPO, level = 'certain
         : { ...card };
       if (u.commit) next.commit = u.commit;
       if (u.branch) next.branch = u.branch;
-      next.note = next.note ? `${next.note} || ${u.note}` : u.note;
+      // A dated evidence entry, stated as such: "[git audit] …" is a record of
+      // what was checked, and an explicit kind cannot be misread by the
+      // classifier no matter what the audit text happens to quote.
+      next.note = appendedNote(next.note, next.created,
+        { t: new Date().toISOString(), kind: 'evidence', text: u.note });
       doc.cards[i] = next;
       applied.push({
         id: next.id, was: card.status, to: next.status, rules: u.rules,

@@ -419,3 +419,14 @@ textarea.input { min-height: 90px; resize: vertical; }
   padding: 0; cursor: pointer;
 }
 .log-id:hover { color: var(--color-accent-700); border-bottom-color: var(--color-accent); }
+
+/* ── structured note entries in the dialog (SW-028) ──────── */
+.dlg-entries {
+  max-height: 220px; overflow-y: auto;
+  border: 1px solid var(--color-neutral-300); border-radius: var(--radius-md);
+  padding: var(--space-2) var(--space-3); background: var(--color-surface);
+}
+.dlg-entry { padding: 6px 0; }
+.dlg-entry + .dlg-entry { border-top: 1px dotted var(--color-neutral-300); }
+.dlg-entry-meta { font-family: var(--font-mono); font-size: 10.5px; margin-bottom: 2px; }
+.dlg-entry-text { font-size: 12.5px; line-height: 1.5; white-space: pre-wrap; }

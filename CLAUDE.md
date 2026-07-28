@@ -45,10 +45,13 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 
 ## Writing rules
 
-- ISO 8601 timestamps. Never renumber or reuse ids. Never remove `feed` history beyond the 200 cap.
+- ISO 8601 timestamps. Never renumber or reuse ids. Never remove `feed` history beyond the 200 cap (entries the cap trims are preserved automatically in `.shipward/feed-archive.jsonl` — never delete that file either).
 - Branch naming: `feat/…`, `fix/…`, `chore/…` (kebab, ≤3 words) — mirror the card's `type`.
 - Commit messages reference the card id: `BW-016: add bloom interval alerts`.
-- `note` is append-only in spirit: it is the memory a future session reads, so add to it rather than replacing it.
+- `note` is a **list of dated entries** — `{t, kind?, text, resolves?}` — and is append-only: push an entry, never rewrite one. It is the memory a future session reads.
+  - **State the `kind`** (`open | finding | decision | evidence | outcome | brief`). A stated kind is a fact; an omitted one is classified from the text, and prose that merely *quotes* a marker word ("the hook failed OPEN") gets misfiled.
+  - **`resolves: "SW-011"`** settles the open items of that card — the only way to close a question raised on *another* card. Use it whenever your work answers something an earlier card left open.
+  - A plain-string `note` (prose, segments joined by ` || `) is still valid when hand-editing; it converts to entries on the next tool append.
 
 ## Hooks
 

@@ -110,6 +110,10 @@ async function handshake() {
 
 const doc = async () => JSON.parse(await readFile(tracker, 'utf8'));
 
+// The whole note as one string, whichever form it is in — assertions read
+// content; the entry structure gets its own dedicated tests.
+const noteStr = (note) => (Array.isArray(note) ? note.map((e) => e.text).join('\n') : (note || ''));
+
 // Board state without the MCP heartbeat. The server stamps doc.mcp while it
 // runs, so a raw byte comparison would call every read-only tool a writer.
 const board = async () => {
@@ -200,7 +204,9 @@ test('log adds a backlog card with the next id and a feed entry', async () => {
   assert.equal(card.status, 'backlog');
   assert.equal(card.type, 'bug');
   assert.equal(card.pri, 'P1');
-  assert.equal(card.note, 'seen under load');
+  assert.deepEqual(card.note.map((e) => ({ kind: e.kind, text: e.text })),
+    [{ kind: 'brief', text: 'seen under load' }], 'the opening entry IS the brief, stated not guessed');
+  assert.ok(Date.parse(card.note[0].t) > 0, 'entries are dated');
   assert.equal(card.claude, null);
   assert.equal(d.feed[0].msg, "You added TS-004 to Backlog — it's on the list");
   assert.equal(d.feed[0].by, 'claude', 'the MCP server is not the human');
@@ -270,7 +276,8 @@ test('done moves the card to review with a sha and an appended note', async () =
   assert.equal(card.status, 'review');
   assert.equal(card.claude, 'done');
   assert.equal(card.commit, 'abc1234');
-  assert.match(card.note, /used a queue, not a mutex/);
+  assert.match(noteStr(card.note), /used a queue, not a mutex/);
+  assert.ok(Array.isArray(card.note), 'the appended note is a structured entry');
   assert.equal((await doc()).feed[0].msg, 'TS-001 moved to Review — give it a look');
 });
 
@@ -281,8 +288,10 @@ test('done keeps the existing note and appends to it', async () => {
   const { c } = await handshake();
   await c.call('done', { id: 'TS-001', note: 'and what happened' });
   const card = (await doc()).cards.find((x) => x.id === 'TS-001');
-  assert.match(card.note, /^original context/, 'the memory this product exists to keep is not overwritten');
-  assert.match(card.note, /and what happened/);
+  assert.ok(Array.isArray(card.note), 'a prose note converts on first structured append');
+  assert.equal(card.note[0].text, 'original context', 'the memory this product exists to keep is not overwritten');
+  assert.equal(card.note[0].t, d.cards[0].created, 'converted segments carry the card\'s own clock');
+  assert.equal(card.note[1].text, 'and what happened');
 });
 
 test('done with pushed stamps the timestamp', async () => {
@@ -309,7 +318,7 @@ test('sync applies updates and creations in one write with one feed entry', asyn
   const d = await doc();
   assert.equal(d.cards.find((x) => x.id === 'TS-003').status, 'pushed');
   assert.equal(d.cards.find((x) => x.id === 'TS-003').commit, 'aaa1111');
-  assert.match(d.cards.find((x) => x.id === 'TS-001').note, /no commits/);
+  assert.match(noteStr(d.cards.find((x) => x.id === 'TS-001').note), /no commits/);
   const made = d.cards.find((x) => x.title === 'Untracked refactor found in git');
   assert.equal(made.id, 'TS-004');
   assert.equal(made.status, 'pushed');
@@ -819,7 +828,10 @@ test('apply:true accepts the inferences and still refuses to demote a card', asy
     assert.equal(by('TS-003').note, '', 'and not annotated either — nothing happened to it');
 
     // One card, two rules, two reasons, one note.
-    assert.equal(by('TS-002').note.match(/\[git audit/g).length, 2);
+    const audits = by('TS-002').note.filter((e) => e.text.includes('[git audit'));
+    assert.equal(audits.length, 1, 'one card, one audit, ONE entry — even when two rules fired');
+    assert.equal(audits[0].text.match(/\[git audit/g).length, 2, 'both reasons in it');
+    assert.equal(audits[0].kind, 'evidence', 'audit entries state their kind — the classifier never guesses them');
     assert.equal(onDisk.feed.length, 1, 'one entry for the audit, not one per card');
   } finally {
     await rm(repo, { recursive: true, force: true });

@@ -21,7 +21,9 @@ import { readRaw, mutate, TRACKER } from './tracker-store.mjs';
 import {
   nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, fmtDate,
 } from './public/lib.js';
-import { memoryEntries, recall as recallEntries, ALL_KINDS } from './public/memory-lib.js';
+import {
+  memoryEntries, recall as recallEntries, ALL_KINDS, noteText, appendedNote,
+} from './public/memory-lib.js';
 import { standupText, line } from './standup.mjs';
 import { auditBoard, summarise, reconcilePlan, CERTAIN, REPO } from './git.mjs';
 import { today } from './reconcile.mjs';
@@ -194,7 +196,12 @@ const TOOLS = [
       properties: {
         id: str('Card id.'),
         commit: str('Short sha of the latest commit.'),
-        note: str('What changed, decisions taken, anything that bit you. Appended to the existing note.'),
+        note: str('What changed, decisions taken, anything that bit you. Appended to the existing note as a dated entry.'),
+        kind: {
+          type: 'string', enum: ['open', 'finding', 'decision', 'evidence', 'outcome', 'brief'],
+          description: 'What kind of entry this note is. State it — a stated kind is a fact; an omitted one is classified from the text and can misfile (a note QUOTING the word GOTCHA reads as a finding).',
+        },
+        resolves: str('Card id whose open items this note settles, e.g. SW-011. The only way to close an open question raised on ANOTHER card.'),
         pushed: { type: 'boolean', description: 'True if this is already deployed; sets status pushed and stamps the timestamp.' },
       },
       required: ['id'],
@@ -328,6 +335,13 @@ async function recall({ file, kind, query, limit = 10, project: wanted }) {
   return lines.join('\n').trimEnd();
 }
 
+const entryOf = (text, { kind, resolves } = {}) => {
+  const e = { t: nowIso(), text };
+  if (kind) e.kind = kind;
+  if (resolves) e.resolves = resolves;
+  return e;
+};
+
 async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note, project: wanted }, signal) {
   const text = asText(title, 'title').trim();
   const context = asText(note, 'note');
@@ -340,7 +354,10 @@ async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note
     doc.cards.unshift({
       id, p: project.id, title: text, type, pri, effort,
       status: 'backlog', claude: null, branch: null, commit: null,
-      note: context, created: nowIso(), pushed: null, shipped: null,
+      // The opening entry is the brief by definition — that is what KINDS
+      // calls an unmarked first segment, stated here instead of guessed later.
+      note: context.trim() ? [{ t: nowIso(), kind: 'brief', text: context.trim() }] : [],
+      created: nowIso(), pushed: null, shipped: null,
     });
     doc.feed = feedAdd(doc.feed, project.id, addMsg(id), nowIso(), 'claude');
     return doc;
@@ -378,18 +395,29 @@ async function startCard({ id, branch }, signal) {
     `Title: ${card.title}`,
     `Type ${card.type} · ${card.pri} · effort ${card.effort}`,
   ];
-  lines.push(card.note ? `Note:\n${card.note}` : 'Note: (empty)');
+  const rendered = noteText(card.note);
+  lines.push(rendered ? `Note:\n${rendered}` : 'Note: (empty)');
   lines.push(already ? `Next: git checkout ${card.branch}` : `Next: git checkout -b ${card.branch}`);
   return lines.join('\n');
 }
 
-async function doneCard({ id, commit, note, pushed = false }, signal) {
+const KIND_KEYS = new Set(ALL_KINDS.map((k) => k.key));
+const CARD_ID = /^[A-Z]+-[0-9]{3}$/;
+
+async function doneCard({ id, commit, note, kind, resolves, pushed = false }, signal) {
   const to = pushed ? 'pushed' : 'review';
-  const addition = asText(note, 'note');
+  const addition = asText(note, 'note').trim();
   const sha = asText(commit, 'commit').trim();
+  if (kind != null && !KIND_KEYS.has(kind)) throw new ToolError(`kind must be one of: ${[...KIND_KEYS].join(', ')}`);
+  if (resolves != null && !CARD_ID.test(String(resolves))) throw new ToolError('resolves must be a card id like SW-011');
   let card;
+  let resolvesUnknown = false;
   await mutate((doc) => {
     const found = findCard(doc, id);
+    // A resolves pointing at a card nobody has heard of settles nothing —
+    // written anyway (the card may live in another project's history), but the
+    // reply says so rather than letting a typo silently resolve nothing.
+    if (resolves) resolvesUnknown = !doc.cards.some((c) => c.id === resolves);
     const moved = applyTransition(found, to, nowIso()) || { ...found };
     moved.claude = 'done';
     // applyTransition returns null when the card is already in that status, so
@@ -397,7 +425,9 @@ async function doneCard({ id, commit, note, pushed = false }, signal) {
     // reply claimed a stamp — and the card then never counted as shipped.
     if (to === 'pushed' && !moved.pushed) moved.pushed = nowIso();
     if (sha) moved.commit = sha;
-    if (addition) moved.note = moved.note ? `${moved.note} || ${addition}` : addition;
+    // resolves with no prose still deserves an entry: the assertion is the point.
+    const text = addition || (resolves ? `Resolves ${resolves}.` : '');
+    if (text) moved.note = appendedNote(moved.note, moved.created, entryOf(text, { kind, resolves }));
     doc.cards[doc.cards.indexOf(found)] = moved;
     doc.feed = feedAdd(doc.feed, moved.p, moveMsg(id, to), nowIso(), 'claude');
     card = moved;
@@ -409,6 +439,7 @@ async function doneCard({ id, commit, note, pushed = false }, signal) {
     to === 'review'
       ? 'It is on the Review column now; only the human moves it to Pushed.'
       : `Stamped pushed ${fmtDate(card.pushed)}.`,
+    ...(resolvesUnknown ? [`Warning: resolves ${resolves} names a card this tracker does not have — nothing was settled by it.`] : []),
   ].join('\n');
 }
 
@@ -473,7 +504,9 @@ async function syncCards({ summary, updates = [], create = [], fromGit = false, 
     // ask buys: certain AND proposed. Being asked twice is exactly what pays
     // for the inference tier. The note it attaches says why the card moved, so
     // a derived change is not silently indistinguishable from a hand-made one.
-    derived = reconcilePlan(findings, { level: 'all', on: today() }).updates;
+    // Tagged so the writer below can state kind 'evidence' on the entry —
+    // the same fact reconcile.mjs states when IT writes an audit note.
+    derived = reconcilePlan(findings, { level: 'all', on: today() }).updates.map((u) => ({ ...u, audit: true }));
     const byId = new Map(updates.map((u) => [u.id, u]));
     updates = [...derived.filter((d) => !byId.has(d.id)), ...updates];
   }
@@ -493,7 +526,7 @@ async function syncCards({ summary, updates = [], create = [], fromGit = false, 
       }
       if (u.commit) next.commit = u.commit;
       if (u.branch) next.branch = u.branch;
-      if (u.note) next.note = next.note ? `${next.note} || ${u.note}` : u.note;
+      if (u.note) next.note = appendedNote(next.note, next.created, entryOf(String(u.note).trim(), { kind: u.audit ? 'evidence' : undefined }));
       doc.cards[doc.cards.indexOf(card)] = next;
       touched.add(next.p);
       changed.push(`${next.id} → ${next.status}${u.commit ? ` @${u.commit}` : ''}`);
@@ -506,7 +539,8 @@ async function syncCards({ summary, updates = [], create = [], fromGit = false, 
         type: c.type || 'chore', pri: c.pri || 'P2', effort: c.effort || 'M',
         status: c.status || 'backlog', claude: null,
         branch: c.branch || null, commit: c.commit || null,
-        note: c.note || '', created: nowIso(),
+        note: c.note ? [{ t: nowIso(), kind: 'brief', text: String(c.note).trim() }] : [],
+        created: nowIso(),
         pushed: c.status === 'pushed' ? nowIso() : null,
         shipped: c.status === 'shipped' ? nowIso() : null,
       });

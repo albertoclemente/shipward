@@ -6,8 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   classify, refs, symbols, mentionsAny, distinctiveTokens, recall, excerpt,
-  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP,
-} from './public/memory-lib.js';
+  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP, appendedNote, noteText } from './public/memory-lib.js';
 
 const card = (over = {}) => ({
   id: 'SW-001', p: 'shipward', title: 'A card', type: 'feature', pri: 'P2', effort: 'M',
@@ -398,4 +397,118 @@ test('a clip never leaves half of an emoji behind', () => {
 test('a non-ASCII identifier does not invent a function name', () => {
   assert.deepEqual(symbols('called señor() and 日本()'), [], 'no fabricated "or"');
   assert.deepEqual(symbols('called isStale() twice'), ['isStale'], 'real names still found');
+});
+
+/* ── structured entries (SW-028) ─────────────────────────── */
+
+const eCard = (id, note, over = {}) => ({
+  id, p: 'shipward', title: `card ${id}`, type: 'feature', pri: 'P2', effort: 'M',
+  status: 'review', claude: null, branch: null, commit: null, note,
+  created: '2026-07-25T09:00:00Z', pushed: null, shipped: null, ...over,
+});
+
+test('a stated kind is a fact — quoting a marker word cannot misfile it', () => {
+  // The SW-018 wart verbatim: prose saying "it failed OPEN" classified as an
+  // open item. With the kind stored, the classifier never runs.
+  const entries = memoryEntries([eCard('SW-050', [
+    { t: '2026-07-28T10:00:00Z', kind: 'finding', text: 'the Stop hook failed OPEN — fixed by bounding the payload' },
+  ])], 'shipward');
+  assert.equal(entries[0].kind, 'finding');
+  assert.equal(stillOpen(entries).length, 0);
+});
+
+test('an unlabelled structured entry still gets classified', () => {
+  const entries = memoryEntries([eCard('SW-050', [
+    { t: '2026-07-28T10:00:00Z', text: 'NEEDS ALBERTO: pick a direction' },
+  ])], 'shipward');
+  assert.equal(entries[0].kind, 'open');
+});
+
+test('resolves settles the open items of ANOTHER card', () => {
+  // The SW-011/SW-012 case: the SPEC fix lived on a different card, and prose
+  // could never carry the link.
+  const entries = memoryEntries([
+    eCard('SW-011', [{ t: '2026-07-27T09:00:00Z', kind: 'open', text: 'LEFT STALE: SPEC CAP-5 still describes the raw view' }]),
+    eCard('SW-012', [{ t: '2026-07-27T15:00:00Z', kind: 'outcome', text: 'SPEC caught up to the product', resolves: 'SW-011' }]),
+  ], 'shipward');
+  const item = entries.find((e) => e.card === 'SW-011');
+  assert.equal(item.superseded, true);
+  assert.equal(item.settledBy, 'SW-012', 'the view can say WHO answered it');
+  assert.equal(stillOpen(entries).length, 0);
+});
+
+test('a resolves from a later entry on the same card also settles', () => {
+  const entries = memoryEntries([eCard('SW-050', [
+    { t: '2026-07-27T09:00:00Z', kind: 'open', text: 'OPEN: which storage backend?' },
+    { t: '2026-07-28T09:00:00Z', kind: 'decision', text: 'Went with sqlite.', resolves: 'SW-050' },
+  ])], 'shipward');
+  assert.equal(entries.find((e) => e.kind === 'open').superseded, true);
+});
+
+test('resolves pointing at a card with no open items settles nothing and breaks nothing', () => {
+  const entries = memoryEntries([
+    eCard('SW-050', [{ t: '2026-07-28T09:00:00Z', kind: 'outcome', text: 'done', resolves: 'SW-099' }]),
+  ], 'shipward');
+  assert.equal(entries.length, 1);
+  assert.equal(stillOpen(entries).length, 0);
+});
+
+test('an entry carries its own date, not the card blanket date', () => {
+  const entries = memoryEntries([eCard('SW-050', [
+    { t: '2026-07-26T09:00:00Z', text: 'first' },
+    { t: '2026-07-28T09:00:00Z', text: 'second' },
+  ])], 'shipward');
+  assert.deepEqual(entries.map((e) => e.text), ['second', 'first'], 'sorted by entry time, newest first');
+});
+
+test('prose notes and structured notes coexist in one board', () => {
+  const entries = memoryEntries([
+    eCard('SW-050', 'brief prose || SHIPPED and verified'),
+    eCard('SW-051', [{ t: '2026-07-28T09:00:00Z', kind: 'finding', text: 'a structured gotcha' }]),
+  ], 'shipward');
+  assert.equal(entries.length, 3);
+  assert.equal(entries.filter((e) => e.card === 'SW-050').length, 2, 'legacy parsing unchanged');
+});
+
+test('a structured note cannot be split by mentioning the separator', () => {
+  // SW-013's third documented limit, dead: this very sentence used to cut the
+  // note in half.
+  const entries = memoryEntries([eCard('SW-050', [
+    { t: '2026-07-28T09:00:00Z', kind: 'finding', text: 'Claude appends with " || " and that used to split notes' },
+  ])], 'shipward');
+  assert.equal(entries.length, 1);
+  assert.match(entries[0].text, /\|\|/);
+});
+
+test('appendedNote converts prose once, stamping the card clock, then appends', () => {
+  const note = appendedNote('brief || SHIPPED it', '2026-07-25T09:00:00Z', { t: '2026-07-28T10:00:00Z', kind: 'finding', text: 'new' });
+  assert.deepEqual(note, [
+    { t: '2026-07-25T09:00:00Z', text: 'brief' },
+    { t: '2026-07-25T09:00:00Z', text: 'SHIPPED it' },
+    { t: '2026-07-28T10:00:00Z', kind: 'finding', text: 'new' },
+  ]);
+  // And appending to an array never mutates the original.
+  const again = appendedNote(note, 'x', { t: '2026-07-28T11:00:00Z', text: 'more' });
+  assert.equal(note.length, 3);
+  assert.equal(again.length, 4);
+});
+
+test('noteText renders entries stamped and passes prose through untouched', () => {
+  assert.equal(noteText('plain prose'), 'plain prose');
+  const text = noteText([
+    { t: '2026-07-28T10:00:00Z', kind: 'decision', text: 'sqlite', resolves: 'SW-050' },
+    { t: '2026-07-28T11:00:00Z', text: 'unlabelled' },
+  ]);
+  assert.match(text, /^\[2026-07-28 · decision · resolves SW-050\] sqlite/);
+  assert.match(text, /\[2026-07-28\] unlabelled/);
+});
+
+test('junk inside a structured note is skipped, not thrown on', () => {
+  const entries = memoryEntries([eCard('SW-050', [
+    null, { t: '2026-07-28T09:00:00Z' }, { t: '2026-07-28T09:00:00Z', text: '   ' },
+    { t: '2026-07-28T09:00:00Z', text: 'the real one', kind: 'no-such-kind' },
+  ])], 'shipward');
+  assert.equal(entries.length, 1);
+  assert.equal(entries[0].text, 'the real one');
+  assert.equal(entries[0].kind, 'brief', 'an invalid stored kind falls back to the classifier — first surviving entry reads as the brief');
 });

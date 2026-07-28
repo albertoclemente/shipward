@@ -36,7 +36,11 @@ before(async () => {
   // SHIPWARD_PORT=0 lets the OS pick. A fixed port meant a leftover server from
   // an earlier run kept the port, this spawn died on EADDRINUSE, and the suite
   // then asserted against the STALE server instead of failing.
+  // cwd matters since SW-033: the store prefers the tracker of the directory
+  // you stand in over the install's own. This sandbox IS the repo under test,
+  // so stand in it — spawning from the real repo would serve the real board.
   proc = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], {
+    cwd: sandbox,
     env: { ...process.env, SHIPWARD_PORT: '0' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -232,6 +236,7 @@ test('a second server on the same port fails loudly instead of dying silently', 
   // race, and the tests happily talked to the server that was already there.
   const taken = Number(new URL(base).port);
   const clash = spawn(process.execPath, [join(sandbox, 'shipward', 'serve.mjs')], {
+    cwd: sandbox,
     env: { ...process.env, SHIPWARD_PORT: String(taken) },
     stdio: ['ignore', 'ignore', 'pipe'],
   });

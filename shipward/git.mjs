@@ -13,6 +13,7 @@
 // against a real one.
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -20,7 +21,13 @@ const run = promisify(execFile);
 // SHIPWARD_REPO overrides the repository, mirroring SHIPWARD_TRACKER. It exists
 // so the audit can be tested against a staged repository instead of this one —
 // without it the only way to exercise a finding is to break the real board.
-export const REPO = process.env.SHIPWARD_REPO || join(dirname(fileURLToPath(import.meta.url)), '..');
+// Same resolution ladder as the tracker (SW-033): explicit env, the repo you
+// are standing in, then this one. The middle rung keeps the audit honest when
+// one central install serves many repos — the board of the repo you are in is
+// compared against THAT repo's git, never against Shipward's own.
+const CWD_REPO = process.cwd();
+export const REPO = process.env.SHIPWARD_REPO
+  || (existsSync(join(CWD_REPO, '.git')) ? CWD_REPO : join(dirname(fileURLToPath(import.meta.url)), '..'));
 
 // Never throws, never rejects. A missing repo, a detached HEAD, a git that is
 // not installed — all of it is "we do not know", which must read differently

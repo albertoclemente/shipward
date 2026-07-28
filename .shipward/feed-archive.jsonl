@@ -1,0 +1,112 @@
+{"t":"2026-07-25T12:29:17Z","p":"shipward","msg":"You added SW-001 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T12:47:00Z","p":"shipward","msg":"You added SW-002 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T12:52:00Z","p":"shipward","msg":"SW-002 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-25T13:04:00Z","p":"shipward","msg":"SW-001 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-25T13:18:00Z","p":"shipward","msg":"You added SW-003 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T13:18:00Z","p":"shipward","msg":"You added SW-004 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T13:18:00Z","p":"shipward","msg":"You added SW-005 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T14:41:00Z","p":"shipward","msg":"SW-001 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-25T15:02:00Z","p":"shipward","msg":"SW-005 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-25T15:06:49.615Z","p":"shipward","msg":"SW-005 sent back to Backlog","by":"claude"}
+{"t":"2026-07-25T15:06:49.615Z","p":"shipward","msg":"You added SW-007 to Backlog — it is on the list","by":"claude"}
+{"t":"2026-07-25T15:06:49.615Z","p":"shipward","msg":"SW-006 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-25T15:15:42.539Z","p":"shipward","msg":"SW-006 sent back to Backlog","by":"claude"}
+{"t":"2026-07-25T15:25:44.607Z","p":"shipward","msg":"You added SW-009 to Backlog — it is on the list","by":"claude"}
+{"t":"2026-07-25T15:25:44.607Z","p":"shipward","msg":"You added SW-008 to Backlog — it is on the list","by":"claude"}
+{"t":"2026-07-25T15:25:44.607Z","p":"shipward","msg":"SW-006 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-25T16:00:25.458Z","p":"shipward","msg":"SW-008 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-25T16:04:15.190Z","p":"shipward","msg":"SW-003 handed to Claude Code — queued","by":"user"}
+{"t":"2026-07-25T16:04:33.907Z","p":"shipward","msg":"SW-003 sent back to Backlog","by":"user"}
+{"t":"2026-07-25T16:05:07.948Z","p":"shipward","msg":"SW-008 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T14:33:55.973Z","p":"shipward","msg":"SW-009 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T14:50:38.188Z","p":"shipward","msg":"SW-009 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T14:50:54.528Z","p":"shipward","msg":"You added SW-010 to Backlog — it is on the list","by":"claude"}
+{"t":"2026-07-27T14:50:57.780Z","p":"shipward","msg":"SW-010 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:04:10.319Z","p":"shipward","msg":"SW-010 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:04:45.788Z","p":"shipward","msg":"SW-003 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:09:00.383Z","p":"shipward","msg":"SW-003 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:09:04.383Z","p":"shipward","msg":"SW-004 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:11:31.359Z","p":"shipward","msg":"SW-004 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:24:22.275Z","p":"shipward","msg":"SW-005 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:24:48.746Z","p":"shipward","msg":"SW-005 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:25:10.652Z","p":"shipward","msg":"SW-007 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:28:59.597Z","p":"shipward","msg":"SW-007 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:35:16.401Z","p":"shipward","msg":"You added SW-011 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T15:35:24.769Z","p":"shipward","msg":"SW-011 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:37:52.975Z","p":"shipward","msg":"SW-011 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:38:03.950Z","p":"shipward","msg":"SW-004 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:42:05.896Z","p":"shipward","msg":"You added SW-012 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T15:42:06.203Z","p":"shipward","msg":"SW-012 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:45:14.620Z","p":"shipward","msg":"SW-012 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:48:59.429Z","p":"shipward","msg":"You added SW-013 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T15:48:59.686Z","p":"shipward","msg":"SW-013 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T15:55:48.397Z","p":"shipward","msg":"SW-013 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T16:01:56.627Z","p":"shipward","msg":"You added SW-014 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T16:02:06.211Z","p":"shipward","msg":"SW-014 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T16:09:27.605Z","p":"shipward","msg":"SW-014 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T16:18:46.568Z","p":"shipward","msg":"You added SW-015 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T16:18:51.337Z","p":"shipward","msg":"SW-015 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T16:22:45.656Z","p":"shipward","msg":"SW-015 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T16:29:20.433Z","p":"shipward","msg":"Synced with git — all 15 review cards merged to main as bd75f11 — fast-forward, no merge commits, 123 tests green on main","by":"claude"}
+{"t":"2026-07-27T17:26:07.950Z","p":"shipward","msg":"You added SW-016 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T17:26:08.253Z","p":"shipward","msg":"SW-016 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T17:29:57.293Z","p":"shipward","msg":"SW-016 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T17:30:19.492Z","p":"shipward","msg":"Synced with git — SW-016 merged to main — ambient status line","by":"claude"}
+{"t":"2026-07-27T17:59:45.296Z","p":"shipward","msg":"You added SW-017 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T18:00:03.356Z","p":"shipward","msg":"SW-017 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T18:16:18.639Z","p":"shipward","msg":"You added SW-018 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T18:16:20.635Z","p":"shipward","msg":"SW-018 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T18:23:44.544Z","p":"shipward","msg":"SW-018 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T18:23:44.926Z","p":"shipward","msg":"SW-017 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T18:31:21.568Z","p":"shipward","msg":"You added SW-019 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T18:31:44.694Z","p":"shipward","msg":"SW-019 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T18:35:34.356Z","p":"shipward","msg":"SW-019 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T18:37:50.675Z","p":"shipward","msg":"You added SW-020 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-27T18:37:50.902Z","p":"shipward","msg":"SW-020 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T18:57:43.331Z","p":"shipward","msg":"SW-020 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T18:57:43.529Z","p":"shipward","msg":"You added SW-021 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-28T07:21:06.062Z","p":"shipward","msg":"Synced with git — the four review-fix cards are on main at fa881cd; SW-021 stays in backlog, it is not done","by":"claude"}
+{"t":"2026-07-28T07:23:12.152Z","p":"shipward","msg":"SW-021 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T07:26:14.188Z","p":"shipward","msg":"SW-021 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T07:26:14.536Z","p":"shipward","msg":"Synced with git — SW-021 merged to main — cancellation honoured","by":"claude"}
+{"t":"2026-07-28T07:42:32.102Z","p":"shipward","msg":"You added SW-022 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-28T07:42:32.411Z","p":"shipward","msg":"SW-022 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T07:46:52.361Z","p":"shipward","msg":"SW-022 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T07:46:52.718Z","p":"shipward","msg":"Synced with git — SW-022 merged to main — sync now reads git","by":"claude"}
+{"t":"2026-07-28T08:41:50.437Z","p":"shipward","msg":"You added SW-023 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-28T08:42:01.351Z","p":"shipward","msg":"SW-023 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T08:42:10.509Z","p":"shipward","msg":"Synced with git — SW-023 merged — session opener audits git","by":"claude"}
+{"t":"2026-07-28T10:12:33.014Z","p":"shipward","msg":"23 cards filed to the archive — the board is clear","by":"user"}
+{"t":"2026-07-28T10:20:42.665Z","p":"shipward","msg":"SW-024 logged and taken — git becomes authoritative for what it can prove","by":"claude"}
+{"t":"2026-07-28T10:27:39.143Z","p":"shipward","msg":"Reconciled with git — SW-024 → claude","by":"claude"}
+{"t":"2026-07-28T10:32:47.418Z","p":"shipward","msg":"SW-024 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T10:33:13.220Z","p":"shipward","msg":"SW-025 logged and taken — the feed becomes a view","by":"claude"}
+{"t":"2026-07-28T10:39:47.595Z","p":"shipward","msg":"You added SW-026 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-28T10:40:12.263Z","p":"shipward","msg":"SW-025 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T10:40:40.282Z","p":"shipward","msg":"Reconciled with git — 2 cards corrected from the repository","by":"claude"}
+{"t":"2026-07-28T10:44:05.807Z","p":"shipward","msg":"SW-026 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T10:47:56.921Z","p":"shipward","msg":"SW-026 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T10:48:18.004Z","p":"shipward","msg":"Reconciled with git — SW-026 review → pushed","by":"claude"}
+{"t":"2026-07-28T11:12:54.619Z","p":"shipward","msg":"You added SW-027, SW-028 and SW-029 to Backlog — the assessment becomes work","by":"claude"}
+{"t":"2026-07-28T11:13:04.451Z","p":"shipward","msg":"SW-027 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T11:17:03.240Z","p":"shipward","msg":"SW-027 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T11:17:36.031Z","p":"shipward","msg":"SW-028 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T11:28:28.251Z","p":"shipward","msg":"Notes migrated to structured entries — 29 cards, kinds stated, one severed note repaired (SW-028)","by":"claude"}
+{"t":"2026-07-28T11:29:45.647Z","p":"shipward","msg":"Reconciled with git — SW-027 review → pushed","by":"claude"}
+{"t":"2026-07-28T11:34:37.514Z","p":"shipward","msg":"SW-028 edited — note","by":"user"}
+{"t":"2026-07-28T11:35:43.990Z","p":"shipward","msg":"SW-028 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T11:35:56.397Z","p":"shipward","msg":"SW-029 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T11:39:20.641Z","p":"shipward","msg":"SW-029 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T11:40:10.856Z","p":"shipward","msg":"Reconciled with git — 2 cards corrected from the repository","by":"claude"}
+{"t":"2026-07-28T13:01:23.159Z","p":"shipward","msg":"SW-030 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T13:03:19.883Z","p":"shipward","msg":"SW-030 moved to Review — give it a look","by":"user"}
+{"t":"2026-07-28T13:03:29.611Z","p":"shipward","msg":"SW-030 handed to Claude Code — queued","by":"user"}
+{"t":"2026-07-28T13:04:32.605Z","p":"shipward","msg":"SW-030 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T13:04:47.045Z","p":"shipward","msg":"Reconciled with git — SW-030 review → pushed","by":"claude"}
+{"t":"2026-07-28T13:06:33.565Z","p":"shipward","msg":"SW-031 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T13:10:09.893Z","p":"shipward","msg":"SW-031 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T13:10:26.494Z","p":"shipward","msg":"Reconciled with git — SW-031 review → pushed","by":"claude"}
+{"t":"2026-07-28T13:19:36.099Z","p":"shipward","msg":"SW-032 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T13:20:22.896Z","p":"shipward","msg":"SW-032 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T13:20:23.394Z","p":"shipward","msg":"Reconciled with git — SW-032 review → pushed","by":"claude"}
+{"t":"2026-07-28T14:18:52.470Z","p":"shipward","msg":"SW-033 handed to Claude Code — queued","by":"claude"}

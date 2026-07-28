@@ -82,6 +82,10 @@ Every automatic correction appends a dated `[git audit …]` line to the card's 
 
 **The certain tier is monotonic** — it fills blanks and confirms landed work, and nothing in it moves a card backwards. So if you move a card ahead of what git can see, the audit will never overrule you. What it cannot do is invent `backlog`, `review` or a priority: those are intent, and no commit records intent.
 
+## Onboarding another repo
+
+`node shipward/setup.mjs /path/to/repo [--name N] [--prefix PX]` wires any git repository to this install in one idempotent command: seeds the target's **own** `.shipward/tracker.json` (each repo keeps its own memory — trackers are never pooled), merges the four hooks + statusline into its `.claude/settings.json`, registers the MCP server in its `.mcp.json`, and appends the protocol to its `CLAUDE.md`. The central tools resolve by where they run — env `SHIPWARD_TRACKER`/`SHIPWARD_REPO` first, then the repo you are standing in, then this one — so `node <here>/shipward/serve.mjs` from inside an onboarded repo serves *that* repo's board.
+
 ## The app
 
 `shipward/` contains the tracker UI (see `design_handoff_shipward/README.md` for the spec) and the MCP server. Both read the same `tracker.json`.

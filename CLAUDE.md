@@ -4,7 +4,7 @@
 
 ## Reaching it
 
-An MCP server exposes the tracker as five tools. **Prefer them** — they hold a cross-process lock, validate against the schema, allocate ids, name branches and write the feed for you, so the desk UI and you cannot drift apart.
+An MCP server exposes the tracker as six tools. **Prefer them** — they hold a cross-process lock, validate against the schema, allocate ids, name branches and write the feed for you, so the desk UI and you cannot drift apart.
 
 | Tool | Use it to |
 |---|---|
@@ -17,7 +17,7 @@ An MCP server exposes the tracker as five tools. **Prefer them** — they hold a
 
 Registered in `.mcp.json`. Run it standalone with `node shipward/mcp.mjs`; it logs to stderr and speaks JSON-RPC on stdout.
 
-**Fallback — editing `tracker.json` directly is supported and safe** when the MCP server is not connected (the header tag in the desk reads `MCP OFFLINE`, and `tools/list` will not show the five tools). Read → modify → write the whole file, keep it valid against `.shipward/schema.json`, pretty-print with 2 spaces. The desk polls the file, so your edits appear within about 3 seconds either way. The rules below apply whichever route you take.
+**Fallback — editing `tracker.json` directly is supported and safe** when the MCP server is not connected (the header tag in the desk reads `MCP OFFLINE`, and `tools/list` will not show the six tools). Read → modify → write the whole file, keep it valid against `.shipward/schema.json`, pretty-print with 2 spaces. The desk polls the file, so your edits appear within about 3 seconds either way. The rules below apply whichever route you take.
 
 ## The file
 

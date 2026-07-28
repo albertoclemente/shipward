@@ -7,7 +7,7 @@
 import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -261,7 +261,11 @@ async function repoWithDrift() {
   return repo;
 }
 
-test('session-start reports drift between the board and git', async () => {
+test('session-start FIXES what git can prove and only reports the rest', async () => {
+  // The SW-024 contract. This card trips two rules at once: the branch has a
+  // commit the card does not record (certain — a blank git can fill), and the
+  // card says backlog while work exists (proposed — git proves backlog is
+  // false but cannot say whether it is claude or review).
   const repo = await repoWithDrift();
   try {
     await writeFile(tracker, JSON.stringify(seed([
@@ -270,10 +274,48 @@ test('session-start reports drift between the board and git', async () => {
     const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
     const ctx = parsed.hookSpecificOutput.additionalContext;
 
-    assert.match(ctx, /The board and git disagree/);
-    assert.match(ctx, /started-without-saying/, 'the SW-005 slip, caught before any work begins');
-    assert.match(ctx, /Nothing has been changed/, 'the opener reports, it never fixes');
+    assert.match(ctx, /the board was corrected/, 'it no longer merely reports');
+    assert.match(ctx, /missing-commit/, 'the certain half is applied');
+    assert.match(ctx, /Still unsettled/);
+    assert.match(ctx, /started-without-saying/, 'the SW-005 slip, still surfaced, not written');
     assert.match(ctx, /Claude working \(0\)/, 'and the standup is still there');
+
+    // The claim has to be true on disk, not just in the prose.
+    const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    const c = onDisk.cards.find((x) => x.id === 'TS-001');
+    assert.ok(c.commit, 'the sha git already knew was written to the card');
+    assert.equal(c.status, 'backlog', 'the inference was NOT applied — that needs an explicit ask');
+    assert.match(c.note, /\[git audit \d{4}-\d\d-\d\d\] commit → /, 'the card note records why it moved');
+    assert.equal(onDisk.feed.length, 1);
+    assert.match(onDisk.feed[0].msg, /Reconciled with git/);
+    assert.equal(onDisk.feed[0].by, 'claude');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('the standup describes the board AFTER the reconciler moved it', async () => {
+  // Rendering the board and then correcting it in the same breath would hand
+  // the session two answers and no way to tell which one is now.
+  const repo = await repoWithDrift();
+  try {
+    const head = (await import('node:child_process')).execFileSync(
+      'git', ['rev-parse', '--short', 'feat/mcp-server'], { cwd: repo, encoding: 'utf8' },
+    ).trim();
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'review', branch: 'feat/mcp-server', commit: head }),
+    ])));
+    // main has not moved, so that commit is NOT an ancestor of it yet.
+    const { execFile: ex } = await import('node:child_process');
+    const sh = (await import('node:util')).promisify(ex);
+    await sh('git', ['merge', '--no-ff', '-m', 'merge', 'feat/mcp-server'], { cwd: repo });
+
+    const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const ctx = parsed.hookSpecificOutput.additionalContext;
+
+    assert.match(ctx, /review → pushed/, 'the reconciler moved it');
+    assert.match(ctx, /Waiting on you \(0\)/, 'and the standup counts it where it now is');
+    assert.doesNotMatch(ctx, /Waiting on you \(1\)/);
   } finally {
     await rm(repo, { recursive: true, force: true });
   }

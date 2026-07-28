@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-024",
+      "p": "shipward",
+      "title": "Git is authoritative — reconcile instead of report",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/git-authoritative",
+      "commit": null,
+      "note": "The narrowed (b) angle: git stops being a witness the board consults and becomes the authority for the facts it can prove. SW-022 built the detection, SW-023 wired it into session start as a REPORT — diagnosis without cure. Today the system can tell you the board is lying and then waits for someone to agree. WHY NARROWED, not the pure version: deleting the columns would delete information git cannot hold. backlog is intent and leaves no commits. review means waiting on a human, which no git object represents in a repo that merges branches directly. shipped is a filing action. Those stay hand-held. THREE TIERS, replacing the loose fix!=null proxy that sync uses today:   certain  — git is the witness and the correction is a fact, so it applies WITHOUT being asked: merged-not-pushed (the commit is provably an ancestor of the trunk) and missing-commit (filling a blank the branch already answers).   proposed — git proves the board is wrong but the correction is an inference: started-without-saying proves backlog is FALSE, but claude vs review is a guess. Needs the explicit apply.   reported — git can only raise a question: not-on-trunk, no-branch, untracked-branch. Never written. SAFETY PROPERTY WORTH KEEPING: the reconciler is MONOTONIC. Every certain rule only ever confirms progress git can prove — in-flight to pushed, blank to sha. Nothing walks a card backwards, so a human who moves a card ahead of git is never overruled by it. The single-writer lesson from SW-023 applies again: the classification and the plan are pure and live in git.mjs, one writer in reconcile.mjs, and the hook and the sync tool both go through it. Two implementations of what git means for the board would eventually disagree, and the hook is the one nobody would think to re-check. Every auto-correction appends a dated line to the card note rather than adding a schema field, so the reason git moved it is in the memory a future session reads instead of a marker only the desk can render.",
+      "created": "2026-07-28T10:20:42.665Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-023",
       "p": "shipward",
       "title": "SessionStart reports board-vs-git drift",
@@ -380,6 +396,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T10:20:42.665Z",
+      "p": "shipward",
+      "msg": "SW-024 logged and taken — git becomes authoritative for what it can prove",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T10:12:33.014Z",
       "p": "shipward",

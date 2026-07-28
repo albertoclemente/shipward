@@ -3,6 +3,7 @@
 import {
   COLUMNS, fmtDate, relTime, nextId, moveMsg, applyTransition,
   feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed, feedDays, feedLede,
+  claudeSince, elapsedShort, filterFeed,
   archiveRows, archiveLede, addMsg, editMsg, deleteMsg, mcpStatus, FEED_CAP,
 } from './lib.js';
 import {
@@ -21,6 +22,8 @@ const state = {
   dragging: null,
   memoryQuery: '',   // memory view: free-text filter
   memoryFile: null,  // memory view: narrow to one file's accumulated knowledge
+  logBy: null,       // log view: null = everyone, 'claude' | 'user'
+  logQuery: '',      // log view: free-text filter over the messages
   etag: null,      // from the last GET; PUT must match it
   offline: false,
   error: null,      // server said no, as opposed to server is gone
@@ -349,13 +352,37 @@ function renderArchive(doc, project) {
 // activity strip, discarding the rest at render time.
 function renderFeed(doc, project) {
   const ids = new Set(cardsOf(doc.cards, project.id).map((c) => c.id));
-  const days = feedDays(doc.feed, project.id, { ids });
+  const filtered = filterFeed(doc.feed, { by: state.logBy, query: state.logQuery });
+  const days = feedDays(filtered, project.id, { ids });
+  // The cap note describes the WHOLE feed — a filter narrows the view, not
+  // the history.
   const capped = doc.feed.length >= FEED_CAP;
+  const filtering = state.logBy || state.logQuery.trim();
 
+  const who = [[null, 'Everyone'], ['claude', 'Claude Code'], ['user', 'You']];
   return el('main', { class: 'view-wrap' },
     el('div', { class: 'view-body' },
       el('h3', { class: 'view-title', text: `What happened on ${project.name}` }),
       el('p', { class: 'text-muted view-lede', text: feedLede(days, { capped }) }),
+
+      // "Just show me what Claude did" is the query this view exists for.
+      el('div', { class: 'log-controls' },
+        el('div', { class: 'log-who-seg', role: 'group', 'aria-label': 'Filter by author' },
+          who.map(([key, label]) =>
+            el('button', {
+              class: `log-filter${state.logBy === key ? ' is-on' : ''}`,
+              text: label,
+              'aria-pressed': state.logBy === key ? 'true' : 'false',
+              onclick: () => { if (state.logBy !== key) { state.logBy = key; renderLogOnly(); } },
+            }))),
+        el('input', {
+          class: 'input log-search', type: 'search', placeholder: 'Filter the log — a card id, a word…',
+          value: state.logQuery,
+          // `input`, not a full render per keystroke: this filters a local
+          // projection and never touches the tracker — same as the memory search.
+          oninput: (e) => { state.logQuery = e.target.value; renderLogOnly(); },
+        }),
+      ),
       // The rest of the desk reads timestamps with UTC getters on purpose, so
       // this does too — and says so, because a time of day is a moment someone
       // lived through and an unlabelled one is just wrong to anyone east of
@@ -390,9 +417,29 @@ function renderFeed(doc, project) {
                 ))),
             ))
         : el('div', { class: 'text-muted view-empty',
-            text: 'Nothing logged yet. This fills itself as work moves — you never write to it.' }),
+            text: filtering
+              ? 'Nothing in the log matches that filter.'
+              : 'Nothing logged yet. This fills itself as work moves — you never write to it.' }),
     ),
   );
+}
+
+// Same trick as renderMemoryOnly, for the same reason: a full render on every
+// keystroke rebuilds the header and drops focus out of the search box.
+function renderLogOnly() {
+  const doc = state.doc;
+  if (!doc || state.view !== 'log') return render();
+  const project = activeProject(doc);
+  const current = document.querySelector('.view-wrap');
+  const next = renderFeed(doc, project);
+  const focused = document.activeElement?.classList.contains('log-search');
+  const caret = focused ? document.activeElement.selectionStart : null;
+  current?.replaceWith(next);
+  if (focused) {
+    const box = next.querySelector('.log-search');
+    box?.focus();
+    if (caret != null) box?.setSelectionRange(caret, caret);
+  }
 }
 
 // What Claude Code knows about this repo, which is two thirds of the tracker by
@@ -499,13 +546,19 @@ function renderMemoryEntry(e) {
         onclick: () => openDialog(e.card),
       }),
       el('span', { class: 'mem-entry-title', text: e.title }),
+      // A stated resolves is a cross-card fact — render it as the link it is.
+      e.resolves
+        ? el('button', { class: 'mem-entry-flag mem-flag-link', text: `resolves ${e.resolves}`,
+            title: `Open ${e.resolves}`, onclick: () => openDialog(e.resolves) })
+        : null,
       e.superseded
         // Say why it is dimmed — and by WHOM, now that resolution can arrive
-        // from another card entirely. An unexplained grey block reads as broken.
-        ? el('span', { class: 'mem-entry-flag',
-            text: e.settledBy && e.settledBy !== e.card
-              ? `answered by ${e.settledBy}`
-              : 'answered later on this card' })
+        // from another card entirely. An unexplained grey block reads as
+        // broken, and a named card you cannot open reads as homework.
+        ? (e.settledBy && e.settledBy !== e.card
+            ? el('button', { class: 'mem-entry-flag mem-flag-link', text: `answered by ${e.settledBy}`,
+                title: `Open ${e.settledBy}`, onclick: () => openDialog(e.settledBy) })
+            : el('span', { class: 'mem-entry-flag', text: 'answered later on this card' }))
         : null,
       el('span', { class: 'text-muted mem-entry-date', text: fmtDate(e.at) }),
     ),
@@ -566,8 +619,14 @@ function renderColumn(col) {
 }
 
 function renderCard(c) {
+  // "on it · 14m" — the state plus how long it has been true. Derived from the
+  // feed at render time; when the start entry has rolled off the cap the badge
+  // simply drops the clock rather than inventing one.
+  const since = c.status === 'claude' && c.claude === 'working'
+    ? claudeSince(state.doc.feed, c.p, c.id) : null;
+  const away = since ? elapsedShort(since) : '';
   const claudeLine = c.status === 'claude'
-    ? (c.claude === 'working' ? 'Claude is on it' : 'Queued for Claude')
+    ? (c.claude === 'working' ? `Claude is on it${away ? ` · ${away}` : ''}` : 'Queued for Claude')
     : null;
 
   return el('article', {

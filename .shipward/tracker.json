@@ -11,6 +11,28 @@
   ],
   "cards": [
     {
+      "id": "SW-031",
+      "p": "shipward",
+      "title": "Product-fit pass — elapsed time, resolve links, log filters, tabular figures",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/product-fit",
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-28T13:06:33.565Z",
+          "kind": "brief",
+          "text": "The product-fit half of the ui-ux-pro-max assessment. (1) CLAUDE IS ON IT becomes CLAUDE IS ON IT · 14m — elapsed since the newest handed-to-Claude feed entry for that card, DERIVED not stored, because the feed already records every start and a schema field would duplicate it. (2) The Memory view answered-by flags and resolves markers become links that open the named card — the cross-card facts SW-028 added are navigation, not decoration. (3) The Log gains filters: All / Claude Code / You plus a text query, because just-show-me-what-Claude-did is the query the view exists for. (4) font-variant-numeric tabular-nums on stats and counts so numbers stop shimmying between repaints. DECIDED AGAINST here: the serif-for-memory-prose flavor — a font import in a zero-dep app for a look nobody asked for."
+        }
+      ],
+      "created": "2026-07-28T13:06:33.565Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-030",
       "p": "shipward",
       "title": "A11y pass — keyboard status moves, contrast, motion, announcements",
@@ -933,6 +955,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T13:06:33.565Z",
+      "p": "shipward",
+      "msg": "SW-031 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T13:04:47.045Z",
       "p": "shipward",

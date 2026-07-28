@@ -191,6 +191,43 @@ export const latestFeed = (feed, projectId) =>
     .filter((f) => f.p === projectId && !Number.isNaN(Date.parse(f.t)))
     .sort((a, b) => Date.parse(b.t) - Date.parse(a.t))[0] || null;
 
+// When Claude took this card, read from the feed rather than stored on the
+// card: every start already writes "SW-031 handed to Claude Code — queued"
+// (drag, dialog and MCP all route through moveMsg), so a schema field would
+// be a second copy of a fact the log is already keeping. Newest match wins —
+// a card can be re-taken. Null when the entry has rolled off the cap; the
+// caller shows the badge without a clock rather than inventing one.
+export function claudeSince(feed, projectId, cardId) {
+  const want = `${cardId} handed to Claude Code`;
+  const hit = feed
+    .filter((f) => f.p === projectId && typeof f.msg === 'string'
+      && f.msg.startsWith(want) && !Number.isNaN(Date.parse(f.t)))
+    .sort((a, b) => Date.parse(b.t) - Date.parse(a.t))[0];
+  return hit ? hit.t : null;
+}
+
+// "14m", "3h", "2d" — a duration, not an ago-time; relTime answers "when did
+// this happen", this answers "how long has it been going".
+export function elapsedShort(iso, now = Date.now()) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t) || now < t) return '';
+  const m = Math.floor((now - t) / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  return h < 24 ? `${h}h` : `${Math.floor(h / 24)}d`;
+}
+
+// The Log's filters. `by` follows the same rule feedDays uses to label
+// authors: anything that is not 'user' reads as Claude, because `by` is
+// nullable in old hand-written entries and a null there is not a third person.
+export function filterFeed(feed, { by = null, query = '' } = {}) {
+  const q = String(query ?? '').trim().toLowerCase();
+  return feed.filter((f) =>
+    (!by || (by === 'user' ? f.by === 'user' : f.by !== 'user'))
+    && (!q || String(f.msg).toLowerCase().includes(q)));
+}
+
 /* ── the log ─────────────────────────────────────────────── */
 // The board answers "where does this stand". The log answers "what happened",
 // which is the only one of the two that can show you a day you were not there

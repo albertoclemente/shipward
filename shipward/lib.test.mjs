@@ -4,6 +4,7 @@ import assert from 'node:assert/strict';
 import {
   fmtDate, relTime, autoBranch, nextId, moveMsg, applyTransition,
   feedAdd, deriveColumns, deriveStats, latestFeed, feedDays, feedLede, messageParts, FEED_CAP,
+  claudeSince, elapsedShort, filterFeed,
   archiveRows, archiveLede, mcpStatus, MCP_STALE_MS,
 } from './public/lib.js';
 
@@ -360,4 +361,49 @@ test('rejoining the parts reproduces the message exactly', () => {
       .map((p) => p.id || p.text).join('');
     assert.equal(back, msg, 'no character may be dropped or duplicated in the split');
   }
+});
+
+/* ── product-fit helpers (SW-031) ────────────────────────── */
+
+test('claudeSince reads the start from the feed, newest take wins', () => {
+  const feed = [
+    at('2026-07-28T10:00:00Z', 'SW-031 handed to Claude Code — queued'),
+    at('2026-07-27T09:00:00Z', 'SW-031 handed to Claude Code — queued'),
+    at('2026-07-28T11:00:00Z', 'SW-030 handed to Claude Code — queued'),
+    at('2026-07-28T12:00:00Z', 'SW-031 moved to Review — give it a look'),
+    at('2026-07-28T13:00:00Z', 'SW-031 handed to Claude Code — queued', 'claude', 'other'),
+  ];
+  assert.equal(claudeSince(feed, 'shipward', 'SW-031'), '2026-07-28T10:00:00Z');
+  assert.equal(claudeSince(feed, 'shipward', 'SW-099'), null, 'rolled off or never started: no clock, not a guess');
+});
+
+test('elapsedShort is a duration, not an ago-time', () => {
+  const now = Date.parse('2026-07-28T12:00:00Z');
+  assert.equal(elapsedShort('2026-07-28T11:59:40Z', now), 'just now');
+  assert.equal(elapsedShort('2026-07-28T11:46:00Z', now), '14m');
+  assert.equal(elapsedShort('2026-07-28T09:00:00Z', now), '3h');
+  assert.equal(elapsedShort('2026-07-26T09:00:00Z', now), '2d');
+  assert.equal(elapsedShort('not a date', now), '');
+  assert.equal(elapsedShort('2026-07-28T13:00:00Z', now), '', 'a start in the future renders nothing rather than a negative');
+});
+
+test('filterFeed by author follows the same rule the labels use', () => {
+  const feed = [
+    at('2026-07-28T10:00:00Z', 'by claude'),
+    at('2026-07-28T09:00:00Z', 'by user', 'user'),
+    { t: '2026-07-28T08:00:00Z', p: 'shipward', msg: 'by nobody' },   // by omitted — reads as Claude
+  ];
+  assert.deepEqual(filterFeed(feed, { by: 'user' }).map((f) => f.msg), ['by user']);
+  assert.deepEqual(filterFeed(feed, { by: 'claude' }).map((f) => f.msg), ['by claude', 'by nobody']);
+  assert.equal(filterFeed(feed, {}).length, 3);
+});
+
+test('filterFeed query matches the message text, case-insensitively', () => {
+  const feed = [
+    at('2026-07-28T10:00:00Z', 'SW-024 moved to Review'),
+    at('2026-07-28T09:00:00Z', 'Reconciled with git'),
+  ];
+  assert.deepEqual(filterFeed(feed, { query: 'sw-024' }).map((f) => f.msg), ['SW-024 moved to Review']);
+  assert.deepEqual(filterFeed(feed, { query: '  ' }).length, 2, 'whitespace is no filter');
+  assert.deepEqual(filterFeed(feed, { by: 'claude', query: 'reconciled' }).map((f) => f.msg), ['Reconciled with git']);
 });

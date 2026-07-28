@@ -39,9 +39,9 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/replace-guard",
       "commit": null,
       "created": "2026-07-28T14:26:46.531Z",
       "pushed": null,
@@ -1093,6 +1093,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T14:30:37.978Z",
+      "p": "shipward",
+      "msg": "SW-035 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:27:39.431Z",
       "p": "shipward",

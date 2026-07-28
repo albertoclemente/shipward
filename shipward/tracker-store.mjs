@@ -271,10 +271,11 @@ async function publish(token) {
   }
 }
 
-async function acquire() {
+async function acquire(signal) {
   const token = randomUUID();
   const deadline = Date.now() + LOCK_TIMEOUT_MS;
   for (;;) {
+    if (signal?.aborted) throw new CancelledError('cancelled while waiting for the tracker lock');
     try {
       if (await publish(token)) return token;
       const err = new Error('lock held');
@@ -312,6 +313,12 @@ async function release(token) {
   process.stderr.write(`shipward: could not release the tracker lock at ${LOCK} — remove it by hand if writes hang\n`);
 }
 
+// Thrown when a caller abandons the work before it was committed. Distinct from
+// a failure: nothing went wrong, and nothing was written.
+export class CancelledError extends Error {
+  constructor(msg) { super(msg); this.name = 'CancelledError'; }
+}
+
 // Thrown when a holder discovers, just before committing, that the lock it took
 // is no longer at the path. Loud beats silent: the caller can retry, where a
 // blind write would overwrite whoever holds it now.
@@ -328,11 +335,11 @@ export class LockLostError extends Error {
 // blamed contention.
 let heldToken = null;
 
-export async function withLock(fn) {
+export async function withLock(fn, { signal } = {}) {
   if (heldToken) {
     throw new Error('the tracker lock is already held by this process — a nested mutate() would deadlock against itself');
   }
-  const token = await acquire();
+  const token = await acquire(signal);
   heldToken = token;
   const held = async () => {
     const holder = await readHolder();
@@ -445,7 +452,7 @@ async function atomicWrite(doc, held) {
 
 // Read-modify-write under one lock. `fn` receives the current document and
 // returns the replacement, or null/undefined for a deliberate no-op.
-export async function mutate(fn) {
+export async function mutate(fn, { signal } = {}) {
   return withLock(async (held) => {
     const doc = await read();
     const before = serialize(doc);
@@ -464,9 +471,13 @@ export async function mutate(fn) {
     const out = normalize(next);
     const bad = validate(out);
     if (bad) throw new ValidationError(`refusing to write an invalid tracker document: ${bad}`);
+    // The commit point. Up to here a cancellation costs nothing: the lock is
+    // released and the file is untouched. Past the rename inside atomicWrite
+    // the write is durable and cancelling it would mean inventing an undo.
+    if (signal?.aborted) throw new CancelledError('cancelled before the write was committed');
     const body = await atomicWrite(out, held);
     return { doc: out, body, changed: true, etag: etagOf(body) };
-  });
+  }, { signal });
 }
 
 // Replace the whole document — the shape PUT /api/tracker needs. Validated

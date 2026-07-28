@@ -324,7 +324,7 @@ async function recall({ file, kind, query, limit = 10, project: wanted }) {
   return lines.join('\n').trimEnd();
 }
 
-async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note, project: wanted }) {
+async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note, project: wanted }, signal) {
   const text = asText(title, 'title').trim();
   const context = asText(note, 'note');
   if (!text) throw new ToolError('a card needs a title');
@@ -340,11 +340,11 @@ async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note
     });
     doc.feed = feedAdd(doc.feed, project.id, addMsg(id), nowIso(), 'claude');
     return doc;
-  });
+  }, { signal });
   return `${created.id} added to ${created.project.name} backlog — ${text}`;
 }
 
-async function startCard({ id, branch }) {
+async function startCard({ id, branch }, signal) {
   let out;
   await mutate((doc) => {
     const card = findCard(doc, id);
@@ -364,7 +364,7 @@ async function startCard({ id, branch }) {
     doc.feed = feedAdd(doc.feed, moved.p, moveMsg(id, 'claude'), nowIso(), 'claude');
     out = { card: moved, already: false };
     return doc;
-  });
+  }, { signal });
 
   const { card, already } = out;
   const lines = [
@@ -379,7 +379,7 @@ async function startCard({ id, branch }) {
   return lines.join('\n');
 }
 
-async function doneCard({ id, commit, note, pushed = false }) {
+async function doneCard({ id, commit, note, pushed = false }, signal) {
   const to = pushed ? 'pushed' : 'review';
   const addition = asText(note, 'note');
   const sha = asText(commit, 'commit').trim();
@@ -398,7 +398,7 @@ async function doneCard({ id, commit, note, pushed = false }) {
     doc.feed = feedAdd(doc.feed, moved.p, moveMsg(id, to), nowIso(), 'claude');
     card = moved;
     return doc;
-  });
+  }, { signal });
   return [
     `${card.id} → ${to}${card.commit ? ` at ${card.commit}` : ''}.`,
     `Title: ${card.title}`,
@@ -408,7 +408,7 @@ async function doneCard({ id, commit, note, pushed = false }) {
   ].join('\n');
 }
 
-async function syncCards({ summary, updates = [], create = [], project: wanted }) {
+async function syncCards({ summary, updates = [], create = [], project: wanted }, signal) {
   const headline = asText(summary, 'summary').trim();
   if (!headline) throw new ToolError('sync needs a one-line summary for the feed');
   for (const [i, c] of create.entries()) {
@@ -462,7 +462,7 @@ async function syncCards({ summary, updates = [], create = [], project: wanted }
     const home = touched.size === 1 ? [...touched][0] : project.id;
     doc.feed = feedAdd(doc.feed, home, `Synced with git — ${headline}`, nowIso(), 'claude');
     return doc;
-  });
+  }, { signal });
   const lines = [`Sync applied: ${changed.length} updated, ${added.length} created.`];
   for (const l of changed) lines.push(`  ${l}`);
   for (const l of added) lines.push(`  + ${l}`);
@@ -478,7 +478,7 @@ const error = (id, code, message, collect) => emit(collect, { jsonrpc: '2.0', id
 
 const text = (s, isError = false) => ({ content: [{ type: 'text', text: s }], isError });
 
-async function callTool(params) {
+async function callTool(params, signal) {
   const tool = TOOLS.find((t) => t.name === params?.name);
   if (!tool) {
     // A wrong tool name is the model's mistake to correct, not a protocol
@@ -486,8 +486,9 @@ async function callTool(params) {
     return text(`no tool "${params?.name}". Available: ${TOOLS.map((t) => t.name).join(', ')}`, true);
   }
   try {
-    return text(await tool.run(params.arguments || {}));
+    return text(await tool.run(params.arguments || {}, signal));
   } catch (err) {
+    if (err.name === 'CancelledError') throw err;   // not a tool failure — no reply at all
     if (err.name === 'ToolError' || err.name === 'ValidationError' || err.name === 'ConflictError') {
       return text(err.message, true);
     }
@@ -541,18 +542,38 @@ async function handle(msg, collect) {
           + 'and every finished piece needs done with a note a future session can read. Never delete a card — archive it.',
       }, collect);
     }
-    case 'notifications/initialized':
     case 'notifications/cancelled':
+      cancel(params?.requestId);
       return;                                   // notifications get no reply, ever
+    case 'notifications/initialized':
+      return;
     case 'ping':
       return result(id, {}, collect);
     case 'tools/list':
       return result(id, {
         tools: TOOLS.map(({ name, title, description, inputSchema }) => ({ name, title, description, inputSchema })),
       }, collect);
-    case 'tools/call':
+    case 'tools/call': {
       // The only path that takes the lock, so the only one that queues.
-      return result(id, await onWriteQueue(() => callTool(params)), collect);
+      const controller = new AbortController();
+      const entry = { controller, started: false };
+      cancellable.set(id, entry);
+      try {
+        const out = await onWriteQueue(() => {
+          // Cancelled while queued: never run it at all.
+          if (controller.signal.aborted) return null;
+          entry.started = true;
+          return callTool(params, controller.signal);
+        });
+        if (out === null) return;                    // cancelled before it began
+        return result(id, out, collect);
+      } catch (err) {
+        if (err.name === 'CancelledError') return;   // abandoned, nothing written
+        throw err;
+      } finally {
+        cancellable.delete(id);
+      }
+    }
     default:
       return error(id, -32601, `method not found: ${method}`, collect);
   }
@@ -570,6 +591,25 @@ let buffer = '';
 // when the lock was never released. A handshake bounded by the lock timeout is
 // a server the client gives up on.
 let writes = Promise.resolve();
+
+// Requests that can still be cancelled: queued, or running and not yet
+// committed. notifications/cancelled used to be accepted and ignored, so the
+// call kept running, still wrote, and still held the write queue behind it.
+//
+// What cancellation can honestly promise: a queued call never runs at all, and
+// a running one is abandoned at the commit point in mutate() with the file
+// untouched. Past the rename the write is durable and cancelling it would mean
+// inventing an undo, so the work finishes — but per the protocol no response is
+// ever sent for a cancelled request either way.
+const cancellable = new Map();
+
+function cancel(requestId) {
+  const entry = cancellable.get(requestId);
+  // An unknown id is the normal race: the reply and the cancellation crossed.
+  if (!entry) return;
+  entry.controller.abort();
+  log(`cancelled request ${requestId}${entry.started ? ' (already running)' : ' (never started)'}`);
+}
 const onWriteQueue = (fn) => {
   const run = writes.then(fn, fn);
   writes = run.then(() => {}, () => {});

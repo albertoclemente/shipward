@@ -17,9 +17,9 @@
       "type": "bug",
       "pri": "P3",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/mcp-cancellation",
       "commit": null,
       "note": "Deferred from SW-020, deliberately. notifications/cancelled is accepted and then ignored: the cancelled call keeps running, still writes, and still holds the write queue behind it. Real cancellation means carrying an AbortSignal from the notification through callTool into mutate() and the cross-process file lock, and deciding what a half-applied mutation means — a lock holder cannot simply be abandoned. That is a larger change than the finding warrants, and bodging it would be worse than the honest gap. The blast radius today is small: a client that cancels gets no reply and the write lands anyway.",
       "created": "2026-07-27T18:57:43.529Z",
@@ -348,6 +348,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T07:23:12.152Z",
+      "p": "shipward",
+      "msg": "SW-021 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T07:21:06.062Z",
       "p": "shipward",
@@ -758,7 +764,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-28T07:21:06.043Z",
-    "pid": 96241
+    "lastSeen": "2026-07-28T07:25:39.842Z",
+    "pid": 97523
   }
 }

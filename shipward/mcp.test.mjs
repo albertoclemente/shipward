@@ -663,3 +663,70 @@ test('a nonsense limit does not print a total and then list nothing', async () =
   assert.match(text, /3 recalled/);
   assert.match(text, /finding 0/, 'the entries themselves must be there');
 });
+
+
+/* -- cancellation (SW-021) ---------------------------------- */
+
+test('a cancelled call that never started does not run and gets no reply', async () => {
+  // It used to be accepted and ignored: the call ran, wrote, and held the queue.
+  const { c } = await handshake();
+  const before = await board();
+
+  // Hold the tracker lock so the call cannot begin.
+  const { writeFile: wf, unlink } = await import('node:fs/promises');
+  await wf(`${tracker}.lock`, JSON.stringify({ pid: process.pid, token: 'held-by-the-test', at: Date.now() }));
+  try {
+    c.send({ jsonrpc: '2.0', id: 700, method: 'tools/call', params: { name: 'log', arguments: { title: 'should never exist' } } });
+    await new Promise((r) => setTimeout(r, 300));
+    c.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 700 } });
+    await new Promise((r) => setTimeout(r, 300));
+  } finally {
+    await unlink(`${tracker}.lock`).catch(() => {});
+  }
+
+  // A tools/call queues BEHIND the cancelled one, so once this answers the
+  // cancelled call has definitively resolved. tools/list would not: protocol
+  // frames deliberately no longer wait on the write queue, and using one here
+  // let the assertion race the write it was meant to catch.
+  const after = await c.call('standup', {});
+  assert.equal(after.isError, false, 'the server is still healthy');
+  assert.equal(c.frames().find((f) => f.id === 700), undefined, 'a cancelled request gets no response');
+  assert.equal(await board(), before, 'and nothing was written');
+});
+
+test('cancelling frees the queue for the calls behind it', async () => {
+  const { c } = await handshake();
+  const { writeFile: wf, unlink } = await import('node:fs/promises');
+  await wf(`${tracker}.lock`, JSON.stringify({ pid: process.pid, token: 'held-by-the-test', at: Date.now() }));
+
+  c.send({ jsonrpc: '2.0', id: 710, method: 'tools/call', params: { name: 'log', arguments: { title: 'blocked' } } });
+  await new Promise((r) => setTimeout(r, 200));
+  const queued = c.request('tools/call', { name: 'standup', arguments: {} });
+  c.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 710 } });
+  await unlink(`${tracker}.lock`).catch(() => {});
+
+  const res = await queued;
+  assert.ok(res.result, 'the call behind it completed');
+  assert.equal(c.frames().find((f) => f.id === 710), undefined);
+  assert.ok(!(await doc()).cards.some((x) => x.title === 'blocked'), 'the cancelled write never landed');
+});
+
+test('cancelling an unknown or already-finished id is harmless', async () => {
+  const { c } = await handshake();
+  const done = await c.call('standup', {});
+  assert.equal(done.isError, false);
+
+  c.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: { requestId: 99999 } });
+  c.send({ jsonrpc: '2.0', method: 'notifications/cancelled', params: {} });
+  c.send({ jsonrpc: '2.0', method: 'notifications/cancelled' });
+
+  const alive = await c.request('ping');
+  assert.deepEqual(alive.result, {}, 'the reply and the cancellation crossing is the normal race');
+});
+
+test('an uncancelled call still answers normally', async () => {
+  const { c } = await handshake();
+  const r = await c.call('log', { title: 'not cancelled' });
+  assert.equal(r.isError, false);
+  assert.ok((await doc()).cards.some((x) => x.title === 'not cancelled'));
+});

@@ -91,8 +91,8 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
+      "status": "claude",
+      "claude": "working",
       "branch": "feat/note-lint",
       "commit": null,
       "note": [
@@ -866,6 +866,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T11:35:56.397Z",
+      "p": "shipward",
+      "msg": "SW-029 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T11:35:43.990Z",
       "p": "shipward",

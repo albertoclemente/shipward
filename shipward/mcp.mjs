@@ -404,12 +404,48 @@ async function startCard({ id, branch }, signal) {
 const KIND_KEYS = new Set(ALL_KINDS.map((k) => k.key));
 const CARD_ID = /^[A-Z]+-[0-9]{3}$/;
 
+// The one rung of the ladder that cannot be a mechanism. Hooks can force
+// touching Shipward; nothing can force a note worth reading — done({note:
+// "fixed it"}) satisfies every check in the system and teaches the next
+// session nothing. A gate here would be gamed within a day and resented for
+// longer, so this is a NUDGE in the reply, never a rejection: it names what
+// the next session will be missing, and then it gets out of the way. The same
+// philosophy as the pre-edit hook — warn, never block.
+const THIN_WORDS = 25;
+// "fixed it", "done", "works now" — the notes that satisfy a checkbox.
+const TRIVIAL = /^(fixed|done|ok|okay|works|working|finished|completed|implemented|shipped)\b[\s\S]{0,25}$/i;
+// The signals a note worth reading tends to carry: a why, a decision, a thing
+// that bit. Their absence in a LONG note is fine — length is its own evidence
+// of care — so this only weighs in under the word floor.
+const SIGNAL = /\b(because|why|decided|decision|tradeoff|gotcha|instead|rather than|so that|verified|measured|root cause|turned out)\b/i;
+
+function noteNudge(text) {
+  if (!text) {
+    return 'No note was recorded. The next session knows only what is written here — one line on what '
+      + 'changed and why beats reconstructing it from the diff.';
+  }
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (TRIVIAL.test(text.trim())) {
+    return `The note ("${text.trim()}") satisfies the protocol and teaches the next session nothing. `
+      + 'What changed? What did you decide, and what did you reject? What bit you? Append with another done or sync — entries are cheap.';
+  }
+  if (words < THIN_WORDS && !SIGNAL.test(text)) {
+    return `The note is ${words} word${words === 1 ? '' : 's'} and carries no decision, reason or gotcha. `
+      + 'That may be all there is — but if anything surprised you, the next session pays for its absence.';
+  }
+  return null;
+}
+
 async function doneCard({ id, commit, note, kind, resolves, pushed = false }, signal) {
   const to = pushed ? 'pushed' : 'review';
   const addition = asText(note, 'note').trim();
   const sha = asText(commit, 'commit').trim();
   if (kind != null && !KIND_KEYS.has(kind)) throw new ToolError(`kind must be one of: ${[...KIND_KEYS].join(', ')}`);
   if (resolves != null && !CARD_ID.test(String(resolves))) throw new ToolError('resolves must be a card id like SW-011');
+  // Advisory, computed before the write and reported after the facts: the card
+  // moves regardless; only the reply carries the nudge. A resolves-only close
+  // is exempt — the assertion IS the note.
+  const nudge = addition ? noteNudge(addition) : (resolves ? null : noteNudge(''));
   let card;
   let resolvesUnknown = false;
   await mutate((doc) => {
@@ -440,6 +476,7 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false }, si
       ? 'It is on the Review column now; only the human moves it to Pushed.'
       : `Stamped pushed ${fmtDate(card.pushed)}.`,
     ...(resolvesUnknown ? [`Warning: resolves ${resolves} names a card this tracker does not have — nothing was settled by it.`] : []),
+    ...(nudge ? [`\nNote check: ${nudge}`] : []),
   ].join('\n');
 }
 

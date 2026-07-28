@@ -11,6 +11,38 @@
   ],
   "cards": [
     {
+      "id": "SW-037",
+      "p": "shipward",
+      "title": "The fleet starts itself — a launchd agent, installed by script",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "S",
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/fleet-service",
+      "commit": "d72c32f",
+      "note": [
+        {
+          "t": "2026-07-28T15:38:50.949Z",
+          "kind": "brief",
+          "text": "Alberto: start the fleet automatically so I do not have to run it. macOS answer: a user LaunchAgent — RunAtLoad + KeepAlive, logs to ~/Library/Logs/shipward-fleet.log. Shipped as shipward/fleet-service.mjs install|uninstall|status rather than hand-written machine config, so it is redoable on any machine and the plist generation is testable as a pure function. Node is pinned by absolute path (process.execPath at install time) because launchd has no shell PATH."
+        },
+        {
+          "t": "2026-07-28T15:40:38.956Z",
+          "kind": "outcome",
+          "text": "SHIPPED. fleet-service.mjs install [root] | status | uninstall. LaunchAgent com.shipward.fleet: RunAtLoad + KeepAlive, stdout/stderr to ~/Library/Logs/shipward-fleet.log, re-install safe (bootout then bootstrap; a bootout of nothing is the expected no-op). NODE IS PINNED by absolute path from process.execPath — launchd has no shell profile, so bare node would resolve to nothing; the printed install summary names the pinned path and says to re-run install after a Node upgrade, so the future surprise is at least documented at the moment it is created."
+        },
+        {
+          "t": "2026-07-28T15:40:38.956Z",
+          "kind": "evidence",
+          "text": "VERIFIED live on this machine: installed against /Users/alberto/projects, status showed the pid, the page answered with 10 boards; then the fleet PROCESS WAS KILLED and launchd restarted it under a new pid within seconds, page answering 200 — KeepAlive proven by execution, not by reading the man page. Plist tested as data: paths pinned, XML-hostile root escaped not injected, tag balance checked because a malformed plist fails SILENTLY at login, the worst possible failure mode. 251 tests pass, 2 new."
+        }
+      ],
+      "created": "2026-07-28T15:38:50.949Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-036",
       "p": "shipward",
       "title": "Onboard from the fleet — a button, not a command",
@@ -1165,6 +1197,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T15:40:38.956Z",
+      "p": "shipward",
+      "msg": "SW-037 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T15:38:50.949Z",
+      "p": "shipward",
+      "msg": "SW-037 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T15:17:09.426Z",
       "p": "shipward",

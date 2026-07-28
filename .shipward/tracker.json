@@ -17,13 +17,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": null,
       "commit": "1fdd7ca",
       "note": "Deferred at the end of SW-022 on cost grounds, then done once the cost was fixed. MADE IT AFFORDABLE FIRST: the audit cost 239ms, of which 134ms was one git process per card asking whether a commit had landed. Parallelising changed NOTHING — spawning is the cost, not the query — so a single rev-list of the trunk now answers for every card at once: ~130ms, and it no longer grows with card count. A sha outside the bounded 5000-commit window still falls back to asking directly, so the shortcut cannot produce a false 'never landed'. BUDGETED at 2.5s anyway, because this repo is not every repo; past the budget, or if git cannot be read, the opener says NOTHING about git. Silence, never a false all-clear — 'we do not know' must not render as 'nothing is wrong'. Session start measures ~260ms here, once, and the per-turn prompt hook deliberately does not audit. auditBoard moved into git.mjs so the hook and the sync tool share one implementation; two answers to 'what does git say about the board' would eventually disagree, and the hook is the one nobody would think to re-check. git.mjs gained SHIPWARD_REPO mirroring SHIPWARD_TRACKER — without it the only way to exercise a finding in a test was to break the real board. TEST GOTCHA: my clean-board test failed because I had assumed the staged repo was clean when it carried a branch no card claimed. The rule was right and the test was wrong; fixed the test. Also corrected CLAUDE.md, which still said five MCP tools when there are six. 189 tests pass, 4 new; the drift test was verified to fail against the pre-change hook. || SHIPPED — see the commit and the brief. Card logged after the work as an honest record; the protocol wants it before, and this one slipped because the change grew out of the tail of SW-022 rather than starting as its own request.",
       "created": "2026-07-28T08:41:50.437Z",
-      "pushed": null,
+      "pushed": "2026-07-28T08:42:10.509Z",
       "shipped": null
     },
     {
@@ -380,6 +380,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T08:42:10.509Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-023 merged — session opener audits git",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T08:42:01.351Z",
       "p": "shipward",
@@ -844,7 +850,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-28T08:42:01.332Z",
-    "pid": 7649
+    "lastSeen": "2026-07-28T08:42:10.491Z",
+    "pid": 7669
   }
 }

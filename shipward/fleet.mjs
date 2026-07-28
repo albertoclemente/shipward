@@ -79,6 +79,8 @@ function onboard(repo) {
 // Keyed by tracker path. A child that dies stays dead until the fleet is
 // restarted — a supervisor that flaps is worse than a row saying "desk down".
 const desks = new Map();
+// Known once listen() lands; rows built before that omit the return address.
+let fleetPort = null;
 
 function spawnDesk({ repo, tracker }) {
   if (desks.size >= MAX_DESKS) return { port: null, error: `desk limit (${MAX_DESKS}) reached` };
@@ -143,7 +145,11 @@ async function rows() {
         pushed: count('pushed'),
         statLine: deriveStats(doc.cards, project.id).line,
         last: feed ? { msg: feed.msg, by: feed.by === 'user' ? 'You' : 'Claude Code', ago: relTime(feed.t) } : null,
-        desk: desk.port ? `http://localhost:${desk.port}` : null,
+        // The return address rides along, so the desk can offer a way home —
+        // a desk opened any other way shows nothing.
+        desk: desk.port && fleetPort
+          ? `http://localhost:${desk.port}/?fleet=${encodeURIComponent(`http://localhost:${fleetPort}`)}`
+          : (desk.port ? `http://localhost:${desk.port}` : null),
         deskError: desk.error,
       });
     } catch (err) {
@@ -244,7 +250,14 @@ const PAGE = `<!doctype html>
   function rowNode(r) {
     if (r.kind === 'candidate') return candidateNode(r);
     const row = el('div', r.ok ? 'row' : 'row dead');
-    if (r.ok && r.desk && /^http:\\/\\/localhost:\\d+$/.test(r.desk)) {
+    // Parsed, not pattern-matched: the SW-034 origin-only regex silently
+    // unlinked every board the moment SW-038 appended ?fleet= — the producer
+    // grew, the consumer's pattern didn't. URL() checks what actually matters
+    // (local http origin, no path) and survives the next added param.
+    const okDesk = (h) => { try { const u = new URL(h);
+      return u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.pathname === '/';
+    } catch { return false; } };
+    if (r.ok && r.desk && okDesk(r.desk)) {
       const a = el('a', 'name', r.name);
       a.href = r.desk;
       row.append(a);
@@ -337,6 +350,7 @@ server.on('error', (err) => {
 
 server.listen(PORT, '127.0.0.1', async () => {
   const port = server.address().port;
+  fleetPort = port;
   console.log(`Shipward — the fleet\n  http://localhost:${port}\n  root: ${ROOT}`);
   // Spawn the desks up front so first click works; rows() keeps them honest.
   for (const f of (await scan()).boards.slice(0, MAX_DESKS)) if (!desks.has(f.tracker)) spawnDesk(f);

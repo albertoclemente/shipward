@@ -11,6 +11,28 @@
   ],
   "cards": [
     {
+      "id": "SW-038",
+      "p": "shipward",
+      "title": "A way back — the desk links to the fleet that opened it",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/fleet-link",
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-28T15:59:53.736Z",
+          "kind": "brief",
+          "text": "Alberto, on the desk: where is browser back? A desk opened from the fleet had no way home but browser chrome — invisible in the Claude Code pane. Fix: the fleet appends ?fleet=<its origin> to each desk link; the desk renders a home link in the header when, and only when, that param names a localhost origin. Validated by a pure lib function, because a URL taken from the query string and rendered as a link is exactly how open-redirect decorations get in."
+        }
+      ],
+      "created": "2026-07-28T15:59:53.736Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-037",
       "p": "shipward",
       "title": "The fleet starts itself — a launchd agent, installed by script",
@@ -1202,6 +1224,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T15:59:53.736Z",
+      "p": "shipward",
+      "msg": "SW-038 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T15:40:39.771Z",
       "p": "shipward",

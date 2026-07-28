@@ -461,3 +461,12 @@ textarea.input { min-height: 90px; resize: vertical; }
 /* Numbers that repaint every poll must not shimmy: same-width digits for
    every counter the eye rests on. */
 .activity-stats, .log-day-n, .col-count, .tab, .mem-file-n, .log-day-date { font-variant-numeric: tabular-nums; }
+
+/* ── the way home (SW-038) ───────────────────────────────── */
+.nav-fleet {
+  font-family: var(--font-heading); font-weight: 800; font-size: 12px;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--color-neutral-700); text-decoration: none;
+  padding: 4px 8px; border: 1px solid var(--color-neutral-400);
+}
+.nav-fleet:hover { color: var(--color-accent); border-color: var(--color-accent); }

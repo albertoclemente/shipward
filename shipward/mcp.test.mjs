@@ -837,3 +837,52 @@ test('apply:true accepts the inferences and still refuses to demote a card', asy
     await rm(repo, { recursive: true, force: true });
   }
 });
+
+/* ── the note nudge (SW-029) ─────────────────────────────── */
+
+test('done with no note moves the card AND says what is missing', async () => {
+  const { c } = await handshake();
+  const { text, isError } = await c.call('done', { id: 'TS-001' });
+  assert.equal(isError, false, 'a nudge is never a rejection');
+  assert.match(text, /TS-001 → review/);
+  assert.match(text, /Note check: No note was recorded/);
+  assert.equal((await doc()).cards.find((x) => x.id === 'TS-001').status, 'review',
+    'the move happened regardless');
+});
+
+test('a trivial note is named for what it is', async () => {
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', note: 'fixed it' });
+  assert.match(text, /teaches the next session nothing/);
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.note[card.note.length - 1].text, 'fixed it',
+    'the thin note is still recorded — the nudge lives only in the reply');
+});
+
+test('a short note with no reasoning signal gets the gentler nudge', async () => {
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', note: 'swapped the parser for the streaming one' });
+  assert.match(text, /carries no decision, reason or gotcha/);
+});
+
+test('a short note that says WHY passes clean', async () => {
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', note: 'swapped the parser because the old one buffered the whole file' });
+  assert.doesNotMatch(text, /Note check/);
+});
+
+test('a substantial note is never nagged', async () => {
+  const { c } = await handshake();
+  const long = 'Rewrote the poll loop to reuse the AbortController across cycles rather than allocating one per tick, '
+    + 'which was leaking listeners on the shared signal and eventually hit the MaxListeners warning under long sessions.';
+  const { text } = await c.call('done', { id: 'TS-001', note: long });
+  assert.doesNotMatch(text, /Note check/);
+});
+
+test('a resolves-only close is exempt — the assertion is the note', async () => {
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', resolves: 'TS-003' });
+  assert.doesNotMatch(text, /Note check/);
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.note[card.note.length - 1].resolves, 'TS-003');
+});

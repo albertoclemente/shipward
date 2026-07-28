@@ -91,15 +91,30 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
+      "status": "review",
+      "claude": "done",
       "branch": "feat/note-lint",
-      "commit": null,
+      "commit": "fca311b",
       "note": [
         {
           "t": "2026-07-28T11:12:54.619Z",
           "kind": "brief",
           "text": "The one rung of the ladder that stays good faith: hooks can force touching Shipward but nothing can force a note worth reading — done with fixed-it satisfies every check. A gate would be gamed and then resented, so this is a NUDGE in the done() result text, never a rejection: when the note is missing or thin (few words, no decision/gotcha/verification signal), the tool answers with what the next session will be missing. Mirrors the pre-edit hook philosophy: warn, never block."
+        },
+        {
+          "t": "2026-07-28T11:39:20.641Z",
+          "kind": "outcome",
+          "text": "SHIPPED as a reply-side nudge in done(), never a gate. Three tiers: no note at all; trivial (fixed it / done / works, under ~25 extra chars); short with none of the signal words a note worth reading tends to carry (because, decided, tradeoff, gotcha, verified, root cause…). The signal scan only weighs in UNDER the 25-word floor — length is its own evidence of care, so a long note is never nagged about vocabulary."
+        },
+        {
+          "t": "2026-07-28T11:39:20.641Z",
+          "kind": "decision",
+          "text": "DECIDED: the nudge never blocks and the thin note is still written. A gate would be gamed within a day (pad the note to length) and resented for longer, and a padded note is WORSE than a thin one — it costs reading time and teaches the same nothing. resolves-only closes are exempt because the assertion is the note. This stays the one rung of the ladder that runs on good faith; the nudge just makes the faith legible at the moment it is cheapest to act on."
+        },
+        {
+          "t": "2026-07-28T11:39:20.641Z",
+          "kind": "evidence",
+          "text": "VERIFIED: 230 tests pass, 6 new — no-note nudges and still moves the card, fixed-it named for what it is, short-no-signal gets the gentler line, short-with-because passes clean, long passes clean, resolves-only exempt."
         }
       ],
       "created": "2026-07-28T11:12:54.619Z",
@@ -866,6 +881,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T11:39:20.641Z",
+      "p": "shipward",
+      "msg": "SW-029 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T11:35:56.397Z",
+      "p": "shipward",
+      "msg": "SW-029 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T11:35:43.990Z",
       "p": "shipward",

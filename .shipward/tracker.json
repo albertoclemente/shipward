@@ -17,9 +17,9 @@
       "type": "feature",
       "pri": "P3",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/fleet-view",
       "commit": null,
       "created": "2026-07-28T14:26:46.531Z",
       "pushed": null,
@@ -1098,6 +1098,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T14:32:40.986Z",
+      "p": "shipward",
+      "msg": "SW-034 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:32:01.032Z",
       "p": "shipward",

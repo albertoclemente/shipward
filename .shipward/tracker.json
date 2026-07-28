@@ -17,7 +17,7 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/fleet-link",
       "commit": "5302d84",
@@ -41,10 +41,15 @@
           "t": "2026-07-28T16:04:53.002Z",
           "kind": "evidence",
           "text": "VERIFIED as the full round trip in the live pane against the launchd service (kickstarted twice to pick up code): fleet → click Shipward → desk header shows ← fleet linking to http://localhost:4740/ → click → back on the fleet. 252 tests pass (fleetLinkFrom acceptance/rejection table, producer URL shape)."
+        },
+        {
+          "t": "2026-07-28T16:04:53.646Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 5302d84 is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T15:59:53.736Z",
-      "pushed": null,
+      "pushed": "2026-07-28T16:04:53.646Z",
       "shipped": null
     },
     {
@@ -1239,6 +1244,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T16:04:53.646Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-038 review → pushed",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T16:04:53.002Z",
       "p": "shipward",

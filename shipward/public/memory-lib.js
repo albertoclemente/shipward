@@ -20,6 +20,63 @@ import { cardsOf } from './lib.js';
 // entries laid down at different times.
 export const SEGMENT_SEP = ' || ';
 
+// SW-028, ratified by Alberto 2026-07-28: a note may also be an ARRAY of
+// entries — { t, text, kind?, resolves? } — instead of prose around an
+// unescaped delimiter. Everything below reads both. The three limits SW-013
+// documented all die with the structured form: an explicit `kind` cannot be
+// fooled by a note that merely QUOTES a marker word, an entry has no separator
+// to collide with, and `resolves` names the CARD whose open items this entry
+// settles — the cross-card link prose could never carry.
+//
+// String notes stay valid forever: CLAUDE.md documents hand-editing the tracker
+// as supported, and the classifier remains the fallback wherever a kind is not
+// stated.
+const VALID_KIND = (k) => ALL_KINDS.some((x) => x.key === k);
+
+// A card's note as raw segments, whichever form it is in. `kind`/`t`/`resolves`
+// are present only when the note actually stored them.
+export function noteSegments(note) {
+  if (Array.isArray(note)) {
+    return note
+      .filter((e) => e && typeof e.text === 'string' && e.text.trim())
+      .map((e) => ({
+        text: e.text.trim(),
+        kind: VALID_KIND(e.kind) ? e.kind : undefined,
+        t: typeof e.t === 'string' ? e.t : undefined,
+        resolves: typeof e.resolves === 'string' ? e.resolves : undefined,
+      }));
+  }
+  if (typeof note !== 'string' || !note) return [];
+  return note.split(SEGMENT_SEP).map((s) => s.trim()).filter(Boolean).map((text) => ({ text }));
+}
+
+// Append one entry to a note, whichever form it is in today. The single shared
+// implementation — MCP, the reconciler and the desk all append through this,
+// because two versions of "convert legacy prose, then push" would eventually
+// convert differently. A prose note converts on first structured append: its
+// segments become entries stamped with the card's own clock, which is exactly
+// the date the reader would have guessed for them anyway.
+export function appendedNote(note, createdFallback, entry) {
+  const prior = Array.isArray(note)
+    ? note.slice()
+    : noteSegments(note).map((s) => ({ t: createdFallback, text: s.text }));
+  return [...prior, entry];
+}
+
+// Render a note back as text — for the MCP `start` handoff and anywhere else a
+// human-or-model reads the whole thing in one piece. A string note passes
+// through untouched.
+export function noteText(note) {
+  if (typeof note === 'string') return note;
+  return noteSegments(note)
+    .map((s) => {
+      const stamp = [s.t ? s.t.slice(0, 10) : '', s.kind || ''].filter(Boolean).join(' · ');
+      const head = stamp ? `[${stamp}${s.resolves ? ` · resolves ${s.resolves}` : ''}] ` : '';
+      return head + s.text;
+    })
+    .join('\n\n');
+}
+
 // Ordered by how much it would cost to miss. A segment carrying several
 // markers takes the most expensive one: "SHIPPED … VERIFIED … LEFT STALE FOR
 // ALBERTO" is, to the person reading, an open item.
@@ -283,14 +340,30 @@ export const tokenScore = (entry, tokens) => (tokens || []).filter((t) => hits(e
 // would be worse than admitting the note only knows the card's own clock.
 export function memoryEntries(cards, projectId) {
   const out = [];
+  // Every card any entry explicitly resolves, mapped to its earliest resolver.
+  // Collected in a first pass because resolution crosses cards: SW-012 fixed
+  // the SPEC that SW-011 left stale, and no amount of same-card reading could
+  // ever see it.
+  const resolvedCards = new Map();
   for (const card of cardsOf(cards, projectId)) {
-    // validate() does not police `note`, and CLAUDE.md calls hand-editing the
-    // tracker supported, so a number or an object can reach here. It used to
-    // throw straight out of standup, the memory view and both MCP tools.
-    if (typeof card.note !== 'string' || !card.note) continue;
-    const segments = card.note.split(SEGMENT_SEP).map((s) => s.trim()).filter(Boolean);
-    segments.forEach((text, i) => {
-      const kind = classify(text, i === 0);
+    for (const seg of noteSegments(card.note)) {
+      if (seg.resolves && !resolvedCards.has(seg.resolves)) resolvedCards.set(seg.resolves, card.id);
+    }
+  }
+  for (const card of cardsOf(cards, projectId)) {
+    const segments = noteSegments(card.note);
+    segments.forEach((seg, i) => {
+      // A stored kind is a fact and wins; classification remains the guess it
+      // always was, for prose and for unlabelled entries. This is the mention-
+      // vs-use fix: an entry that QUOTES a marker word cannot misfile itself
+      // when its kind is stated.
+      const kind = seg.kind || classify(seg.text, i === 0);
+      const laterResolves = segments.slice(i + 1).some((s) => resolves(s.text) || s.resolves === card.id);
+      const resolver = resolvedCards.get(card.id);
+      // A card cannot settle its own past by pointing at itself from the same
+      // entry, but an explicit resolves from a LATER entry or another card is
+      // an assertion, not a guess.
+      const settledBy = resolver && resolver !== card.id ? resolver : (laterResolves ? card.id : null);
       out.push({
         id: `${card.id}#${i}`,
         card: card.id,
@@ -298,14 +371,17 @@ export function memoryEntries(cards, projectId) {
         status: card.status,
         commit: card.commit,
         branch: card.branch,
-        at: card.shipped || card.pushed || card.created,
+        // The entry's own clock when it has one; the card's otherwise.
+        at: seg.t || card.shipped || card.pushed || card.created,
         kind,
-        // Only an open item can be settled, and only by something written after
-        // it on the same card.
-        superseded: kind === 'open' && segments.slice(i + 1).some(resolves),
-        text,
-        refs: refs(text),
-        syms: symbols(text),
+        // Only an open item can be settled — by later assertive prose on the
+        // same card, or by any entry anywhere that explicitly resolves this card.
+        superseded: kind === 'open' && settledBy != null,
+        settledBy: kind === 'open' ? settledBy : null,
+        resolves: seg.resolves || null,
+        text: seg.text,
+        refs: refs(seg.text),
+        syms: symbols(seg.text),
       });
     });
   }

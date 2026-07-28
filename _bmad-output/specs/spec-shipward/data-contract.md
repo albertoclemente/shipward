@@ -23,10 +23,10 @@
 | `claude` | `queued` \| `working` \| `done` \| `null` — Claude Code's own state while `status: "claude"` |
 | `branch` | git branch, e.g. `feat/brew-timer`, or null |
 | `commit` | short sha of the latest relevant commit, or null |
-| `note` | context and decisions; Claude Code appends here |
+| `note` | context and decisions; Claude Code appends here. Since SW-028 (ratified 2026-07-28): an **array of entries** `{t, kind?, text, resolves?}` — `kind` ∈ `open\|finding\|decision\|evidence\|outcome\|brief` (omitted = classified from the text), `resolves` names a card id whose open items this entry settles. Legacy plain-string prose (segments joined by ` \|\| `) remains valid and converts on the next tool append |
 | `created` / `pushed` / `shipped` | ISO 8601 date-time, or null for the latter two |
 
-**Feed entry** — `{t, p, msg, by}`. `by` is `claude` or `user`. Newest first, capped at 200; entries are never edited, only pushed onto the front and truncated off the tail. The cap **truncates**; it never rejects. Rejecting a 201st entry froze the tracker permanently once the feed filled, since every card write appends one.
+**Feed entry** — `{t, p, msg, by}`. `by` is `claude` or `user`. Newest first, capped at 200; entries are never edited, only pushed onto the front and truncated off the tail. The cap **truncates**; it never rejects. Rejecting a 201st entry froze the tracker permanently once the feed filled, since every card write appends one. Since SW-027, whatever the cap truncates is appended to `.shipward/feed-archive.jsonl` (oldest first, one JSON object per line) by the store before the write — the feed is a window, the archive is the history.
 
 **MCP heartbeat** — `mcp: {lastSeen, pid}`, absent until an MCP server has run. Written every 60s by the running server and by nothing else; it is liveness, not board state, and carries no feed entry. Deliberately in `tracker.json` rather than a sidecar: a committed tracker therefore goes dirty in git about once a minute during a session, which was judged cheaper than two files that can disagree.
 

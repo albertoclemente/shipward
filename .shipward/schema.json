@@ -126,8 +126,50 @@
             "description": "short sha of the latest relevant commit"
           },
           "note": {
-            "type": "string",
-            "description": "context / decisions; Claude Code appends here"
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "legacy prose; segments separated by ' || '"
+              },
+              {
+                "type": "array",
+                "description": "structured entries, append-only in spirit (SW-028)",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "t",
+                    "text"
+                  ],
+                  "properties": {
+                    "t": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "when this entry was written"
+                    },
+                    "kind": {
+                      "enum": [
+                        "open",
+                        "finding",
+                        "decision",
+                        "evidence",
+                        "outcome",
+                        "brief"
+                      ],
+                      "description": "stated kind; omitted = classified from the text"
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "resolves": {
+                      "type": "string",
+                      "pattern": "^[A-Z]+-[0-9]{3}$",
+                      "description": "card id whose open items this entry settles"
+                    }
+                  }
+                }
+              }
+            ],
+            "description": "context / decisions; Claude Code appends here. String prose or an array of dated entries."
           },
           "created": {
             "type": "string",
@@ -171,7 +213,7 @@
           },
           "msg": {
             "type": "string",
-            "description": "one human-readable line, e.g. 'Claude Code pushed 3f8c21a — BW-014 moved to Review'"
+            "description": "one human-readable line, e.g. 'Claude Code pushed 3f8c21a \u2014 BW-014 moved to Review'"
           },
           "by": {
             "enum": [

@@ -285,7 +285,10 @@ test('session-start FIXES what git can prove and only reports the rest', async (
     const c = onDisk.cards.find((x) => x.id === 'TS-001');
     assert.ok(c.commit, 'the sha git already knew was written to the card');
     assert.equal(c.status, 'backlog', 'the inference was NOT applied — that needs an explicit ask');
-    assert.match(c.note, /\[git audit \d{4}-\d\d-\d\d\] commit → /, 'the card note records why it moved');
+    const entry = Array.isArray(c.note) ? c.note[c.note.length - 1] : null;
+    assert.ok(entry, 'the correction is a structured entry');
+    assert.equal(entry.kind, 'evidence');
+    assert.match(entry.text, /\[git audit \d{4}-\d\d-\d\d\] commit → /, 'the card note records why it moved');
     assert.equal(onDisk.feed.length, 1);
     assert.match(onDisk.feed[0].msg, /Reconciled with git/);
     assert.equal(onDisk.feed[0].by, 'claude');

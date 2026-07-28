@@ -462,3 +462,26 @@ test('an unwritable archive does not take the tracker write with it', async () =
   assert.equal(doc.feed.length, 1, 'the tracker write must land regardless');
   assert.match(stderr, /could not archive 1 feed entry/, 'but not silently');
 });
+
+/* ── structured note validation (SW-028) ─────────────────── */
+
+test('validate accepts both note forms and rejects malformed entries', async () => {
+  const base = seed();
+  const mk = (note) => JSON.parse(JSON.stringify({ ...base, cards: [{ ...card(1), note }] }));
+  const v = async (doc) => {
+    const { validate } = await import(STORE);
+    return validate(doc);
+  };
+
+  assert.equal(await v(mk('plain prose')), null);
+  assert.equal(await v(mk([])), null);
+  assert.equal(await v(mk([{ t: '2026-07-28T10:00:00Z', text: 'x' }])), null);
+  assert.equal(await v(mk([{ t: '2026-07-28T10:00:00Z', kind: 'finding', text: 'x', resolves: 'TS-001' }])), null);
+
+  assert.match(await v(mk(42)), /note must be a string or an array/);
+  assert.match(await v(mk([{ t: '2026-07-28T10:00:00Z' }])), /text must be a string/);
+  assert.match(await v(mk([{ text: 'x' }])), /t must be a date-time/);
+  assert.match(await v(mk([{ t: 'yesterday-ish', text: 'x' }])), /t must be a date-time/);
+  assert.match(await v(mk([{ t: '2026-07-28T10:00:00Z', text: 'x', kind: 'vibe' }])), /kind is invalid/);
+  assert.match(await v(mk([{ t: '2026-07-28T10:00:00Z', text: 'x', resolves: 'not-an-id' }])), /resolves must be a card id/);
+});

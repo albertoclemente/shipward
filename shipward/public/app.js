@@ -7,6 +7,7 @@ import {
 } from './lib.js';
 import {
   memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen,
+  noteSegments, appendedNote,
 } from './memory-lib.js';
 
 const POLL_MS = 3000;
@@ -143,6 +144,7 @@ function moveCard(id, to) {
 }
 
 async function saveCard(values, opened) {
+  const { noteAdd, ...edits } = values;
   const ok = await commit((doc) => {
     if (state.editing !== 'new') {
       const i = doc.cards.findIndex((c) => c.id === state.editing);
@@ -151,9 +153,14 @@ async function saveCard(values, opened) {
       // from when it opened; Claude Code may have appended to `note` on disk
       // since, and that context is the memory this product exists to keep.
       const touched = {};
-      for (const [k, v] of Object.entries(values)) {
+      for (const [k, v] of Object.entries(edits)) {
         if (opened && v === opened[k]) continue;
         touched[k] = v;
+      }
+      // Appended against the note as it stands NOW, not as the dialog saw it —
+      // an entry Claude filed while the dialog was open survives the save.
+      if (noteAdd) {
+        touched.note = appendedNote(doc.cards[i].note, doc.cards[i].created, { t: now(), text: noteAdd });
       }
       if (!Object.keys(touched).length) return null;
       doc.cards[i] = { ...doc.cards[i], ...touched };
@@ -165,7 +172,7 @@ async function saveCard(values, opened) {
     const id = nextId(doc.cards, project.prefix);
     doc.cards.unshift({
       id, p: project.id, status: 'backlog', claude: null, commit: null,
-      created: now(), pushed: null, shipped: null, ...values,
+      created: now(), pushed: null, shipped: null, ...edits,
     });
     doc.feed = feedAdd(doc.feed, project.id, addMsg(id), now());
     return doc;
@@ -475,8 +482,12 @@ function renderMemoryEntry(e) {
       }),
       el('span', { class: 'mem-entry-title', text: e.title }),
       e.superseded
-        // Say why it is dimmed. An unexplained grey block reads as broken.
-        ? el('span', { class: 'mem-entry-flag', text: 'answered later on this card' })
+        // Say why it is dimmed — and by WHOM, now that resolution can arrive
+        // from another card entirely. An unexplained grey block reads as broken.
+        ? el('span', { class: 'mem-entry-flag',
+            text: e.settledBy && e.settledBy !== e.card
+              ? `answered by ${e.settledBy}`
+              : 'answered later on this card' })
         : null,
       el('span', { class: 'text-muted mem-entry-date', text: fmtDate(e.at) }),
     ),
@@ -623,13 +634,22 @@ function renderDialog(doc, project) {
       const fd = new FormData(e.currentTarget);
       const title = String(fd.get('title') || '').trim();
       if (!title) return;                              // required — dialog stays open
+      const noteRaw = String(fd.get('note') || '');
       saveCard({
         title,
         type: fd.get('type') || 'feature',
         pri: fd.get('pri') || 'P2',
         effort: fd.get('effort') || 'M',
         branch: String(fd.get('branch') || '').trim() || null,
-        note: String(fd.get('note') || ''),
+        // Three shapes on purpose: a new card's note starts life as its brief
+        // entry; a structured note APPENDS (against the live card, not the
+        // dialog's snapshot — Claude may have added entries since it opened);
+        // a legacy prose note keeps the old replace-the-string behaviour.
+        ...(card
+          ? (Array.isArray(c.note)
+              ? { noteAdd: noteRaw.trim() }
+              : { note: noteRaw })
+          : { note: noteRaw.trim() ? [{ t: now(), kind: 'brief', text: noteRaw.trim() }] : [] }),
       }, opened);
     } },
     el('div', { style: 'display:flex;align-items:baseline;gap:10px' },
@@ -654,10 +674,26 @@ function renderDialog(doc, project) {
       el('input', { class: 'input', name: 'branch', value: c.branch || '', placeholder: 'feat/…',
         style: 'font-family:var(--font-mono);font-size:13px' }),
     ),
+    // A structured note renders as its history and grows by appending — the
+    // writing rules always said "append-only in spirit", and entries make that
+    // the shape of the form instead of a norm to remember. A legacy prose note
+    // keeps the old editable textarea; hand-edited trackers still exist.
+    Array.isArray(c.note) && c.note.length
+      ? el('div', { class: 'field' },
+          el('label', { text: `Note so far — ${c.note.length} entr${c.note.length === 1 ? 'y' : 'ies'}, appended as work happened` }),
+          el('div', { class: 'dlg-entries' }, noteSegments(c.note).map((s) =>
+            el('div', { class: 'dlg-entry' },
+              el('div', { class: 'text-muted dlg-entry-meta',
+                text: [s.t ? s.t.slice(0, 10) : '', s.kind, s.resolves ? `resolves ${s.resolves}` : ''].filter(Boolean).join(' · ') }),
+              el('div', { class: 'dlg-entry-text', text: s.text }),
+            ))),
+        )
+      : null,
     el('div', { class: 'field' },
-      el('label', { text: 'Notes for Claude — optional' }),
+      el('label', { text: card && Array.isArray(c.note) ? 'Add a note — optional, appended as a new entry' : 'Notes for Claude — optional' }),
       el('textarea', { class: 'input', name: 'note', style: 'min-height:64px',
-        placeholder: 'Context Claude Code sees when it picks this up over MCP' }, c.note || ''),
+        placeholder: 'Context Claude Code sees when it picks this up over MCP' },
+        card && !Array.isArray(c.note) ? (c.note || '') : ''),
     ),
     el('div', { class: 'dialog-actions' },
       el('button', { type: 'submit', class: 'btn btn-primary', text: card ? 'Save changes' : 'Add to Backlog' }),

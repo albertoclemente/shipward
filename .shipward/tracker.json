@@ -11,6 +11,43 @@
   ],
   "cards": [
     {
+      "id": "SW-036",
+      "p": "shipward",
+      "title": "Onboard from the fleet — a button, not a command",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "S",
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/onboard-button",
+      "commit": "64c1a7d",
+      "note": [
+        {
+          "t": "2026-07-28T15:10:33.807Z",
+          "kind": "brief",
+          "text": "Alberto: I do not want commands, I want something easier. The fleet already walks the projects folder, so it can SEE git repos that are not onboarded yet. They become rows — dimmed, with an Onboard button — and the button POSTs to the fleet server, which runs the same setup.mjs the command line runs. SAFETY SHAPE: the endpoint never takes a path on faith — it re-scans and only onboards a repo the walk itself found under the root with a .git and no tracker, so the API cannot be aimed at an arbitrary directory; the server stays bound to 127.0.0.1."
+        },
+        {
+          "t": "2026-07-28T15:17:08.943Z",
+          "kind": "outcome",
+          "text": "SHIPPED. The fleet_s walk now surfaces CANDIDATES — git repos with no tracker — as dimmed dashed rows with an Onboard button. Click → confirm → POST /api/onboard → the server runs the same setup.mjs the command line runs (one implementation of wiring), the row comes back as a live board with its own desk. The endpoint re-scans and accepts only a repo the walk itself just offered: no arbitrary paths, no already-onboarded boards, no gitless dirs; server stays on 127.0.0.1."
+        },
+        {
+          "t": "2026-07-28T15:17:08.943Z",
+          "kind": "finding",
+          "text": "GOTCHA THAT KILLED THE PAGE SILENTLY: strings inside the server-side PAGE template literal need DOUBLE-escaped newlines — a plain backslash-n became a real newline in the served source, snapped a quoted JS string mid-sentence, and the resulting syntax error killed the ENTIRE page script, which the poll_s catch-all then hid (page stuck on Scanning… with an empty console). Found by curling the served page and running node --check on the extracted script. Two sites fixed (confirm and alert strings); regression test now extracts the served script and asserts new Function() accepts it, so no future template-escape slip can ship a dead page."
+        },
+        {
+          "t": "2026-07-28T15:17:08.943Z",
+          "kind": "evidence",
+          "text": "VERIFIED against the real projects folder: the fleet at ~/projects showed 1 board + 9 candidates, and Catch was onboarded BY CLICKING ITS BUTTON in the live page — fulfilling Alberto_s standing onboard-catch request the way he asked for it (no commands). Catch now: .shipward/tracker.json with project catch-grocery-app prefix CA, hooks merged into its EXISTING .claude/settings.json (nothing clobbered), protocol appended to its EXISTING CLAUDE.md, and the fleet shows it as a live board with its own desk. 249 tests pass, 3 new (candidate discovery + button round-trip, endpoint refusals, served-script-parses)."
+        }
+      ],
+      "created": "2026-07-28T15:10:33.807Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-034",
       "p": "shipward",
       "title": "Fleet view — one page over every onboarded board",
@@ -1123,6 +1160,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T15:17:08.943Z",
+      "p": "shipward",
+      "msg": "SW-036 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T15:10:33.807Z",
+      "p": "shipward",
+      "msg": "SW-036 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:36:27.883Z",
       "p": "shipward",

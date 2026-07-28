@@ -109,8 +109,55 @@ test('the index page is served and self-contained', async () => {
   // The comment in the page says "never innerHTML" — match the ASSIGNMENT,
   // not the vocabulary, or the rule's own documentation trips the test.
   assert.doesNotMatch(html, /\.innerHTML\s*=/, 'DOM building only — the desk rule (SW-025) holds here too');
+  // And the page's script must PARSE — a template-literal escape slip once
+  // shipped a real newline inside a JS string and killed the whole script,
+  // which the poll's catch-all then hid completely.
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+  assert.doesNotThrow(() => new Function(script), 'the served page script is valid JavaScript');
 });
 
+
+/* ── onboarding over HTTP (SW-036) ───────────────────────── */
+
+test('a git repo without a tracker is listed as a candidate, and the button onboards it', async () => {
+  // gamma: a git repo the walk should offer to onboard.
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const sh = promisify(execFile);
+  await mkdir(join(root, 'gamma'));
+  await sh('git', ['init', '-q'], { cwd: join(root, 'gamma') });
+
+  let rows = await fleetRows({ needDesks: false });
+  const cand = rows.find((r) => r.kind === 'candidate' && r.folder === 'gamma');
+  assert.ok(cand, 'gamma is offered');
+
+  const res = await fetch(`${base}/api/onboard`, {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ repo: cand.repo }),
+  });
+  assert.equal(res.status, 200);
+  assert.equal((await res.json()).ok, true);
+
+  const { existsSync } = await import('node:fs');
+  assert.ok(existsSync(join(root, 'gamma', '.shipward', 'tracker.json')), 'the tracker exists');
+  assert.ok(existsSync(join(root, 'gamma', '.claude', 'settings.json')), 'the hooks exist');
+
+  rows = await fleetRows({ needDesks: false });
+  const board = rows.find((r) => r.kind === 'board' && r.folder === 'gamma');
+  assert.ok(board?.ok, 'the candidate came back as a live board');
+});
+
+test('the endpoint refuses anything the walk did not offer', async () => {
+  for (const repo of ['/etc', join(root, 'decoy'), null, join(root, 'alpha')]) {
+    const res = await fetch(`${base}/api/onboard`, {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ repo }),
+    });
+    assert.equal(res.status, 400, `${repo} must be refused`);
+  }
+});
+
+// Runs LAST on purpose: it kills the fleet every other test talks to.
 test('killing the fleet takes every desk down with it', async () => {
   const rows = await fleetRows();
   const pids = rows.map((r) => r.pid).filter(Boolean);

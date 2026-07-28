@@ -106,12 +106,47 @@ async function tracker() {
 
 /* ── the four hooks ──────────────────────────────────────── */
 
+// The board says what someone remembered to write down; git says what happened.
+// Measured at ~130ms for this repo, which is worth paying once at session start
+// and never on a per-turn hook. Budgeted anyway: a slow or enormous repository
+// must delay a session by a bounded amount, or not at all.
+const AUDIT_BUDGET_MS = 2500;
+const DRIFT_SHOWN = 6;
+
+async function drift(doc, project) {
+  try {
+    const git = await import(join(ROOT, 'shipward', 'git.mjs'));
+    // Default the repo rather than passing ROOT: git.mjs honours SHIPWARD_REPO,
+    // and overriding it here would silently defeat that.
+    const audit = git.auditBoard(doc.cards, project.id);
+    const timeout = new Promise((resolve) => {
+      const t = setTimeout(() => resolve(null), AUDIT_BUDGET_MS);
+      t.unref?.();
+    });
+    const out = await Promise.race([audit, timeout]);
+    // Timed out, or git could not be read. Silence, not a guess: "we do not
+    // know" must never render as "nothing is wrong".
+    if (!out || out.reason || !out.findings.length) return '';
+
+    const shown = out.findings.slice(0, DRIFT_SHOWN);
+    const lines = shown.map((f) => `  ${f.id || '(no card)'} [${f.rule}] board says ${f.says}; git says ${f.git}`);
+    if (out.findings.length > shown.length) {
+      lines.push(`  …and ${out.findings.length - shown.length} more`);
+    }
+    return `\n\nThe board and git disagree. ${git.summarise(out.findings)}\n${lines.join('\n')}\n`
+      + 'Nothing has been changed. sync({fromGit:true}) shows the full picture; add apply:true to write the safe fixes.';
+  } catch {
+    return '';                     // an audit is never worth a session
+  }
+}
+
 async function sessionStart() {
   const { doc, project, standup } = await tracker();
   context('SessionStart',
     `Shipward — the tracker is your memory for this repo, and this is its current state. `
     + `You did not ask for it because a session that has to remember to look is a session that will not.\n\n`
-    + `${standup.standupText(doc, project)}\n\n`
+    + `${standup.standupText(doc, project)}`
+    + `${await drift(doc, project)}\n\n`
     + `Before editing a file you have not touched yet, call recall({file:"…"}).`);
 }
 

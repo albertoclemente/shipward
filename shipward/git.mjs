@@ -17,7 +17,10 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const run = promisify(execFile);
-export const REPO = join(dirname(fileURLToPath(import.meta.url)), '..');
+// SHIPWARD_REPO overrides the repository, mirroring SHIPWARD_TRACKER. It exists
+// so the audit can be tested against a staged repository instead of this one —
+// without it the only way to exercise a finding is to break the real board.
+export const REPO = process.env.SHIPWARD_REPO || join(dirname(fileURLToPath(import.meta.url)), '..');
 
 // Never throws, never rejects. A missing repo, a detached HEAD, a git that is
 // not installed — all of it is "we do not know", which must read differently
@@ -69,6 +72,21 @@ export async function readGit(cwd = REPO) {
   }
 
   return { ok: true, trunk, branches };
+}
+
+// One list of what is on the trunk, instead of one process per card.
+// merge-base --is-ancestor is cheap but a process spawn is not: 22 of them cost
+// 134ms sequentially and no less in parallel, because spawning is the cost.
+// This is a single call. The window is bounded so a very old repository cannot
+// make session start expensive; anything outside it falls back to asking
+// directly, which is correct just slower.
+const TRUNK_WINDOW = 5000;
+
+export async function trunkIndex(trunk, cwd = REPO) {
+  const out = await git(['rev-list', `--max-count=${TRUNK_WINDOW}`, trunk], cwd);
+  if (out === null) return null;
+  // Keyed on the abbreviation git itself hands out, which is what a card holds.
+  return new Set(lines(out).map((sha) => sha.slice(0, 7)));
 }
 
 // Is this commit already on the trunk? The branch may be long deleted — which
@@ -169,6 +187,27 @@ export function deriveFindings(cards, facts) {
   }
 
   return findings;
+}
+
+// The whole audit, in one place, because two callers need it — the sync tool
+// and the SessionStart hook — and two implementations of "what does git say
+// about the board" would eventually disagree about it.
+export async function auditBoard(cards, projectId, cwd = REPO) {
+  const facts = await readGit(cwd);
+  if (!facts.ok) return { facts, findings: [], reason: facts.reason };
+
+  const mine = cards.filter((c) => c.p === projectId);
+  // Only where the answer can change a finding.
+  const needsTrunk = new Set(['pushed', 'shipped', 'claude', 'review']);
+  const index = await trunkIndex(facts.trunk, cwd);
+  const resolved = await Promise.all(mine.map(async (c) => {
+    if (!c.commit || !needsTrunk.has(c.status)) return { ...c, onTrunk: null };
+    if (index?.has(String(c.commit).slice(0, 7))) return { ...c, onTrunk: true };
+    // Not in the window, or no index at all: ask about this one directly rather
+    // than reporting a false "never landed".
+    return { ...c, onTrunk: await isOnTrunk(c.commit, facts.trunk, cwd) };
+  }));
+  return { facts, findings: deriveFindings(resolved, facts), reason: null };
 }
 
 export const summarise = (findings) => {

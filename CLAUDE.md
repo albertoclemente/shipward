@@ -56,7 +56,7 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 
 | Hook | Does |
 |---|---|
-| `SessionStart` | injects a standup before you ask for one |
+| `SessionStart` | injects a standup before you ask for one, plus any place the board and git disagree |
 | `UserPromptSubmit` | injects one line naming the active card, every turn |
 | `PreToolUse` on edits | **warns** — never blocks — when source changes with no card in progress |
 | `Stop` | refuses to end the session while a card is still `working` with no `done` |

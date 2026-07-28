@@ -237,3 +237,92 @@ test('pre-edit sees a notebook, whose path parameter is not file_path', async ()
   assert.match(parsed.systemMessage, /no card in progress/,
     'NotebookEdit was in the matcher but could never warn');
 });
+
+
+/* -- git drift in the session opener (SW-023) --------------- */
+
+// A repository staged with the SW-005 slip: a branch carrying real work while
+// the card is still sitting in Backlog.
+async function repoWithDrift() {
+  const { execFile: ex } = await import('node:child_process');
+  const { promisify: p } = await import('node:util');
+  const sh = p(ex);
+  const repo = await mkdtemp(join(tmpdir(), 'shipward-hookgit-'));
+  const g = (...a) => sh('git', a, { cwd: repo });
+  await g('init', '-q', '-b', 'main');
+  await g('config', 'user.email', 'test@example.com');
+  await g('config', 'user.name', 'Test');
+  await writeFile(join(repo, 'a.txt'), 'one');
+  await g('add', '-A'); await g('commit', '-qm', 'first');
+  await g('checkout', '-qb', 'feat/mcp-server');
+  await writeFile(join(repo, 'b.txt'), 'two');
+  await g('add', '-A'); await g('commit', '-qm', 'work');
+  await g('checkout', '-q', 'main');
+  return repo;
+}
+
+test('session-start reports drift between the board and git', async () => {
+  const repo = await repoWithDrift();
+  try {
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
+    ])));
+    const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const ctx = parsed.hookSpecificOutput.additionalContext;
+
+    assert.match(ctx, /The board and git disagree/);
+    assert.match(ctx, /started-without-saying/, 'the SW-005 slip, caught before any work begins');
+    assert.match(ctx, /Nothing has been changed/, 'the opener reports, it never fixes');
+    assert.match(ctx, /Claude working \(0\)/, 'and the standup is still there');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('session-start says nothing about git when the board matches', async () => {
+  // The drift repo is NOT clean for this purpose: its feature branch carries
+  // work no card claims, which is a finding in its own right. Correctly so —
+  // the first version of this test asserted otherwise and was simply wrong.
+  const repo = await repoWithDrift();
+  try {
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'claude', claude: 'working', branch: 'feat/mcp-server', commit: 'ffffff0' }),
+    ])));
+    const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const ctx = parsed.hookSpecificOutput.additionalContext;
+    assert.doesNotMatch(ctx, /started-without-saying|untracked-branch|no-branch/,
+      'a board that matches git earns no drift paragraph');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('an unreadable repository is silence, never a false all-clear', async () => {
+  // "We do not know" must not render as "nothing is wrong".
+  const plain = await mkdtemp(join(tmpdir(), 'shipward-nogit-'));
+  try {
+    await writeFile(tracker, JSON.stringify(seed([card({ id: 'TS-001', status: 'backlog' })])));
+    const { code, parsed } = await run('session-start', {}, { SHIPWARD_REPO: plain });
+    assert.equal(code, 0);
+    const ctx = parsed.hookSpecificOutput.additionalContext;
+    assert.doesNotMatch(ctx, /disagree/);
+    assert.doesNotMatch(ctx, /matches git/, 'it must not claim the board is clean either');
+    assert.match(ctx, /Claude working/, 'and the standup still arrives');
+  } finally {
+    await rm(plain, { recursive: true, force: true });
+  }
+});
+
+test('the audit runs only at session start, never on a per-turn hook', async () => {
+  const repo = await repoWithDrift();
+  try {
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
+    ])));
+    const { parsed } = await run('prompt', {}, { SHIPWARD_REPO: repo });
+    assert.doesNotMatch(parsed.hookSpecificOutput.additionalContext, /disagree/,
+      'the prompt hook is paid for on every turn — it stays one line');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});

@@ -19,11 +19,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readRaw, mutate, TRACKER } from './tracker-store.mjs';
 import {
-  nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, cardsOf, fmtDate,
+  nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, fmtDate,
 } from './public/lib.js';
 import { memoryEntries, recall as recallEntries, ALL_KINDS } from './public/memory-lib.js';
 import { standupText, line } from './standup.mjs';
-import { readGit, isOnTrunk, deriveFindings, summarise, REPO } from './git.mjs';
+import { auditBoard, summarise, REPO } from './git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -414,16 +414,8 @@ async function doneCard({ id, commit, note, pushed = false }, signal) {
 // Ask git what happened, and compare. Read-only: this produces findings, never
 // changes anything.
 async function auditAgainstGit(doc, project) {
-  const facts = await readGit(REPO);
-  if (!facts.ok) return { facts, findings: [], note: `git could not be read — ${facts.reason}` };
-
-  const mine = cardsOf(doc.cards, project.id);
-  // Resolving "is this sha on the trunk" is I/O, so it happens here and the
-  // rules stay pure.
-  const resolved = await Promise.all(mine.map(async (c) => ({
-    ...c, onTrunk: c.commit ? await isOnTrunk(c.commit, facts.trunk, REPO) : null,
-  })));
-  return { facts, findings: deriveFindings(resolved, facts), note: null };
+  const { findings, reason } = await auditBoard(doc.cards, project.id, REPO);
+  return { findings, note: reason ? `git could not be read — ${reason}` : null };
 }
 
 const renderFindings = (findings, trunk) => findings.map((f) => {

@@ -290,7 +290,7 @@ function renderArchive(doc, project) {
       el('h3', { class: 'view-title', text: 'Shipped & archived' }),
       el('p', { class: 'text-muted view-lede', text: archiveLede(project.name, rows.length) }),
       rows.length
-        ? el('table', { class: 'table archive-table' },
+        ? el('div', { class: 'table-scroll' }, el('table', { class: 'table archive-table' },
             el('thead', {},
               el('tr', {},
                 el('th', { class: 'w-date', text: 'Shipped' }),
@@ -309,7 +309,7 @@ function renderArchive(doc, project) {
                 el('td', { text: r.effort }),
                 el('td', { class: 'cell-mono', text: r.commit }),
               ))),
-          )
+          ))
         : el('div', { class: 'text-muted view-empty',
             text: 'Nothing archived yet. Push something, then file it here.' }),
     ),

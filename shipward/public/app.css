@@ -150,8 +150,14 @@ textarea.input { min-height: 90px; resize: vertical; }
 .tag-outline { border: 1px solid var(--color-accent); color: var(--color-accent); }
 
 /* ── nav ─────────────────────────────────────────────────── */
+/* Wrapping is unconditional rather than behind a media query: nothing wraps
+   while there is room, so there is no breakpoint to keep in sync with the
+   contents. Without it the brand, the project switch, the MCP tag and the
+   button sat on one unbreakable row and pushed the document to 444px — see
+   SW-026, which measured it on every view before assuming it was the header. */
 .nav {
-  display: flex; align-items: center; gap: var(--space-6);
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
   padding: var(--space-3) var(--space-4);
   border-bottom: 2px solid var(--color-divider);
 }
@@ -186,7 +192,8 @@ textarea.input { min-height: 90px; resize: vertical; }
 .mcp-dot { width: 7px; height: 7px; background: var(--color-accent); animation: swm-blink 2.4s ease-in-out infinite; }
 
 .activity {
-  display: flex; align-items: center; gap: var(--space-3);
+  display: flex; align-items: center; flex-wrap: wrap;
+  gap: 2px var(--space-3);
   padding: var(--space-2) var(--space-4);
   border-bottom: 2px solid var(--color-divider);
   font-size: 12px; min-height: 40px;
@@ -222,6 +229,10 @@ textarea.input { min-height: 90px; resize: vertical; }
 .table td { padding: var(--space-2); border-bottom: 1px solid var(--color-divider); }
 .table tbody tr:hover { background: color-mix(in srgb, var(--color-text) 4%, transparent); }
 
+/* Six columns of tabular data have a genuine minimum width. Scroll the table,
+   not the document. */
+.table-scroll { overflow-x: auto; margin-top: var(--space-4); }
+.table-scroll .table { min-width: 640px; }
 .archive-table { margin-top: var(--space-4); }
 .archive-table .w-date, .archive-table .w-id, .archive-table .w-type { width: 90px; }
 .archive-table .w-effort { width: 70px; }
@@ -230,9 +241,15 @@ textarea.input { min-height: 90px; resize: vertical; }
 .cell-mono { font-family: var(--font-mono); font-size: 12px; }
 .cell-what { font-family: var(--font-heading); font-weight: 600; }
 
-.board-wrap { flex: 1; padding: var(--space-4); }
+/* A four-column kanban does not fit a phone, and squeezing it to ~87px per
+   column does not make it fit — it makes it unreadable AND still overflowing.
+   So the columns keep a floor and the BOARD scrolls sideways inside its own
+   wrapper, which is how a kanban is meant to behave on a narrow screen. The
+   page body never scrolls horizontally. minmax's floor never binds above
+   ~840px, so desktop layout is byte-for-byte unchanged. */
+.board-wrap { flex: 1; min-width: 0; padding: var(--space-4); overflow-x: auto; }
 .board {
-  display: grid; grid-template-columns: repeat(4, 1fr);
+  display: grid; grid-template-columns: repeat(4, minmax(200px, 1fr));
   border: 2px solid var(--color-divider); min-height: 700px; align-items: stretch;
 }
 .col { display: flex; flex-direction: column; min-width: 0; background: transparent; }

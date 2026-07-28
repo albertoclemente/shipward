@@ -17,7 +17,7 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/fleet-service",
       "commit": "d72c32f",
@@ -36,10 +36,15 @@
           "t": "2026-07-28T15:40:38.956Z",
           "kind": "evidence",
           "text": "VERIFIED live on this machine: installed against /Users/alberto/projects, status showed the pid, the page answered with 10 boards; then the fleet PROCESS WAS KILLED and launchd restarted it under a new pid within seconds, page answering 200 — KeepAlive proven by execution, not by reading the man page. Plist tested as data: paths pinned, XML-hostile root escaped not injected, tag balance checked because a malformed plist fails SILENTLY at login, the worst possible failure mode. 251 tests pass, 2 new."
+        },
+        {
+          "t": "2026-07-28T15:40:39.771Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — d72c32f is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-28T15:38:50.949Z",
-      "pushed": null,
+      "pushed": "2026-07-28T15:40:39.771Z",
       "shipped": null
     },
     {
@@ -1197,6 +1202,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T15:40:39.771Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-037 review → pushed",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T15:40:38.956Z",
       "p": "shipward",

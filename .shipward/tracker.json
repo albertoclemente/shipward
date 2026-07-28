@@ -61,12 +61,12 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/setup",
       "commit": "09965c3",
       "created": "2026-07-28T14:18:52.470Z",
-      "pushed": null,
+      "pushed": "2026-07-28T14:27:39.431Z",
       "shipped": null,
       "note": [
         {
@@ -93,6 +93,11 @@
           "t": "2026-07-28T14:26:46.531Z",
           "kind": "evidence",
           "text": "VERIFIED end to end with a real headless Claude Code session in a throwaway onboarded repo: SessionStart standup arrived unasked describing the Demo Project empty board, the shipward MCP server connected and log allocated DP-001 into the demo_s own tracker (heartbeat written), CLAUDE.md carried the protocol — and this repo_s tracker held zero DP cards. 239 tests pass, 5 new. Test traps found: kept-messages contain the word wired so the idempotence regex needed a column anchor, and macOS spells one temp dir two ways (/var vs /private/var) so paths compare by realpath."
+        },
+        {
+          "t": "2026-07-28T14:27:39.431Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-28] status → pushed — 09965c3 is already on main (branch gone). The board said review."
         }
       ]
     },
@@ -1088,6 +1093,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T14:27:39.431Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-033 review → pushed",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:26:46.531Z",
       "p": "shipward",

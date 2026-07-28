@@ -17,10 +17,10 @@
       "type": "feature",
       "pri": "P3",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "feat/fleet-view",
-      "commit": null,
+      "commit": "3d6809b",
       "created": "2026-07-28T14:26:46.531Z",
       "pushed": null,
       "shipped": null,
@@ -29,6 +29,21 @@
           "t": "2026-07-28T14:26:46.531Z",
           "kind": "brief",
           "text": "The deferred half of SW-033. With per-repo trackers, Alberto_s choose-a-folder wish becomes: point the desk at ~/projects, scan depth-2 for .shipward/tracker.json, and render a fleet index — one row per project with in-flight count, waiting count, last feed line and a link into that repo_s board. Deliberately deferred: serving N trackers from one process means per-tracker etags and PUT routing, and the single-repo flow had to prove itself first (DP-001 in the demo repo is that proof). Build when two or more real projects are onboarded and switching desks is the felt pain."
+        },
+        {
+          "t": "2026-07-28T14:36:27.352Z",
+          "kind": "decision",
+          "text": "DESIGN CALL that made the card cheap: the fleet NEVER serves a board. It spawns one child desk per discovered tracker — the ordinary serve.mjs, pinned with the same explicit-env belt the tests wear since the SW-033 incident — and links to the port each child reports. The per-tracker etag/PUT-routing surgery this card was deferred for simply never needs to exist; process isolation buys what code sharing would have cost. One node process per board is nothing at solo scale."
+        },
+        {
+          "t": "2026-07-28T14:36:27.352Z",
+          "kind": "outcome",
+          "text": "SHIPPED. fleet.mjs <root> on :4740 — depth-2 scan, rows with working/review/backlog/pushed counts + last feed line, busiest board first, names link into each repo_s full desk. Unreadable tracker = flagged row with no desk; vanished tracker kills its child; SIGINT/SIGTERM/exit take every desk down. Index page is self-contained (renders even with every desk dead) and DOM-built — the security hook flagged my first innerHTML rendering and the fix was to follow the desk_s own SW-025 rule rather than argue my escaping was sufficient."
+        },
+        {
+          "t": "2026-07-28T14:36:27.352Z",
+          "kind": "evidence",
+          "text": "VERIFIED live over the session scratchpad: the scan honestly surfaced 11 boards — the two staged demos PLUS every leftover sandbox from today_s work, which is exactly what pointing at a real folder does. Demo Project sorted first with 1 working; its link served the right tracker (curl on the child port returned Demo Project, DP-001). Fleet tests kill the fleet and assert the children are dead by pid. 247 tests pass, 5 new; the real tracker measured byte-identical across the suite. TEST TRAP, same species as SW-033_s: the page COMMENT says never innerHTML, so the no-innerHTML assertion had to match the assignment, not the vocabulary."
         }
       ]
     },
@@ -1098,6 +1113,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T14:36:27.352Z",
+      "p": "shipward",
+      "msg": "SW-034 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T14:32:40.986Z",
       "p": "shipward",

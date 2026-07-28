@@ -361,3 +361,44 @@ textarea.input { min-height: 90px; resize: vertical; }
 }
 .mem-ref:hover { color: var(--color-accent-700); border-bottom-color: var(--color-accent); }
 .mem-group-settled { font-size: 11px; }
+
+/* ── the log (SW-025) ──────────────────────────────────────
+   A record, not a dashboard: dense rows, one line each, so a day reads as a
+   day rather than as a stack of cards. */
+.log-day { margin-bottom: var(--space-8); }
+.log-day-head {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  border-bottom: 1px solid var(--color-neutral-200);
+  padding-bottom: 6px; margin-bottom: var(--space-2);
+}
+.log-day-label { margin: 0; font-family: var(--font-heading); font-weight: 800; font-size: 15px; }
+.log-day-date { font-size: 11px; }
+.log-day-n { font-size: 11px; margin-left: auto; flex: none; }
+
+.log-list { list-style: none; margin: 0; padding: 0; }
+.log-row {
+  display: flex; align-items: baseline; gap: var(--space-2);
+  padding: 5px 0 5px var(--space-2);
+  border-left: 2px solid var(--color-neutral-200);
+  font-size: 13px; line-height: 1.5;
+}
+/* Your own moves read differently from Claude's — the whole point of the view
+   is telling one from the other at a glance. */
+.log-row.is-mine { border-left-color: var(--color-accent); }
+
+.log-time { font-family: var(--font-mono); font-size: 11px; color: var(--color-neutral-600); flex: none; }
+.log-who {
+  font-size: 10px; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--color-neutral-600); flex: none; min-width: 8.5ch;
+}
+.log-who.is-mine { color: var(--color-accent-700); font-weight: 600; }
+/* inline, not flex: the ids sit INSIDE the sentence, so the parts have to flow
+   as text rather than as boxes with gaps between them. */
+.log-msg { max-width: 92ch; }
+.log-tz { font-size: 11px; margin-top: -2px; }
+.log-id {
+  font-family: var(--font-mono); font-size: 10.5px; color: var(--color-neutral-600);
+  background: transparent; border: none; border-bottom: 1px dotted var(--color-neutral-400);
+  padding: 0; cursor: pointer;
+}
+.log-id:hover { color: var(--color-accent-700); border-bottom-color: var(--color-accent); }

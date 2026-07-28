@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   fmtDate, relTime, autoBranch, nextId, moveMsg, applyTransition,
-  feedAdd, deriveColumns, deriveStats, latestFeed, FEED_CAP,
+  feedAdd, deriveColumns, deriveStats, latestFeed, feedDays, feedLede, messageParts, FEED_CAP,
   archiveRows, archiveLede, mcpStatus, MCP_STALE_MS,
 } from './public/lib.js';
 
@@ -239,4 +239,124 @@ test('a heartbeat from the future reads as live, not as infinitely stale', () =>
   const now = Date.parse('2026-07-27T12:00:00Z');
   const ahead = { mcp: { lastSeen: new Date(now + 5000).toISOString() } };
   assert.equal(mcpStatus(ahead, now).connected, true, 'a disagreeing clock is not a dead server');
+});
+
+/* ── the log (SW-025) ────────────────────────────────────── */
+
+const at = (t, msg, by = 'claude', p = 'shipward') => ({ t, p, msg, by });
+const NOW = new Date('2026-07-28T14:00:00Z');
+
+test('feedDays groups by UTC day, newest first', () => {
+  const days = feedDays([
+    at('2026-07-26T23:30:00Z', 'older'),
+    at('2026-07-28T09:00:00Z', 'this morning'),
+    at('2026-07-27T10:00:00Z', 'yesterday midmorning'),
+    at('2026-07-28T11:00:00Z', 'later this morning'),
+  ], 'shipward', { now: NOW });
+
+  assert.deepEqual(days.map((d) => d.label), ['Today', 'Yesterday', 'Sun Jul 26']);
+  assert.deepEqual(days[0].entries.map((e) => e.msg), ['later this morning', 'this morning']);
+  assert.deepEqual(days[0].entries.map((e) => e.time), ['11:00', '09:00']);
+});
+
+test('feedDays groups in UTC, matching how the same date is displayed', () => {
+  // 23:30Z is the 26th everywhere the tracker renders it. Grouping in local
+  // time would file it under the 27th for any reader east of UTC while
+  // fmtDate still said Jul 26 — one entry, two dates, in one view.
+  const days = feedDays([at('2026-07-26T23:30:00Z', 'late')], 'shipward', { now: NOW });
+  assert.equal(days[0].date, 'Jul 26');
+  assert.equal(days[0].entries[0].time, '23:30');
+});
+
+test('feedDays ignores other projects and unparseable timestamps', () => {
+  const days = feedDays([
+    at('2026-07-28T09:00:00Z', 'mine'),
+    at('2026-07-28T09:00:00Z', 'theirs', 'claude', 'other'),
+    at('not a date', 'junk'),
+  ], 'shipward', { now: NOW });
+  assert.equal(days.length, 1);
+  assert.deepEqual(days[0].entries.map((e) => e.msg), ['mine']);
+});
+
+test('feedDays attributes honestly', () => {
+  const days = feedDays([
+    at('2026-07-28T09:00:00Z', 'a drag', 'user'),
+    at('2026-07-28T08:00:00Z', 'a tool call', 'claude'),
+  ], 'shipward', { now: NOW });
+  assert.deepEqual(days[0].entries.map((e) => e.by), ['You', 'Claude Code']);
+  assert.deepEqual(days[0].entries.map((e) => e.mine), [true, false]);
+});
+
+test('feedDays links only card ids that exist', () => {
+  // "SW-024" and "UTF-8" are the same shape; only one of them is a card.
+  const feed = [at('2026-07-28T09:00:00Z', 'SW-024 moved to Review, UTF-8 fixed in SW-999')];
+  const loose = feedDays(feed, 'shipward', { now: NOW });
+  assert.deepEqual(loose[0].entries[0].ids, ['SW-024', 'UTF-8', 'SW-999']);
+
+  const checked = feedDays(feed, 'shipward', { now: NOW, ids: new Set(['SW-024']) });
+  assert.deepEqual(checked[0].entries[0].ids, ['SW-024']);
+});
+
+test('feedDays does not repeat an id mentioned twice in one line', () => {
+  const days = feedDays([at('2026-07-28T09:00:00Z', 'SW-024 superseded by SW-024')], 'shipward', { now: NOW });
+  assert.deepEqual(days[0].entries[0].ids, ['SW-024']);
+});
+
+test('feedLede counts who did what, and says when the cap has bitten', () => {
+  const days = feedDays([
+    at('2026-07-28T09:00:00Z', 'a', 'user'),
+    at('2026-07-28T08:00:00Z', 'b'),
+    at('2026-07-27T08:00:00Z', 'c'),
+  ], 'shipward', { now: NOW });
+
+  assert.equal(feedLede(days), '3 entries over 2 days, 2 by Claude Code, 1 by you.');
+  assert.match(feedLede(days, { capped: true }), new RegExp(`most recent ${FEED_CAP} — anything older has rolled off`));
+
+  // "1 entries" reads like a bug in a product whose whole pitch is care.
+  const solo = feedDays([at('2026-07-28T09:00:00Z', 'a')], 'shipward', { now: NOW });
+  assert.equal(feedLede(solo), '1 entry in one day, written by Claude Code.');
+
+  const yours = feedDays([
+    at('2026-07-28T09:00:00Z', 'a', 'user'),
+    at('2026-07-28T08:00:00Z', 'b', 'user'),
+  ], 'shipward', { now: NOW });
+  assert.equal(feedLede(yours), '2 entries in one day, every one written by you.');
+});
+
+test('feedLede says something useful when there is nothing', () => {
+  assert.match(feedLede([]), /fills itself as work moves/);
+});
+
+test('messageParts makes the id in the sentence the link, not a copy of it', () => {
+  // The first cut appended a chip per line, rendering the same id twice — once
+  // as prose, once as a button — in a view whose whole job is reading cleanly.
+  const parts = messageParts('SW-025 moved to Review', new Set(['SW-025']));
+  assert.deepEqual(parts, [{ id: 'SW-025' }, { text: ' moved to Review' }]);
+
+  assert.deepEqual(
+    messageParts('fixed SW-001 and SW-002 today', new Set(['SW-001', 'SW-002'])),
+    [{ text: 'fixed ' }, { id: 'SW-001' }, { text: ' and ' }, { id: 'SW-002' }, { text: ' today' }],
+  );
+});
+
+test('messageParts leaves a message with no ids in one piece', () => {
+  assert.deepEqual(messageParts('23 cards filed to the archive', new Set(['SW-001'])),
+    [{ text: '23 cards filed to the archive' }]);
+  // An id-shaped token that is not a card stays as text rather than becoming a
+  // button that opens nothing.
+  assert.deepEqual(messageParts('fixed the UTF-8 handling', new Set(['SW-001'])),
+    [{ text: 'fixed the UTF-8 handling' }]);
+});
+
+test('rejoining the parts reproduces the message exactly', () => {
+  for (const msg of [
+    'SW-025 moved to Review — give it a look',
+    'Reconciled with git — SW-024 → claude',
+    'no ids at all here',
+    'SW-001',
+  ]) {
+    const back = messageParts(msg, new Set(['SW-001', 'SW-024', 'SW-025']))
+      .map((p) => p.id || p.text).join('');
+    assert.equal(back, msg, 'no character may be dropped or duplicated in the split');
+  }
 });

@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-026",
+      "p": "shipward",
+      "title": "The desk overflows horizontally below ~444px",
+      "type": "bug",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": "Found while verifying the SW-025 log view at 375px. NOT a regression from that card — measured document.scrollWidth at 444px on ALL FOUR views (Board, Log, Memory, Archive) against a 375px client width, so the source is shared chrome, almost certainly the header: brand + project segmented control + MCP tag + New card button on one row with no wrap. Every view inherits it. LOW PRIORITY BY INTENT: this is a desk that runs on localhost next to an editor, and nobody has opened it on a phone. Logged because a measured number is worth more later than a vague memory that something looked cramped.",
+      "created": "2026-07-28T10:39:47.595Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-025",
       "p": "shipward",
       "title": "The feed is the product — a log, not one line",
@@ -412,6 +428,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T10:39:47.595Z",
+      "p": "shipward",
+      "msg": "You added SW-026 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T10:33:13.220Z",
       "p": "shipward",

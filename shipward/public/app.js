@@ -2,8 +2,8 @@
 // The tracker file is the state; this is a view over it that can also write.
 import {
   COLUMNS, fmtDate, relTime, nextId, moveMsg, applyTransition,
-  feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed,
-  archiveRows, archiveLede, addMsg, editMsg, deleteMsg, mcpStatus,
+  feedAdd, cardsOf, deriveColumns, deriveStats, latestFeed, feedDays, feedLede,
+  archiveRows, archiveLede, addMsg, editMsg, deleteMsg, mcpStatus, FEED_CAP,
 } from './lib.js';
 import {
   memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen,
@@ -204,7 +204,8 @@ function render() {
 
   const view = state.view === 'archive' ? renderArchive(doc, project)
     : state.view === 'memory' ? renderMemory(doc, project)
-    : renderBoard(doc, project);
+      : state.view === 'log' ? renderFeed(doc, project)
+        : renderBoard(doc, project);
 
   root.replaceChildren(
     renderHeader(doc, project),
@@ -266,8 +267,10 @@ function renderActivity(feed, stats, project) {
 function renderTabs(doc, project) {
   const archived = cardsOf(doc.cards, project.id).filter((c) => c.status === 'shipped').length;
   const open = stillOpen(memoryEntries(doc.cards, project.id)).length;
+  const logged = doc.feed.filter((f) => f.p === project.id).length;
   const tabs = [
     ['board', 'Board'],
+    ['log', `Log · ${logged}`],
     ['memory', `Memory${open ? ` · ${open} open` : ''}`],
     ['archive', `Archive · ${archived}`],
   ];
@@ -309,6 +312,60 @@ function renderArchive(doc, project) {
           )
         : el('div', { class: 'text-muted view-empty',
             text: 'Nothing archived yet. Push something, then file it here.' }),
+    ),
+  );
+}
+
+// The log. The board says where things stand; this says what happened, which is
+// the only one of the two that can show you a day you were not here for.
+//
+// The tracker has been keeping this since the first commit — 80 entries by the
+// time this shipped — and the desk rendered exactly one line of it, in the
+// activity strip, discarding the rest at render time.
+function renderFeed(doc, project) {
+  const ids = new Set(cardsOf(doc.cards, project.id).map((c) => c.id));
+  const days = feedDays(doc.feed, project.id, { ids });
+  const capped = doc.feed.length >= FEED_CAP;
+
+  return el('main', { class: 'view-wrap' },
+    el('div', { class: 'view-body' },
+      el('h3', { class: 'view-title', text: `What happened on ${project.name}` }),
+      el('p', { class: 'text-muted view-lede', text: feedLede(days, { capped }) }),
+      // The rest of the desk reads timestamps with UTC getters on purpose, so
+      // this does too — and says so, because a time of day is a moment someone
+      // lived through and an unlabelled one is just wrong to anyone east of
+      // Greenwich.
+      days.length
+        ? el('p', { class: 'text-muted log-tz', text: 'Times in UTC.' })
+        : null,
+
+      days.length
+        ? days.map((day) =>
+            el('section', { class: 'log-day' },
+              el('div', { class: 'log-day-head' },
+                el('h4', { class: 'log-day-label', text: day.label }),
+                el('span', { class: 'text-muted log-day-date', text: day.date }),
+                el('span', { class: 'text-muted log-day-n',
+                  text: day.entries.length === 1 ? '1 entry' : `${day.entries.length} entries` }),
+              ),
+              el('ol', { class: 'log-list' }, day.entries.map((e) =>
+                el('li', { class: `log-row${e.mine ? ' is-mine' : ''}` },
+                  el('span', { class: 'log-time', text: e.time }),
+                  el('span', { class: `log-who${e.mine ? ' is-mine' : ''}`, text: e.by }),
+                  // Every part is a text node or a button — never innerHTML. A
+                  // card title can arrive from an issue body, and this is the
+                  // one view that renders every message ever written rather
+                  // than only the newest.
+                  el('span', { class: 'log-msg' }, e.parts.map((p) => (p.id
+                    ? el('button', {
+                        class: 'log-id', text: p.id, title: `Open ${p.id}`,
+                        onclick: () => openDialog(p.id),
+                      })
+                    : el('span', { text: p.text })))),
+                ))),
+            ))
+        : el('div', { class: 'text-muted view-empty',
+            text: 'Nothing logged yet. This fills itself as work moves — you never write to it.' }),
     ),
   );
 }

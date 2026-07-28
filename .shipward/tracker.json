@@ -11,6 +11,22 @@
   ],
   "cards": [
     {
+      "id": "SW-022",
+      "p": "shipward",
+      "title": "sync reads git itself — derive status instead of asserting it",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/sync-reads-git",
+      "commit": null,
+      "note": "The (b) angle from the divergence exercise, narrowest useful slice. sync today applies fixes but requires Claude to work out the truth from git and hand it over, so it only corrects drift someone already noticed. THREE PIECES OF EVIDENCE FROM 2026-07-27, all real slips not hypotheticals: SW-008 carried a null commit for two days until the merge sync backfilled it by hand; the SPEC accumulated nine false statements in a single day and only got fixed when Alberto asked; and I built the entire MCP server against a card still sitting in Backlog because I forgot to call start, caught by accident while running standup for something else. Every one is drift. Hooks only nag — they cannot tell you the board is WRONG. Git can, because git does not drift. DESIGN: shipward/git.mjs does the I/O and nothing else; the rules live in a pure deriveFindings(cards, facts) so they are testable without a repo, the same split lib.js uses. Six rules, each from a real slip: a commit that is not an ancestor of main on a pushed card; a missing commit where the branch has one; a merged branch on a card still in claude or review; a branch with commits against a backlog card (my SW-005 slip); a claude card with no branch at all; and a feat/fix/chore branch no card references. SAFE BY DEFAULT: fromGit is a DRY RUN and reports; apply:true is required to write, because a tool that can mass-mutate the board on a wrong inference should need to be asked twice.",
+      "created": "2026-07-28T07:42:32.102Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-021",
       "p": "shipward",
       "title": "MCP cancellation is accepted and ignored",
@@ -348,6 +364,18 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-28T07:42:32.411Z",
+      "p": "shipward",
+      "msg": "SW-022 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-28T07:42:32.102Z",
+      "p": "shipward",
+      "msg": "You added SW-022 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-28T07:26:14.536Z",
       "p": "shipward",
@@ -776,7 +804,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-28T07:26:14.517Z",
-    "pid": 97706
+    "lastSeen": "2026-07-28T07:44:34.616Z",
+    "pid": 99119
   }
 }

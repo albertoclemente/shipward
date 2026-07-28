@@ -19,10 +19,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readRaw, mutate, TRACKER } from './tracker-store.mjs';
 import {
-  nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, fmtDate,
+  nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, cardsOf, fmtDate,
 } from './public/lib.js';
 import { memoryEntries, recall as recallEntries, ALL_KINDS } from './public/memory-lib.js';
 import { standupText, line } from './standup.mjs';
+import { readGit, isOnTrunk, deriveFindings, summarise, REPO } from './git.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -204,11 +205,13 @@ const TOOLS = [
     name: 'sync',
     title: 'Sync with reality',
     description:
-      'Reconcile the tracker with git in one atomic write: apply status/commit corrections, add cards for work that exists in git but not on the board, and record a single feed entry describing the audit. Work out the truth from git yourself, then pass the fixes here.',
+      'Reconcile the tracker with git. Call it with fromGit:true to have it read the repository itself — branches, commits, what is merged — and report every place the board disagrees; that is a DRY RUN and changes nothing. Call it again with fromGit:true, apply:true and a summary to write the fixes it can make safely. You can also pass your own updates and create entries, which always win over anything derived.',
     inputSchema: {
       type: 'object',
       properties: {
-        summary: str('One line describing what the audit found. Recorded in the feed.'),
+        summary: str('One line describing what the audit found. Recorded in the feed. Required to write anything.'),
+        fromGit: { type: 'boolean', description: 'Read the repository and derive the discrepancies. Reports only, unless apply is also true.' },
+        apply: { type: 'boolean', description: 'Write the derived fixes. Ignored unless fromGit is set.' },
         updates: {
           type: 'array',
           description: 'Corrections to existing cards.',
@@ -408,7 +411,43 @@ async function doneCard({ id, commit, note, pushed = false }, signal) {
   ].join('\n');
 }
 
-async function syncCards({ summary, updates = [], create = [], project: wanted }, signal) {
+// Ask git what happened, and compare. Read-only: this produces findings, never
+// changes anything.
+async function auditAgainstGit(doc, project) {
+  const facts = await readGit(REPO);
+  if (!facts.ok) return { facts, findings: [], note: `git could not be read — ${facts.reason}` };
+
+  const mine = cardsOf(doc.cards, project.id);
+  // Resolving "is this sha on the trunk" is I/O, so it happens here and the
+  // rules stay pure.
+  const resolved = await Promise.all(mine.map(async (c) => ({
+    ...c, onTrunk: c.commit ? await isOnTrunk(c.commit, facts.trunk, REPO) : null,
+  })));
+  return { facts, findings: deriveFindings(resolved, facts), note: null };
+}
+
+const renderFindings = (findings, trunk) => findings.map((f) => {
+  const head = f.id ? `${f.id} [${f.rule}]` : `(no card) [${f.rule}]`;
+  const fix = f.fix
+    ? `→ would set ${Object.entries(f.fix).map(([k, v]) => `${k}=${v}`).join(', ')}`
+    : '→ needs a human';
+  return `  ${head}\n      board: ${f.says}\n      git:   ${f.git}\n      ${fix}`;
+}).join('\n');
+
+async function syncCards({ summary, updates = [], create = [], fromGit = false, apply = false, project: wanted }, signal) {
+  // The git audit is a dry run unless asked twice. A tool that can rewrite the
+  // whole board off an inference should not do it on the first ask.
+  if (fromGit && !apply) {
+    const { doc } = await readRaw();
+    const project = projectOf(doc, wanted);
+    const { findings, note } = await auditAgainstGit(doc, project);
+    if (note) return note;
+    if (!findings.length) return summarise(findings);
+    return `${summarise(findings)}\n\n${renderFindings(findings)}\n\n`
+      + 'Nothing has been changed. Call sync again with apply:true and a summary to write the applicable ones, '
+      + 'or pass your own updates if git is wrong.';
+  }
+
   const headline = asText(summary, 'summary').trim();
   if (!headline) throw new ToolError('sync needs a one-line summary for the feed');
   for (const [i, c] of create.entries()) {
@@ -420,6 +459,20 @@ async function syncCards({ summary, updates = [], create = [], project: wanted }
     asText(c?.note, `create[${i}].note`);
   }
   for (const [i, u] of updates.entries()) asText(u?.note, `updates[${i}].note`);
+
+  // Derived fixes are merged in front of the caller's own, so an explicit
+  // update always wins: git is the better witness, but the caller may know
+  // something git cannot see.
+  let derived = [];
+  if (fromGit) {
+    const { doc } = await readRaw();
+    const project = projectOf(doc, wanted);
+    const { findings, note } = await auditAgainstGit(doc, project);
+    if (note) throw new ToolError(note);
+    derived = findings.filter((f) => f.fix && f.id).map((f) => ({ id: f.id, ...f.fix }));
+    const byId = new Map(updates.map((u) => [u.id, u]));
+    updates = [...derived.filter((d) => !byId.has(d.id)), ...updates];
+  }
 
   const changed = [];
   const added = [];
@@ -463,7 +516,8 @@ async function syncCards({ summary, updates = [], create = [], project: wanted }
     doc.feed = feedAdd(doc.feed, home, `Synced with git — ${headline}`, nowIso(), 'claude');
     return doc;
   }, { signal });
-  const lines = [`Sync applied: ${changed.length} updated, ${added.length} created.`];
+  const lines = [`Sync applied: ${changed.length} updated, ${added.length} created.`
+    + (derived.length ? ` ${derived.length} derived from git.` : '')];
   for (const l of changed) lines.push(`  ${l}`);
   for (const l of added) lines.push(`  + ${l}`);
   return lines.join('\n');

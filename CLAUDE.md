@@ -13,7 +13,7 @@ An MCP server exposes the tracker as five tools. **Prefer them** — they hold a
 | `log` | add a backlog card the moment work is discovered or promised |
 | `start` | take a card — sets `claude`/`working`, names a branch, hands back the note |
 | `done` | hand a card back — `review` (or `pushed`), sets `commit`, appends to the note |
-| `sync` | reconcile the board with git in one atomic write |
+| `sync` | reconcile the board with git — `fromGit:true` reads the repository itself and reports the drift; add `apply:true` to write the fixes |
 
 Registered in `.mcp.json`. Run it standalone with `node shipward/mcp.mjs`; it logs to stderr and speaks JSON-RPC on stdout.
 
@@ -39,6 +39,7 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 3. **While working:** append decisions and gotchas to the card's `note`. Update `commit` with the latest short sha after each meaningful commit.
 4. **Finishing a task:** call `done` (sets `review`, `claude: "done"`, `commit`, appends your note). Only the human moves `review` → `pushed`, unless they tell you to. When something is deployed, pass `pushed: true`.
 5. **Discovering work:** any bug found, TODO left, or follow-up promised gets a `log` immediately — nothing lives only in your head or in code comments.
+5b. **When the board and git might disagree** — after a merge, or at the start of a session that follows one — call `sync({fromGit: true})`. It reads the repository and reports what does not match. It changes nothing until you ask again with `apply: true`.
 6. **Session end:** every card you touched reflects reality; add one `feed` entry summarizing the session.
 7. **Every write** to a card also appends a `feed` entry (`by: "claude"`), newest first, cap 200. The MCP tools do this for you; a direct edit must do it by hand.
 

@@ -169,6 +169,23 @@ export const LABEL = {
   'never-verified': 'unproven',
 };
 
+// The panel's shape, decided without a DOM (SW-047). renderTrust used to build
+// these groups inline while creating elements, so the only way to check that a
+// heading matched its rows was to look at the page — and four of the five
+// categories cannot be produced by an honest repo, so nobody ever did.
+//
+// Assumes the findings are already ranked: grouping a ranked list preserves the
+// order rankFindings chose, and re-sorting here would silently overrule it.
+export function groupFindings(findings) {
+  const groups = [];
+  for (const f of findings || []) {
+    const last = groups[groups.length - 1];
+    if (last && last.rule === f.rule) last.items.push(f);
+    else groups.push({ rule: f.rule, heading: HEADING[f.rule] || f.rule, items: [f] });
+  }
+  return groups.map((g) => ({ ...g, label: `${g.heading} · ${g.items.length}` }));
+}
+
 export const HEADING = {
   'not-on-trunk': 'Claims git contradicts',
   'untracked-branch': 'Work no card claims',

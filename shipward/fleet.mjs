@@ -28,6 +28,15 @@ import { deriveStats, latestFeed, relTime } from './public/lib.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SERVE = join(HERE, 'serve.mjs');
+const PUBLIC = join(HERE, 'public');
+
+// The only files this server will hand out (SW-047). An allow-list, not a
+// directory: the fleet walks the user's entire projects root, so a path-joining
+// mistake in a generic static handler would serve anything on disk.
+const SERVED = {
+  '/fleet-client.js': 'fleet-client.js',
+  '/fleet-view.js': 'fleet-view.js',
+};
 
 const ROOT = resolve(process.argv[2] || process.env.SHIPWARD_FLEET_ROOT || process.cwd());
 const PORT = Number(process.env.SHIPWARD_FLEET_PORT ?? 4740);
@@ -213,90 +222,7 @@ const PAGE = `<!doctype html>
   <p class="lede" id="lede">Scanning…</p>
   <div id="rows" role="status"></div>
 </main>
-<script>
-  // Built with DOM nodes, never innerHTML — the same rule the desk follows
-  // (SW-025): a project name or feed message is tracker data, and tracker data
-  // can arrive from anywhere. textContent cannot be mis-escaped.
-  const el = (tag, cls, text) => {
-    const n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (text != null) n.textContent = text;
-    return n;
-  };
-  function candidateNode(r) {
-    const row = el('div', 'row cand');
-    row.append(el('span', 'name dead', r.name));
-    row.append(el('span', 'tagline', r.folder + ' — a git repo, not on Shipward yet'));
-    const btn = el('button', 'onboard', 'Onboard');
-    btn.onclick = async () => {
-      // Escaped once for THIS file's template literal, so the page receives a
-      // literal backslash-n. An unescaped pair here became a real newline in
-      // the served source, snapped this string across lines, and killed the
-      // entire script with a syntax error the poll's catch never sees.
-      if (!confirm('Wire ' + r.name + ' to Shipward?\\n\\nAdds .shipward/, hooks, MCP registration and the CLAUDE.md protocol to that repo. Additive and reversible; nothing existing is overwritten.')) return;
-      btn.disabled = true;
-      btn.textContent = 'Wiring…';
-      try {
-        const out = await (await fetch('/api/onboard', { method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ repo: r.repo }) })).json();
-        if (!out.ok) { alert('Onboarding failed:\\n' + (out.error || out.output)); btn.disabled = false; btn.textContent = 'Onboard'; return; }
-      } catch (e) { alert('Onboarding failed: ' + e); btn.disabled = false; btn.textContent = 'Onboard'; return; }
-      refresh();   // the row comes back as a live board with its own desk
-    };
-    row.append(btn);
-    return row;
-  }
-  function rowNode(r) {
-    if (r.kind === 'candidate') return candidateNode(r);
-    const row = el('div', r.ok ? 'row' : 'row dead');
-    // Parsed, not pattern-matched: the SW-034 origin-only regex silently
-    // unlinked every board the moment SW-038 appended ?fleet= — the producer
-    // grew, the consumer's pattern didn't. URL() checks what actually matters
-    // (local http origin, no path) and survives the next added param.
-    const okDesk = (h) => { try { const u = new URL(h);
-      return u.protocol === 'http:' && (u.hostname === 'localhost' || u.hostname === '127.0.0.1') && u.pathname === '/';
-    } catch { return false; } };
-    if (r.ok && r.desk && okDesk(r.desk)) {
-      const a = el('a', 'name', r.name);
-      a.href = r.desk;
-      row.append(a);
-    } else {
-      row.append(el('span', r.ok ? 'name dead' : 'name', r.name));
-    }
-    if (!r.ok) { row.append(el('span', 'down', r.error)); return row; }
-    row.append(el('span', 'prefix', r.prefix + '-… · ' + r.folder));
-    const stats = el('span', 'stats');
-    stats.append(el('b', null, String(r.working)), ' working · ',
-      el('b', null, String(r.review)), ' review · ',
-      r.backlog + ' backlog · ' + r.pushed + ' pushed');
-    row.append(stats);
-    if (r.deskError) row.append(el('span', 'down', r.deskError));
-    if (r.last) {
-      const last = el('span', 'last');
-      last.append(el('span', 'who', r.last.by), ' ' + r.last.msg + ' · ' + r.last.ago);
-      row.append(last);
-    }
-    return row;
-  }
-  async function refresh() {
-    try {
-      const rows = await (await fetch('/api/fleet')).json();
-      const boards = rows.filter((r) => r.kind === 'board');
-      const cands = rows.length - boards.length;
-      const active = boards.filter((r) => r.ok && (r.working + r.review) > 0).length;
-      document.getElementById('lede').textContent =
-        boards.length + ' board' + (boards.length === 1 ? '' : 's') + ' — ' + active + ' with something in flight'
-        + (cands ? ' · ' + cands + ' repo' + (cands === 1 ? '' : 's') + ' not onboarded yet' : '')
-        + '. Click a name to open its desk.';
-      const box = document.getElementById('rows');
-      box.replaceChildren(...(rows.length ? rows.map(rowNode)
-        : [el('p', 'lede', 'No .shipward/tracker.json under this root. Onboard a repo with shipward/setup.mjs.')]));
-    } catch { /* the poll rides out a hiccup */ }
-  }
-  refresh();
-  setInterval(refresh, 5000);
-</script>
+<script type="module" src="/fleet-client.js"></script>
 </body></html>`;
 
 /* ── server ──────────────────────────────────────────────── */
@@ -305,7 +231,14 @@ const log = (...a) => console.log(`fleet: ${a.join(' ')}`);
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');
   try {
-    if (url.pathname === '/api/fleet') {
+    // SW-047. The page's script is a real module now, so it has to be served.
+    // Confined to an allow-list rather than a static directory: this server
+    // walks the user's whole projects root, and a path-joining bug here would
+    // hand any file on disk to a browser.
+    if (SERVED[url.pathname]) {
+      res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+      res.end(await readFile(join(PUBLIC, SERVED[url.pathname]), 'utf8'));
+    } else if (url.pathname === '/api/fleet') {
       res.writeHead(200, { 'content-type': 'application/json' });
       res.end(JSON.stringify(await rows()));
     } else if (url.pathname === '/api/onboard' && req.method === 'POST') {

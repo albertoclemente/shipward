@@ -6,7 +6,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  trustFindings, rankFindings, trustLede, checksBegan, STALE_REVIEW_DAYS, REPORTED_RULES,
+  trustFindings, rankFindings, trustLede, checksBegan, groupFindings, HEADING, LABEL,
+  STALE_REVIEW_DAYS, REPORTED_RULES,
 } from './public/trust-lib.js';
 
 const NOW = Date.parse('2026-07-31T12:00:00Z');
@@ -175,4 +176,49 @@ test('the lede counts by rule so a reader knows the shape before reading', () =>
   assert.match(text, /3 things/);
   assert.match(text, /1 claiming to have landed/);
   assert.match(text, /2 waiting too long/);
+});
+
+/* ── SW-047: the panel's shape, without a DOM ────────────── */
+
+test('consecutive findings of a rule become one group with a counted heading', () => {
+  const groups = groupFindings([
+    { rule: 'not-on-trunk', card: 'SW-001' },
+    { rule: 'stale-review', card: 'SW-002' },
+    { rule: 'stale-review', card: 'SW-003' },
+  ]);
+  assert.deepEqual(groups.map((g) => g.label), ['Claims git contradicts · 1', 'Waiting on you · 2']);
+  assert.equal(groups[1].items.length, 2);
+});
+
+test('grouping preserves the order ranking chose, and never re-sorts', () => {
+  // Grouping a ranked list must not overrule the ranking. If this ever sorted
+  // by its own idea of importance, rankFindings would be silently dead code.
+  const ranked = rankFindings([
+    { rule: 'never-verified', card: 'SW-003' },
+    { rule: 'not-on-trunk', card: 'SW-001' },
+  ]);
+  assert.deepEqual(groupFindings(ranked).map((g) => g.rule), ['not-on-trunk', 'never-verified']);
+});
+
+test('an unknown rule still renders rather than vanishing', () => {
+  // A finding whose rule nobody labelled must not disappear from the panel —
+  // silently dropping what a rule does not recognise is how a board with
+  // something wrong looks identical to a board with nothing wrong.
+  const [g] = groupFindings([{ rule: 'something-new', card: 'SW-009' }]);
+  assert.equal(g.heading, 'something-new');
+  assert.equal(g.items.length, 1);
+});
+
+test('nothing to group is no groups, not one empty group', () => {
+  assert.deepEqual(groupFindings([]), []);
+  assert.deepEqual(groupFindings(null), []);
+});
+
+test('every rule the panel can produce has a heading and a lede label', () => {
+  // The producer/consumer drift this card exists to stop: a rule added to
+  // trustFindings with no entry here would render as a raw slug.
+  for (const rule of ['not-on-trunk', 'untracked-branch', 'uncarded-changes', 'stale-review', 'never-verified']) {
+    assert.ok(HEADING[rule], `${rule} needs a heading`);
+    assert.ok(LABEL[rule], `${rule} needs a lede label`);
+  }
 });

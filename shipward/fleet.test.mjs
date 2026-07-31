@@ -107,20 +107,44 @@ test('each child desk serves ITS OWN board — isolation is the whole point', as
   }
 });
 
-test('the index page is served and self-contained', async () => {
+test('the index page loads its script as a served module', async () => {
   const html = await (await fetch(`${base}/`)).text();
   assert.match(html, /the fleet/);
-  assert.match(html, /\/api\/fleet/);
-  // The comment in the page says "never innerHTML" — match the ASSIGNMENT,
-  // not the vocabulary, or the rule's own documentation trips the test.
-  assert.doesNotMatch(html, /\.innerHTML\s*=/, 'DOM building only — the desk rule (SW-025) holds here too');
-  // And the page's script must PARSE — a template-literal escape slip once
-  // shipped a real newline inside a JS string and killed the whole script,
-  // which the poll's catch-all then hid completely.
-  const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-  assert.doesNotThrow(() => new Function(script), 'the served page script is valid JavaScript');
+  // SW-047 moved the script out of the PAGE template into a real file. The
+  // page no longer mentions /api/fleet because it no longer contains the
+  // fetch — it names the module that does.
+  assert.match(html, /<script type="module" src="\/fleet-client\.js">/);
+  assert.doesNotMatch(html, /<script>/, 'no inline script left to mis-escape');
 });
 
+test('the served module is real JavaScript, and it is the thing that calls the API', async () => {
+  // The old test compiled the inline script with new Function() to prove a
+  // template-literal escape slip had not shipped a broken string (SW-036).
+  // That hazard is gone with the literal; what replaces the check is that the
+  // module is actually served, parses, and still reaches the endpoint.
+  const res = await fetch(`${base}/fleet-client.js`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /javascript/);
+  const src = await res.text();
+  assert.match(src, /\/api\/fleet/, 'the poll moved here with the script');
+  assert.doesNotMatch(src, /\.innerHTML\s*=/, 'DOM building only — the desk rule (SW-025) holds here too');
+  assert.match(src, /from '\.\/fleet-view\.js'/, 'and the decisions live in the tested module');
+});
+
+test('the view module is served too, or the client cannot import it', async () => {
+  const res = await fetch(`${base}/fleet-view.js`);
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /export function deskHref/);
+});
+
+test('the server hands out nothing but its two modules', async () => {
+  // An allow-list, not a static directory: this server walks the user's whole
+  // projects root.
+  for (const path of ['/fleet.mjs', '/../fleet.mjs', '/public/lib.js', '/serve.mjs']) {
+    const res = await fetch(`${base}${path}`);
+    assert.notEqual(res.status, 200, `${path} must not be served`);
+  }
+});
 
 /* ── onboarding over HTTP (SW-036) ───────────────────────── */
 

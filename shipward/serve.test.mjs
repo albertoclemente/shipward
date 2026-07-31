@@ -35,6 +35,7 @@ before(async () => {
   // /api/drift (SW-044) asks git, so the sandbox needs that module too — without
   // it the endpoint would fail soft forever and its test would prove nothing.
   await cp(join(HERE, 'git.mjs'), join(sandbox, 'shipward', 'git.mjs'));
+  // /api/trust (SW-045) needs the rules too; public/ is already copied whole.
 
   // SHIPWARD_PORT=0 lets the OS pick. A fixed port meant a leftover server from
   // an earlier run kept the port, this spawn died on EADDRINUSE, and the suite
@@ -277,5 +278,18 @@ test('/api/drift is read-only', async () => {
   // It spawns git. A write verb reaching it would be a way to make the desk do
   // work on request, and there is nothing there to write anyway.
   const res = await fetch(`${base}/api/drift`, { method: 'PUT', body: '{}' });
+  assert.equal(res.status, 405);
+});
+
+test('GET /api/trust reports findings and whether it could look', async () => {
+  const res = await fetch(`${base}/api/trust`);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(typeof body.known, 'boolean');
+  assert.ok(Array.isArray(body.findings));
+});
+
+test('/api/trust is read-only', async () => {
+  const res = await fetch(`${base}/api/trust`, { method: 'PUT', body: '{}' });
   assert.equal(res.status, 405);
 });

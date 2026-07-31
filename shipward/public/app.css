@@ -482,3 +482,28 @@ textarea.input { min-height: 90px; resize: vertical; }
   padding: 4px 8px; border: 1px solid var(--color-neutral-400);
 }
 .nav-fleet:hover { color: var(--color-accent); border-color: var(--color-accent); }
+
+/* ── trust panel (SW-045) ────────────────────────────────── */
+/* No red, deliberately. Every row here is a QUESTION, not a fault: git can
+   prove some of these claims are wrong, but none of them can be settled
+   without a human, and an alarm colour would assert the stronger thing. The
+   accent rule on the left is the same device the memory entries use. */
+.trust-lede { max-width: 78ch; }
+.trust-group { margin-top: var(--space-6); }
+.trust-heading {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-divider);
+  color: var(--color-neutral-800);
+}
+.trust-row {
+  display: flex; flex-direction: column; gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  margin-top: var(--space-2);
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-neutral-400);
+}
+/* The only category where the board is making a false claim right now. */
+.trust-row.trust-not-on-trunk { border-left-color: var(--color-accent); }
+.trust-row-top { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+.trust-headline { font-family: var(--font-heading); font-weight: 600; font-size: 13.5px; }
+.trust-detail { margin: 0; font-size: 13px; line-height: 1.55; max-width: 88ch; }

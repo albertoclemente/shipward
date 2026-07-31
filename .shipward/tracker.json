@@ -269,20 +269,44 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/trust-panel-surface",
+      "commit": "4b70873",
       "note": [
         {
           "t": "2026-07-31T09:39:59.499Z",
           "kind": "brief",
           "text": "BRIEF. The reported tier is defined in git.mjs and deliberately never written by anything automatic — which means the most interesting data in the system is currently invisible. Give it a desk surface: cards claiming pushed whose commit is nowhere on the trunk, branches no card claims, files changed with no card in flight, review cards ageing past N days, notes carrying no evidence entry at all. Nothing here writes to the board — it reports, and a human decides, which is exactly the tier's existing rule. Why it matters commercially: the actual pain of running an agent solo is not knowing what happened while you were away, and every competing tracker assumes the agent's report is true. This repo has the machinery to contradict it and does not yet show the contradiction to anyone."
+        },
+        {
+          "t": "2026-07-31T11:30:55.950Z",
+          "text": "SHIPPED as a fifth desk tab (Alberto ratified own-tab over an always-visible strip, and report-unverified-but-scoped over count-everything). The reported tier finally has a surface. FIVE RULES, THREE KINDS OF QUESTION, and keeping them apart underneath is the design: what git disproves (not-on-trunk, untracked-branch) is PASSED THROUGH from deriveFindings rather than re-derived, because two implementations of 'is this commit on the trunk' would eventually disagree and the desk would then contradict sync(); what board arithmetic shows (uncarded-changes, stale-review at 7 days) needs no git at all; what the memory is missing (never-verified) is new ground that only exists because SW-043 made evidence something a card can earn. THE DECISION WORTH KEEPING: never-verified is scoped to cards handed back AFTER checks began here, and that date is DERIVED — the earliest verification.at on the board — rather than stored. 51 cards predate verification; listing them would have opened the panel with fifty findings about the past, which teaches a reader to close it. A derived date also cannot drift from the thing it describes, which a stored one would. FIRST REAL FINDINGS, live: SW-040 and SW-041, both handed back by the concurrent session running pre-SW-043 code, so nothing ran. Correct, useful, and not something any other surface would have told anyone. No alarm colour anywhere — every row is a question a human answers, and unproven is not an accusation. KNOWN LIMIT, stated rather than papered over: only the never-verified rendering path was verified in a browser. An honest repo cannot currently produce the other four, a throwaway branch does not count as untracked-branch (deriveFindings measures commits ahead, not refs — correct behaviour, and worth knowing), and app.js's state is module-scoped so synthetic findings cannot be injected from the console. The rules have 18 unit tests; the markup for four of five categories has none. That is exactly SW-047's ground. 355 tests pass, up from 335.",
+          "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T11:30:55.951Z",
+          "text": "Check \"default\" (node --test) passed at 4b70873, in 34907ms. That is what it proves: this command exited zero on this tree, not that the work is correct.",
+          "kind": "evidence",
+          "sha": "4b70873"
         }
       ],
       "created": "2026-07-31T09:39:59.499Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T11:30:55.950Z",
+        "sha": "4b70873",
+        "dirty": false,
+        "ms": 34907
+      }
     },
     {
       "id": "SW-044",
@@ -1724,6 +1748,18 @@
   ],
   "feed": [
     {
+      "t": "2026-07-31T11:30:55.951Z",
+      "p": "shipward",
+      "msg": "SW-045 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T11:21:27.787Z",
+      "p": "shipward",
+      "msg": "SW-045 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-07-31T11:05:40.556Z",
       "p": "shipward",
       "msg": "SW-053 moved to Review — give it a look",
@@ -2685,7 +2721,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T11:06:21.846Z",
-    "pid": 2443
+    "lastSeen": "2026-07-31T11:31:20.944Z",
+    "pid": 48480
   }
 }

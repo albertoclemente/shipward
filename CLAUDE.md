@@ -152,6 +152,28 @@ Read it as a narrowing, not a guarantee: *current* means nothing has landed
 since, which is not the same as still being true. The desk shows the same
 verdict on the Memory tab, fading as the work drifts out from under it.
 
+## What nothing can settle
+
+Desk tab **Trust**. The `reported` tier has always been defined and never shown;
+this is where it surfaces, alongside the questions the board can ask about
+itself. Five rules, and none of them writes anything:
+
+| Finding | Means |
+|---|---|
+| **Claims git contradicts** | a card says it landed and its commit is not on the trunk |
+| **Work no card claims** | a branch with commits that no card names |
+| **Changes with no card** | source modified with nothing in `claude` |
+| **Waiting on you** | a `review` handed back more than 7 days ago |
+| **Closed without a check** | handed back after checks began here, with nothing recorded as having run |
+
+The last one is scoped on purpose: "after checks began" is derived from the
+earliest `verification` on the board, so cards closed before this repo could
+verify anything are never indicted. Unproven is not an accusation — it reads the
+same as verified on a board, and does not read the same at all.
+
+The tab carries a count only when something is unsettled, and an unreadable
+repository says so rather than showing an empty all-clear.
+
 ## Onboarding another repo
 
 `node shipward/setup.mjs /path/to/repo [--name N] [--prefix PX]` wires any git repository to this install in one idempotent command: seeds the target's **own** `.shipward/tracker.json` (each repo keeps its own memory — trackers are never pooled), merges the four hooks + statusline into its `.claude/settings.json`, registers the MCP server in its `.mcp.json`, and appends the protocol to its `CLAUDE.md`. The central tools resolve by where they run — env `SHIPWARD_TRACKER`/`SHIPWARD_REPO` first, then the repo you are standing in, then this one — so `node <here>/shipward/serve.mjs` from inside an onboarded repo serves *that* repo's board. `node shipward/fleet.mjs ~/projects` (port 4740) shows **every** onboarded board on one page — and `node shipward/fleet-service.mjs install ~/projects` makes it permanent (a macOS LaunchAgent: starts at login, restarts on crash, logs to ~/Library/Logs/shipward-fleet.log; `status`/`uninstall` to inspect or remove) — it scans two levels deep for trackers and spawns one ordinary desk per board, so clicking a name opens that repo's full desk.

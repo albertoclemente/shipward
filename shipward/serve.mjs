@@ -80,6 +80,34 @@ async function readDrift(res) {
   }
 }
 
+// SW-045. The other half of what a page cannot ask git: what the board claims
+// that nothing can vouch for. The rules are pure and live in trust-lib; this
+// only gathers the two facts they need — the audit and the working tree.
+//
+// `known: false` is a first-class part of the answer. A repository that cannot
+// be read must render as "we could not look", never as an empty all-clear —
+// the same rule the SessionStart audit has always held.
+async function readTrust(res) {
+  try {
+    const [git, { trustFindings, rankFindings }, { doc }] = await Promise.all([
+      import('./git.mjs'),
+      import('./public/trust-lib.js'),
+      readRaw(),
+    ]);
+    const project = doc.projects.find((p) => p.id === doc.activeProject) || doc.projects[0];
+    const cards = doc.cards.filter((c) => c.p === project?.id);
+    const [audit, tree] = await Promise.all([
+      git.auditBoard(doc.cards, project?.id, git.REPO),
+      git.headState(git.REPO),
+    ]);
+    const known = !audit.reason && tree.known;
+    const findings = rankFindings(trustFindings(cards, { findings: audit.findings, tree }));
+    return send(res, 200, JSON.stringify({ known, findings }));
+  } catch {
+    return send(res, 200, JSON.stringify({ known: false, findings: [] }));
+  }
+}
+
 async function writeTracker(req, res) {
   const chunks = [];
   try {
@@ -150,6 +178,10 @@ const server = createServer((req, res) => {
   if (pathname === '/api/drift') {
     if (req.method !== 'GET') return fail(res, 405, 'use GET');
     return done(readDrift(res));
+  }
+  if (pathname === '/api/trust') {
+    if (req.method !== 'GET') return fail(res, 405, 'use GET');
+    return done(readTrust(res));
   }
   if (req.method !== 'GET') return fail(res, 405, 'use GET');
   done(serveStatic(pathname, res));

@@ -8,6 +8,7 @@
 // What stays here is only the DOM and the network. Every decision about what a
 // row SAYS lives in fleet-view.js, where it is tested.
 import { rowView, fleetLede, onboardPrompt } from './fleet-view.js';
+import { digest, digestLede, digestSections } from './fleet-digest.js';
 
 const POLL_MS = 5000;
 
@@ -80,10 +81,40 @@ function boardNode(v) {
 
 const node = (v, refresh) => (v.kind === 'candidate' ? candidateNode(v, refresh) : boardNode(v));
 
+// SW-046. One standup across every board, above the list of boards. The
+// answers are decided in fleet-digest.js; this only builds the elements.
+function digestNode(d) {
+  const wrap = el('section', 'digest');
+  wrap.append(el('p', 'digest-lede', digestLede(d)));
+  for (const s of digestSections(d)) {
+    const sec = el('div', `digest-group ${s.key}`);
+    sec.append(el('h6', 'digest-heading', s.heading));
+    for (const item of s.items) {
+      const line = el('div', 'digest-item');
+      if (item.href) {
+        const a = el('a', 'digest-board', item.board);
+        a.href = item.href;
+        line.append(a);
+      } else {
+        line.append(el('span', 'digest-board', item.board));
+      }
+      line.append(el('span', 'digest-text', item.text));
+      sec.append(line);
+    }
+    wrap.append(sec);
+  }
+  return wrap;
+}
+
 export async function refresh() {
   try {
-    const rows = await (await fetch('/api/fleet')).json();
+    // { found, rows } since SW-046 — `found` is what the walk saw, which can
+    // exceed what the fleet shows.
+    const payload = await (await fetch('/api/fleet')).json();
+    const rows = payload.rows;
     document.getElementById('lede').textContent = fleetLede(rows);
+    document.getElementById('digest')
+      .replaceChildren(digestNode(digest(rows, { found: payload.found })));
     const box = document.getElementById('rows');
     box.replaceChildren(...(rows.length
       ? rows.map((r) => node(rowView(r), refresh))

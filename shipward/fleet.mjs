@@ -36,6 +36,7 @@ const PUBLIC = join(HERE, 'public');
 const SERVED = {
   '/fleet-client.js': 'fleet-client.js',
   '/fleet-view.js': 'fleet-view.js',
+  '/fleet-digest.js': 'fleet-digest.js',
 };
 
 const ROOT = resolve(process.argv[2] || process.env.SHIPWARD_FLEET_ROOT || process.cwd());
@@ -127,6 +128,29 @@ for (const sig of ['SIGINT', 'SIGTERM']) {
 }
 
 /* ── rows ────────────────────────────────────────────────── */
+// How many cards of one kind a single board may contribute (SW-046). The
+// digest is read at a glance and travels over the wire on every poll; one repo
+// with forty reviews must not crowd out the other nine boards entirely.
+const FLEET_CARD_CAP = 10;
+
+// When a card was last touched — the honest age of a review. `pushed` and
+// `shipped` are stamps a review has not earned yet, so the newest note entry is
+// usually the real answer, and `created` is the floor.
+const lastTouched = (c) => {
+  const stamps = [c.created, c.pushed, c.shipped]
+    .concat(Array.isArray(c.note) ? c.note.map((e) => e?.t) : [])
+    .map((t) => Date.parse(t))
+    .filter((t) => !Number.isNaN(t));
+  return stamps.length ? new Date(Math.max(...stamps)).toISOString() : null;
+};
+
+const lastShippedAt = (cards) => {
+  const stamps = cards
+    .map((c) => Date.parse(c.shipped || c.pushed))
+    .filter((t) => !Number.isNaN(t));
+  return stamps.length ? new Date(Math.max(...stamps)).toISOString() : null;
+};
+
 async function rows() {
   const found = await scan();
   // A tracker that vanished takes its desk with it.
@@ -153,6 +177,17 @@ async function rows() {
         backlog: count('backlog'),
         pushed: count('pushed'),
         statLine: deriveStats(doc.cards, project.id).line,
+        // SW-046. The cards themselves, not just how many — the cross-repo
+        // questions cannot be answered from counts. Bounded per board so one
+        // busy repo cannot dominate the payload.
+        inFlight: cards.filter((c) => c.status === 'claude')
+          .slice(0, FLEET_CARD_CAP)
+          .map((c) => ({ id: c.id, title: c.title, claude: c.claude, branch: c.branch })),
+        waiting: cards.filter((c) => c.status === 'review')
+          .slice(0, FLEET_CARD_CAP)
+          .map((c) => ({ id: c.id, title: c.title, since: lastTouched(c) })),
+        lastShipped: lastShippedAt(cards),
+        everShipped: cards.some((c) => c.pushed || c.shipped),
         last: feed ? { msg: feed.msg, by: feed.by === 'user' ? 'You' : 'Claude Code', ago: relTime(feed.t) } : null,
         // The return address rides along, so the desk can offer a way home —
         // a desk opened any other way shows nothing.
@@ -172,7 +207,14 @@ async function rows() {
   const candidates = found.candidates
     .map((c) => ({ kind: 'candidate', repo: c.repo, folder: basename(c.repo), name: basename(c.repo) }))
     .sort((a, b) => a.name.localeCompare(b.name));
-  return [...out.map((r) => ({ kind: 'board', ...r })), ...candidates];
+  // `found` travels with the rows so the digest can say what it did NOT see.
+  // The desk cap used to drop boards past MAX_DESKS with no mention anywhere,
+  // which reads as full coverage — and a cross-repo answer that silently omits
+  // a repo is worse than no cross-repo answer.
+  return {
+    found: found.boards.length,
+    rows: [...out.map((r) => ({ kind: 'board', ...r })), ...candidates],
+  };
 }
 
 /* ── the page ────────────────────────────────────────────── */
@@ -214,12 +256,23 @@ const PAGE = `<!doctype html>
   .onboard:hover { background:#dd2b0f; }
   .onboard:disabled { opacity:.5; cursor:wait; }
   .cand .tagline { color:var(--muted); font-size:12px; }
+  .digest { margin:0 0 28px; padding:16px; background:var(--surface); border-left:3px solid var(--accent); }
+  .digest-lede { margin:0 0 12px; font-weight:600; font-size:13.5px; }
+  .digest-group { margin-top:12px; }
+  .digest-heading { margin:0 0 6px; font-size:11px; letter-spacing:.08em; text-transform:uppercase;
+                    font-weight:800; color:var(--muted); }
+  .digest-item { display:flex; gap:10px; align-items:baseline; font-size:13px; padding:2px 0;
+                 font-variant-numeric:tabular-nums; }
+  .digest-board { flex:none; min-width:150px; font-weight:600; color:var(--text); text-decoration:none; }
+  a.digest-board:hover { color:var(--accent); }
+  .digest-text { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 </style></head><body>
 <header><div class="mark"></div><div class="brand">SHIPWARD</div><div class="tag">the fleet</div></header>
 <main>
   <h3>Every board under __ROOT__</h3>
   <p class="lede" id="lede">Scanning…</p>
+  <div id="digest"></div>
   <div id="rows" role="status"></div>
 </main>
 <script type="module" src="/fleet-client.js"></script>

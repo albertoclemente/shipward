@@ -68,7 +68,9 @@ after(async () => {
 // Child desks take a moment to report their ports; poll until they have.
 async function fleetRows({ needDesks = true, tries = 40 } = {}) {
   for (let i = 0; i < tries; i++) {
-    const rows = await (await fetch(`${base}/api/fleet`)).json();
+    // { found, rows } since SW-046: `found` is what the walk saw, which can
+    // exceed what the fleet shows, and the digest reports the difference.
+    const { rows } = await (await fetch(`${base}/api/fleet`)).json();
     if (!needDesks || rows.filter((r) => r.ok).every((r) => r.desk)) return rows;
     await new Promise((r) => setTimeout(r, 250));
   }
@@ -187,6 +189,33 @@ test('the endpoint refuses anything the walk did not offer', async () => {
 });
 
 // Runs LAST on purpose: it kills the fleet every other test talks to.
+/* ── SW-046: the fleet answers across boards ─────────────── */
+
+test('the endpoint reports what the walk found, not only what it shows', async () => {
+  const { found, rows } = await (await fetch(`${base}/api/fleet`)).json();
+  assert.equal(typeof found, 'number');
+  assert.ok(Array.isArray(rows));
+  // With fewer boards than the desk cap these agree; the point is that `found`
+  // exists at all, so a fleet past 16 boards can say what it left out instead
+  // of dropping them silently.
+  assert.equal(found, rows.filter((r) => r.kind === 'board').length);
+});
+
+test('each board carries the cards themselves, not just how many', async () => {
+  const rows = await fleetRows();
+  const board = rows.find((r) => r.kind === 'board' && r.ok);
+  assert.ok(Array.isArray(board.inFlight), 'the cross-repo questions cannot be answered from counts');
+  assert.ok(Array.isArray(board.waiting));
+  assert.ok('lastShipped' in board);
+  assert.equal(typeof board.everShipped, 'boolean');
+});
+
+test('the digest module is served, so the page can import it', async () => {
+  const res = await fetch(`${base}/fleet-digest.js`);
+  assert.equal(res.status, 200);
+  assert.match(await res.text(), /export function digest/);
+});
+
 test('killing the fleet takes every desk down with it', async () => {
   const rows = await fleetRows();
   const pids = rows.map((r) => r.pid).filter(Boolean);

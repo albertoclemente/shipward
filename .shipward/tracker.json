@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-055",
+      "p": "shipward",
+      "title": "Nothing makes a session commit notes.jsonl",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-07-31T11:40:05.088Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-054",
       "p": "shipward",
       "title": "The session-start audit test fails under load, because the budget is the assertion",
@@ -919,6 +934,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-31T11:40:05.088Z",
+      "p": "shipward",
+      "msg": "You added SW-055 to Backlog — it's on the list",
+      "by": "claude"
+    },
     {
       "t": "2026-07-31T11:38:47.892Z",
       "p": "shipward",
@@ -1905,7 +1926,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T11:38:26.538Z",
-    "pid": 67359
+    "lastSeen": "2026-07-31T11:40:05.066Z",
+    "pid": 70714
   }
 }

@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-056",
+      "p": "shipward",
+      "title": "A check's timeout does not bound it — the kill leaves grandchildren holding the pipe",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-07-31T14:41:12.470Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-055",
       "p": "shipward",
       "title": "Nothing makes a session commit notes.jsonl",
@@ -150,13 +165,26 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/check-env-leak",
+      "commit": "b24c3c9",
       "created": "2026-07-31T10:01:41.543Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T14:41:42.571Z",
+        "sha": "b24c3c9",
+        "dirty": false,
+        "ms": 22848
+      }
     },
     {
       "id": "SW-049",
@@ -180,13 +208,26 @@
       "type": "feature",
       "pri": "P3",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/a-cli-surface",
+      "commit": "a6a2b4c",
       "created": "2026-07-31T09:39:59.559Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T14:14:59.672Z",
+        "sha": "a6a2b4c",
+        "dirty": true,
+        "ms": 22904
+      }
     },
     {
       "id": "SW-047",
@@ -986,6 +1027,42 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-31T14:41:42.571Z",
+      "p": "shipward",
+      "msg": "SW-050 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T14:41:12.470Z",
+      "p": "shipward",
+      "msg": "You added SW-056 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T14:34:21.035Z",
+      "p": "shipward",
+      "msg": "SW-050 check ran out of time — nothing proved either way",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T14:14:59.672Z",
+      "p": "shipward",
+      "msg": "SW-048 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T14:09:08.203Z",
+      "p": "shipward",
+      "msg": "SW-050 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T14:07:47.170Z",
+      "p": "shipward",
+      "msg": "SW-048 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-31T13:46:13.192Z",
       "p": "shipward",
@@ -2026,7 +2103,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T13:46:49.408Z",
-    "pid": 34403
+    "lastSeen": "2026-07-31T14:41:19.349Z",
+    "pid": 86805
   }
 }

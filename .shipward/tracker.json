@@ -23,13 +23,26 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/commit-the-sidecar",
+      "commit": "73d32c3",
       "created": "2026-07-31T11:40:05.088Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T13:10:31.693Z",
+        "sha": "73d32c3",
+        "dirty": false,
+        "ms": 18142
+      }
     },
     {
       "id": "SW-054",
@@ -182,13 +195,26 @@
       "type": "chore",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "pushed",
+      "claude": "done",
+      "branch": "chore/render-through-pure",
+      "commit": "9cb6734",
       "created": "2026-07-31T09:39:59.539Z",
-      "pushed": null,
-      "shipped": null
+      "pushed": "2026-07-31T13:33:30.212Z",
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T13:33:30.212Z",
+        "sha": "d6de856",
+        "dirty": false,
+        "ms": 16873
+      }
     },
     {
       "id": "SW-046",
@@ -296,9 +322,9 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "chore/cap-shipped-list",
       "commit": null,
       "created": "2026-07-31T09:27:53.037Z",
       "pushed": null,
@@ -934,6 +960,36 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-31T13:34:31.951Z",
+      "p": "shipward",
+      "msg": "SW-042 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T13:33:30.212Z",
+      "p": "shipward",
+      "msg": "SW-047 landed on main — nice work",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T13:10:31.693Z",
+      "p": "shipward",
+      "msg": "SW-055 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T13:09:40.108Z",
+      "p": "shipward",
+      "msg": "SW-047 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T11:42:37.468Z",
+      "p": "shipward",
+      "msg": "SW-055 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-31T11:40:05.088Z",
       "p": "shipward",
@@ -1926,7 +1982,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T11:40:05.066Z",
-    "pid": 70714
+    "lastSeen": "2026-07-31T13:34:31.918Z",
+    "pid": 12640
   }
 }

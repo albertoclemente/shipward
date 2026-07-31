@@ -10,7 +10,7 @@ import {
   memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen,
   noteSegments, appendedNote, freshness,
 } from './memory-lib.js';
-import { trustLede, HEADING } from './trust-lib.js';
+import { trustLede, groupFindings } from './trust-lib.js';
 
 const POLL_MS = 3000;
 const root = document.getElementById('app');
@@ -334,19 +334,14 @@ function renderTabs(doc, project) {
 function renderTrust() {
   const known = state.trust?.known !== false;
   const findings = state.trust?.findings || [];
-  const groups = [];
-  for (const f of findings) {
-    const last = groups[groups.length - 1];
-    if (last && last.rule === f.rule) last.items.push(f);
-    else groups.push({ rule: f.rule, items: [f] });
-  }
+  const groups = groupFindings(findings);
 
   return el('main', { class: 'view-wrap' },
     el('h3', { text: 'What nothing can settle for you' }),
     el('p', { class: 'text-muted trust-lede',
       text: state.trust ? trustLede(findings, { known }) : 'Asking git…' }),
     ...groups.map((g) => el('section', { class: 'trust-group' },
-      el('h6', { class: 'trust-heading', text: `${HEADING[g.rule]} · ${g.items.length}` }),
+      el('h6', { class: 'trust-heading', text: g.label }),
       ...g.items.map((f) => el('article', { class: `trust-row trust-${f.rule}` },
         el('div', { class: 'trust-row-top' },
           f.card

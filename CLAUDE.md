@@ -128,6 +128,17 @@ unauthenticated `PUT /api/tracker`, so a command stored in it would be an exec
 for anything that can write the tracker. Argv arrays run with no shell, so
 nothing inside a check is ever parsed as syntax.
 
+A check also runs with **no `SHIPWARD_*` in its environment**, and with
+`SHIPWARD_TRACKER` pinned at a path in the temp dir that does not exist. It used
+to inherit the server's environment, so a project whose check is its own test
+suite ran that suite holding a pointer to the live board — the shape of the
+SW-033 incident, where a sandbox resolved the real tracker and replaced 32 cards.
+Unsetting alone would not do: the store falls back to the repo you are standing
+in, and a check stands in the repo. So a check that reaches for the board finds
+nothing and says so, loudly. If yours genuinely needs the tracker, give it the
+path in the argv — never through an env field in this file, which would be the
+same injection hole the argv rule exists to close.
+
 What happens then:
 
 | Outcome | Card | Note |

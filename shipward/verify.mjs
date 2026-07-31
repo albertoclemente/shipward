@@ -15,6 +15,8 @@
 // runCheck() does the I/O and nothing else. The spawn is injectable so the
 // outcomes can be tested without launching anything.
 import { spawn } from 'node:child_process';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
 import { headState, REPO } from './git.mjs';
 
 // Short on purpose. The check that gates a tool call is the fast one; a suite
@@ -74,6 +76,42 @@ export function readOutcome(result) {
 
 /* ── I/O ─────────────────────────────────────────────────── */
 
+// Where a check's store lookups are sent instead of the live board. It does
+// not exist and is never created: a check that reaches for the tracker gets a
+// loud MissingTrackerError, which is the correct answer. A check is the code
+// under test, and the board is not its business.
+export const CHECK_TRACKER = join(tmpdir(), 'shipward-check-must-not-touch-the-board.json');
+
+// SW-050. The child used to inherit the server's whole environment, including
+// SHIPWARD_TRACKER pointing at the LIVE board — so a project whose check is its
+// own test suite ran that suite holding a pointer to the real tracker. That is
+// the exact shape of the SW-033 incident, where a test sandbox resolved the
+// real tracker and its PUT tests replaced 32 cards and 111 feed entries.
+//
+// Unsetting alone would not have been enough, and that is the whole reason this
+// PINS rather than scrubs: the store's resolution ladder is env, then the repo
+// you are STANDING IN, then the install. A check runs with cwd set to the repo
+// root, so removing the variable just falls through to the cwd rung and finds
+// the very same live board. Pointing it somewhere that does not exist is what
+// actually closes the door.
+//
+// Measured before choosing: with SHIPWARD_TRACKER pointed at a nonexistent path
+// the whole suite still passes 424/424, so nothing here legitimately reads the
+// ambient board — the inheritance was pure exposure with no upside.
+//
+// Everything else SHIPWARD_* goes too. A check that genuinely needs one is not
+// served by adding an env field to the tracker: that file is written by the
+// agent and by an unauthenticated PUT, so an env it controlled would be the
+// same injection hole SW-043 refused for argv.
+export function checkEnv(env = process.env) {
+  const out = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (!k.startsWith('SHIPWARD_')) out[k] = v;
+  }
+  out.SHIPWARD_TRACKER = CHECK_TRACKER;
+  return out;
+}
+
 // No shell, ever. argv[0] is the program and the rest are arguments, so nothing
 // in a check is parsed as syntax — see the validator in tracker-store.mjs,
 // which refuses a check that is not an argv array at the write.
@@ -82,7 +120,7 @@ export function spawnCheck(argv, { cwd, timeoutMs }) {
     const started = Date.now();
     let child;
     try {
-      child = spawn(argv[0], argv.slice(1), { cwd, shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(argv[0], argv.slice(1), { cwd, env: checkEnv(), shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
     } catch (err) {
       resolve({ exit: null, ms: 0, out: String(err.message || err), spawnError: true });
       return;

@@ -6,10 +6,38 @@
       "id": "shipward",
       "name": "Shipward",
       "tag": "the solo shipping desk",
-      "prefix": "SW"
+      "prefix": "SW",
+      "checks": {
+        "default": [
+          "node",
+          "--test"
+        ]
+      }
     }
   ],
   "cards": [
+    {
+      "id": "SW-050",
+      "p": "shipward",
+      "title": "A check inherits SHIPWARD_TRACKER — a suite could reach the live board",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T10:01:41.543Z",
+          "kind": "brief",
+          "text": "FINDING, found while shipping SW-043. spawnCheck() does not set `env`, so the check inherits the server's environment — including SHIPWARD_TRACKER and SHIPWARD_REPO. A project whose check is its own test suite therefore runs that suite with a pointer to the LIVE board in the environment. This is the exact shape of the SW-033 incident, where a test sandbox resolved the real tracker through the cwd-first ladder and its PUT tests replaced 32 cards and 111 feed entries. It is not exploitable here today — the suite is proven byte-neutral against the real tracker, and that was re-verified by md5 before SW-043's own done() was allowed to run it — but the belt is a property of the suite, not of the runner, and the next repo to declare `checks: {default: [...]}` inherits no such proof. Options, cheapest first: scrub SHIPWARD_* from the child env (a check that genuinely needs them can be given them explicitly); or pass SHIPWARD_TRACKER pointing at a scratch copy; or leave it and say so in the docs. Decide before onboarding tells other repos to declare checks."
+        }
+      ],
+      "created": "2026-07-31T10:01:41.543Z",
+      "pushed": null,
+      "shipped": null
+    },
     {
       "id": "SW-049",
       "p": "shipward",
@@ -149,20 +177,43 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/verification-gating-done",
+      "commit": "d859d43",
       "note": [
         {
           "t": "2026-07-31T09:39:59.453Z",
           "kind": "brief",
           "text": "BRIEF. Strategy card, from a 2026-07-31 market read: Anthropic shipped built-in Tasks in Claude Code v2.1.16 (persistent via CLAUDE_CODE_TASK_LIST_ID, credited to Beads) and Beads now has a community web dashboard. The 'what should I work on next' half of this category is commoditised. The half nobody owns is 'prove it was done'. Today done() accepts a claim: the note nudge asks for prose, nothing checks the work. Build: a card carries a `verify` command (e.g. `node --test`); done() runs it, captures exit code plus the head of the output, and writes an evidence entry stamped WITH THE SHA IT RAN AGAINST. Three outcomes mirroring the git tiers in git.mjs — verified (ran, passed, at this sha), unverified (no check declared, and it says so rather than implying success), refuted (ran, failed: done is refused or the card returns to claude with the failure in the note). This is the existing thesis extended one step: git outranks the claim about the commit, the test run outranks the claim about the work. Alberto's 2026-07-10 sweep of 69 agents found verification gating 'barely exists anywhere'; it still does not exist as of 2026-07-31. It is also the hardest thing here to copy, because it only means anything on top of the tier and provenance machinery already in git.mjs and reconcile.mjs. DECIDED NOT TO BUILD (same session): dependency DAG, ready-queries, leases, multi-agent coordination — that is Beads' engine and competing on it head-on with a zero-dep solo project loses."
+        },
+        {
+          "t": "2026-07-31T10:01:56.461Z",
+          "text": "SHIPPED, and this hand-back is its own first demonstration: the check that gated it is the one it added. Built as designed in _bmad-output/implementation-artifacts/spec-verification-gating.md (ratified by Alberto before a line was written): checks are argv arrays declared by a HUMAN on the project, a card carries only a name, done() resolves and runs it, and the outcome is stamped with the sha and the cleanliness of the tree it ran on. TWO THINGS THE CODE CHANGED ABOUT THE SKETCH. (1) The check cannot run inside mutate(): mutate holds the cross-process advisory lock for the length of its callback and waiters give up at LOCK_TIMEOUT_MS=60000, so a suite inside one would not deadlock — it would starve the desk and every other session for as long as it takes. It runs unlocked between a read and a brief write, and a test pins the ordering by racing a standup against a 1.5s check. (2) A free-text verify command on a card is disqualifying: this file is written by an agent and by an unauthenticated PUT /api/tracker, so a command stored in it is an exec for anything that can write the tracker. Hence argv arrays, shell:false, and a card that can only SELECT. DECISION MADE DURING THE BUILD, not in the design: one rule for everything that was promised and did not pass — failed, timed out, could not spawn, OR named a check nobody declares. The first draft held the card on a timeout but promoted it on a typo, which would have made the gate optional by misspelling; that is the SW-038 failure mode (a feature silently doing nothing) wearing different clothes. WHAT A PASS CLAIMS, deliberately narrow: a declared command exited zero on a named tree. Not that the work is correct — the note says so in those words, because an agent that writes a passing test for broken code defeats this entirely. A pass over a dirty tree says that too, since it is not reproducible from the sha. 293 tests pass, up from 252: 33 new in verify.test.mjs (including the one that proves shell metacharacters are not interpreted and no file is created) and 8 in mcp.test.mjs. verification.sha is what SW-044 reads to expire this evidence; ok/at are what SW-045 counts. LEFT OPEN: the check inherits SHIPWARD_TRACKER from the server's environment — logged as its own card rather than buried here.",
+          "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T10:01:56.461Z",
+          "text": "Check \"default\" (node --test) passed at d859d43, in 14800ms. That is what it proves: this command exited zero on this tree, not that the work is correct.",
+          "kind": "evidence"
         }
       ],
       "created": "2026-07-31T09:39:59.453Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T10:01:56.461Z",
+        "sha": "d859d43",
+        "dirty": false,
+        "ms": 14800
+      }
     },
     {
       "id": "SW-042",
@@ -193,15 +244,20 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "chore/bound-memory-reads",
+      "commit": "a116bf2",
       "note": [
         {
           "t": "2026-07-31T09:27:16.750Z",
           "kind": "brief",
           "text": "MEASURED 2026-07-31 against this repo’s own memory (117 entries): mcp.mjs:330 renders each hit with line(e) and no max, so the COUNT is clamped to 50 (mcp.mjs:312) while the BYTES are not. recall({kind:\"finding\", limit:50}) returns 37,013 chars ≈ 9.3k tokens in a single tool result; kind:\"outcome\" 10,623 chars; kind:\"decision\" 7,754. The default limit of 10 keeps the common case near 2k, so this bites exactly when a session raises the limit — i.e. when it is hunting for something and least wants its context eaten.\n\nstandup already has the answer: line(e, {max}) and excerpt() are shared code this caller simply does not use. Fix is a max that tightens as the hit count rises, plus keeping the \"raise limit to see them\" hint honest by reporting that entries were CLIPPED as well as dropped."
+        },
+        {
+          "t": "2026-07-31T09:54:14.589Z",
+          "text": "SHIPPED on chore/bound-memory-reads (a116bf2). recall clamped how MANY entries came back (50) but never how long they were, because line() was called with no max while standup passed 240/200. Entries now share ONE budget (RECALL_BUDGET 9000 chars in standup.mjs) and each takes a share of it, floored at 320 and ceilinged at 1600 — a flat per-entry clip would be too mean for one hit and too generous for fifty. The floor deliberately wins over the budget: fifty entries clipped to 180 chars each is fifty entries that say nothing, and a caller only reaches fifty by explicitly asking.\n\nFOUND WHILE FIXING IT, and fixed in the same card: the \"files:\" line was unbounded too — refs() pulls every path an entry names, and a note surveying a subsystem names dozens, so a text-only budget would have leaked straight through it. fileList() bounds it to 200 chars keeping WHOLE names, because a path clipped mid-segment is not a shorter path, it is a wrong one.\n\nClipped and dropped are reported as the different losses they are: one is an entry you never saw, the other an entry you saw the point of. Reporting only \"…N more\" while silently truncating the rest would make the answer read as complete.\n\nMEASURED, old server vs new against this repo's own tracker (120 entries), same document: recall(finding,50) 37,685 → 9,740 chars (9.4k → 2.4k tokens); recall(outcome,50) 10,985 → 7,311; recall(decision,50) 8,544 → 6,283; recall(file:\"shipward/mcp.mjs\",6) 8,777 → 6,859.\n\nTEST NOTE for whoever reads mcp.test.mjs next: \"a reply larger than the pipe buffer is not truncated when stdin closes\" (the SW-005 flush bug) built its >64KiB frame out of recall({kind:'finding',limit:50}). This card made that impossible, so the test was silently no longer testing the flush — it now builds the frame from standup's working-card titles, which are unclipped and uncapped. The assertion did not change; the vehicle did. If SW-042 ever caps that list, this test needs a new vehicle again.\n\n261 tests pass, 9 new (4 in memory.test.mjs for noteDigest, 5 in mcp.test.mjs over the real pipe).",
+          "kind": "outcome"
         }
       ],
       "created": "2026-07-31T09:27:16.750Z",
@@ -215,15 +271,20 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "chore/bound-memory-reads",
+      "commit": "a116bf2",
       "note": [
         {
           "t": "2026-07-31T09:27:16.688Z",
           "kind": "brief",
           "text": "MEASURED 2026-07-31: mcp.mjs:398 renders the handoff with noteText(card.note) and no clip, unlike standup, which passes a max to excerpt() (standup.mjs:82 uses 240, :88 uses 200). Biggest notes today — CA-011 6,187 chars ≈ 1.5k tokens, CA-013 5,511, SW-024 4,873 — and a card that is started repeatedly grows without bound. start() sits on the mandatory protocol path (CLAUDE.md rule 2), so every task pays this.\n\nThe machinery already exists: excerpt(entry, max) in public/memory-lib.js:191 leads with the point via pointIndex() instead of the preamble. The judgement call is that start() is the one surface where a session legitimately wants the WHOLE note — it is about to work that card. So the likely shape is: keep the most recent N entries in full, clip the older ones, and SAY how many were clipped and that recall reaches them. A silent truncation here would be worse than the tokens, for the same reason recall reports its dropped count."
+        },
+        {
+          "t": "2026-07-31T09:54:14.565Z",
+          "text": "SHIPPED on chore/bound-memory-reads (a116bf2). start() now renders the note through noteDigest() instead of noteText(): the newest 3 entries exactly as before — that is the state a session is resuming and it should arrive whole — and everything older clipped to 400 chars through the same excerpt() standup already used, which leads with the point rather than the preamble. The reply says how many entries were clipped.\n\nDECISION worth not reversing: the pointer for the full note is the desk and .shipward/tracker.json, NOT recall. recall clips too (SW-041), so \"call recall for the rest\" would have been a promise this server cannot keep.\n\nMEASURED, old server vs new against the same live documents: CA-011 6,187 → 4,265 chars (1,547 → 1,066 tokens, 4 entries clipped), CA-013 5,672 → 4,741, CA-012 4,513 → 3,754, SW-024 4,873 → 3,286.\n\nKNOWN LIMIT, stated rather than hidden: a card whose newest 3 entries are themselves huge is still unbounded — SW-019, SW-015 and SW-020 have 3 or fewer entries and so clip to nothing, still handing back ~4,200 chars (~1k tokens). That is the design the card specified and it is defensible (you want the state you are resuming), but if start ever needs a hard ceiling, this is where it is missing. Also: noteText() now has no production caller — it survives as a public function of memory-lib with its own test, not as dead code, but nothing would break if the desk never picks it up.",
+          "kind": "outcome"
         }
       ],
       "created": "2026-07-31T09:27:16.688Z",
@@ -1487,6 +1548,54 @@
   ],
   "feed": [
     {
+      "t": "2026-07-31T10:01:56.461Z",
+      "p": "shipward",
+      "msg": "SW-043 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:01:41.543Z",
+      "p": "shipward",
+      "msg": "You added SW-050 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:00:59.833Z",
+      "p": "shipward",
+      "msg": "Shipward declares its own check — node --test gates done()",
+      "by": "user"
+    },
+    {
+      "t": "2026-07-31T09:54:14.589Z",
+      "p": "shipward",
+      "msg": "SW-041 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:54:14.565Z",
+      "p": "shipward",
+      "msg": "SW-040 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:43:09.887Z",
+      "p": "shipward",
+      "msg": "SW-041 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:43:09.865Z",
+      "p": "shipward",
+      "msg": "SW-040 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:42:55.651Z",
+      "p": "shipward",
+      "msg": "SW-043 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-07-31T09:41:22.961Z",
       "p": "shipward",
       "msg": "You added SW-049 to Backlog — it's on the list",
@@ -2334,7 +2443,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T09:41:22.925Z",
-    "pid": 47555
+    "lastSeen": "2026-07-31T10:02:41.538Z",
+    "pid": 65359
   }
 }

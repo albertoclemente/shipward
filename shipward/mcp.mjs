@@ -19,7 +19,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readRaw, mutate, TRACKER } from './tracker-store.mjs';
 import {
-  nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, fmtDate,
+  nextId, autoBranch, applyTransition, feedAdd, moveMsg, verifyMsg, addMsg, fmtDate,
 } from './public/lib.js';
 import {
   memoryEntries, recall as recallEntries, ALL_KINDS, noteText, appendedNote,
@@ -27,6 +27,7 @@ import {
 import { standupText, line } from './standup.mjs';
 import { auditBoard, summarise, reconcilePlan, CERTAIN, REPO } from './git.mjs';
 import { today } from './reconcile.mjs';
+import { runCheck, verificationOf, verdictText, kindFor, cmdOf } from './verify.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -203,6 +204,8 @@ const TOOLS = [
         },
         resolves: str('Card id whose open items this note settles, e.g. SW-011. The only way to close an open question raised on ANOTHER card.'),
         pushed: { type: 'boolean', description: 'True if this is already deployed; sets status pushed and stamps the timestamp.' },
+        check: str('Name of a check declared on this project to run instead of the card\'s own. You may SELECT a declared check; you cannot define one — that is a human edit to the tracker.'),
+        force: { type: 'boolean', description: 'Hand the card back even though its check failed. The override is recorded on the card as a decision naming the exit code — it is never silent.' },
       },
       required: ['id'],
       additionalProperties: false,
@@ -436,16 +439,45 @@ function noteNudge(text) {
   return null;
 }
 
-async function doneCard({ id, commit, note, kind, resolves, pushed = false }, signal) {
+async function doneCard({ id, commit, note, kind, resolves, pushed = false, check, force = false }, signal) {
   const to = pushed ? 'pushed' : 'review';
   const addition = asText(note, 'note').trim();
   const sha = asText(commit, 'commit').trim();
   if (kind != null && !KIND_KEYS.has(kind)) throw new ToolError(`kind must be one of: ${[...KIND_KEYS].join(', ')}`);
   if (resolves != null && !CARD_ID.test(String(resolves))) throw new ToolError('resolves must be a card id like SW-011');
+  const chosen = asText(check, 'check').trim();
   // Advisory, computed before the write and reported after the facts: the card
   // moves regardless; only the reply carries the nudge. A resolves-only close
   // is exempt — the assertion IS the note.
   const nudge = addition ? noteNudge(addition) : (resolves ? null : noteNudge(''));
+
+  // SW-043. The check runs HERE, before the lock is taken. mutate() holds the
+  // cross-process advisory lock for the length of its callback and waiters give
+  // up at LOCK_TIMEOUT_MS (60s), so a suite run inside one would not deadlock —
+  // it would starve the desk and every other session for as long as it takes.
+  // The card is looked up first so an unknown id costs nothing to discover.
+  const { doc: pre } = await readRaw();
+  const preCard = findCard(pre, id);
+  const project = pre.projects.find((p) => p.id === preCard.p) || null;
+  const verdict = await runCheck(project, chosen ? { ...preCard, check: chosen } : preCard);
+  // One rule, so there is no gap to fall through: a check that was PROMISED and
+  // did not pass does not earn the promotion — failed, timed out, could not
+  // spawn, or named something this project does not declare. Treating a
+  // misspelled check name as a pass would make the gate optional by typo, and a
+  // silently-unlinked feature is exactly the SW-038 failure mode.
+  const promised = verdict.ran || !!verdict.name;
+  const passed = verdict.ran && verdict.ok;
+  const refuted = promised && !passed;
+  // A refuted claim does not earn the promotion. It does not block the write
+  // either: the note, the commit and the evidence all land — what the check
+  // governs is the status granted, not whether done() may speak.
+  const held = refuted && !force;
+  const cmd = cmdOf(verdict.argv);
+  // Silence in the note when nothing was ever promised. Writing "unverified"
+  // onto every card of every repo that declares no checks would be noise the
+  // next session pays for at every standup.
+  const sayVerdict = promised;
+
   let card;
   let resolvesUnknown = false;
   await mutate((doc) => {
@@ -454,27 +486,73 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false }, si
     // written anyway (the card may live in another project's history), but the
     // reply says so rather than letting a typo silently resolve nothing.
     if (resolves) resolvesUnknown = !doc.cards.some((c) => c.id === resolves);
-    const moved = applyTransition(found, to, nowIso()) || { ...found };
-    moved.claude = 'done';
-    // applyTransition returns null when the card is already in that status, so
-    // done({pushed:true}) on an already-pushed card left `pushed` null while the
-    // reply claimed a stamp — and the card then never counted as shipped.
-    if (to === 'pushed' && !moved.pushed) moved.pushed = nowIso();
+    let moved;
+    if (held) {
+      // Kept where the work actually is. A card done() was called on is being
+      // worked on, whatever column it was sitting in when the call came.
+      moved = found.status === 'claude' ? { ...found } : (applyTransition(found, 'claude', nowIso()) || { ...found });
+      moved.claude = 'working';
+    } else {
+      moved = applyTransition(found, to, nowIso()) || { ...found };
+      moved.claude = 'done';
+      // applyTransition returns null when the card is already in that status, so
+      // done({pushed:true}) on an already-pushed card left `pushed` null while the
+      // reply claimed a stamp — and the card then never counted as shipped.
+      if (to === 'pushed' && !moved.pushed) moved.pushed = nowIso();
+    }
     if (sha) moved.commit = sha;
+    // A check selected at hand-back becomes the card's check: the next done()
+    // on it should be held to the same standard without being told again.
+    if (chosen) moved.check = chosen;
+    if (verdict.ran) moved.verification = verificationOf(verdict, nowIso());
     // resolves with no prose still deserves an entry: the assertion is the point.
     const text = addition || (resolves ? `Resolves ${resolves}.` : '');
     if (text) moved.note = appendedNote(moved.note, moved.created, entryOf(text, { kind, resolves }));
+    // The verdict is its own entry, never folded into the agent's prose: what a
+    // command did is a different kind of claim from what the agent says it did,
+    // and only one of them is checkable.
+    if (sayVerdict) {
+      moved.note = appendedNote(moved.note, moved.created, entryOf(verdictText(verdict, { cmd }), { kind: kindFor(verdict) }));
+    }
+    if (refuted && force) {
+      moved.note = appendedNote(moved.note, moved.created, entryOf(
+        `Handed back over a check that did not pass: "${verdict.name}" ${verdict.ran ? `exited ${verdict.exit}` : verdict.reason} and this was promoted to ${to} anyway. Recorded here because an override nobody can find is indistinguishable from a check that passed.`,
+        { kind: 'decision' },
+      ));
+    }
     doc.cards[doc.cards.indexOf(found)] = moved;
-    doc.feed = feedAdd(doc.feed, moved.p, moveMsg(id, to), nowIso(), 'claude');
+    doc.feed = feedAdd(
+      doc.feed, moved.p,
+      held ? verifyMsg(id, verdict.state) : (refuted ? verifyMsg(id, verdict.state, { forced: true }) : moveMsg(id, to)),
+      nowIso(), 'claude',
+    );
     card = moved;
     return doc;
   }, { signal });
+  // The verdict leads. A reply that opened with "→ review" and mentioned the
+  // failing check four lines down would be read as success by anything
+  // skimming, which is every caller.
+  if (held) {
+    return [
+      `${card.id} was NOT handed back — its check refuted the claim.`,
+      verdictText(verdict, { cmd }),
+      `The card stays in progress (claude/working)${card.commit ? ` at ${card.commit}` : ''}; the note and the commit were still written.`,
+      'Fix the work and call done again, or pass force:true to hand it back anyway — which is recorded on the card, not swallowed.',
+    ].join('\n');
+  }
   return [
     `${card.id} → ${to}${card.commit ? ` at ${card.commit}` : ''}.`,
     `Title: ${card.title}`,
     to === 'review'
       ? 'It is on the Review column now; only the human moves it to Pushed.'
       : `Stamped pushed ${fmtDate(card.pushed)}.`,
+    // Every hand-back says what was proved, including when the answer is
+    // "nothing" — an unverified card that says nothing reads exactly like a
+    // verified one.
+    verdict.ran || verdict.name
+      ? verdictText(verdict, { cmd })
+      : 'Unverified — this project declares no checks, so done() proved nothing about the work. Declare one in the project as `checks: {default: ["node","--test"]}`.',
+    ...(refuted && force ? ['The override is on the card as a decision entry.'] : []),
     ...(resolvesUnknown ? [`Warning: resolves ${resolves} names a card this tracker does not have — nothing was settled by it.`] : []),
     ...(nudge ? [`\nNote check: ${nudge}`] : []),
   ].join('\n');

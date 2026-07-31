@@ -92,6 +92,21 @@ export const addMsg = (id) => `You added ${id} to Backlog — it's on the list`;
 export const editMsg = (id, fields) => `${id} edited — ${fields}`;
 export const deleteMsg = (id) => `${id} deleted — one less thing`;
 
+// SW-043. A refuted hand-back is not a move, so it cannot borrow moveMsg: the
+// feed would read "moved to Review" for a card that did not go there. These
+// lines say what happened to the WORK, which is the only reason the card
+// stayed put.
+export function verifyMsg(id, state, { forced = false } = {}) {
+  if (forced) return `${id} handed back over a failing check — the override is on the card`;
+  switch (state) {
+    case 'fail': return `${id} did not pass its check — still in progress`;
+    case 'timeout': return `${id} check ran out of time — nothing proved either way`;
+    case 'error': return `${id} check could not be run — nothing proved either way`;
+    case 'unresolved': return `${id} names a check this project does not declare — nothing proved`;
+    default: return `${id} check reported nothing`;
+  }
+}
+
 export function moveMsg(id, status) {
   switch (status) {
     case 'claude': return `${id} handed to Claude Code — queued`;

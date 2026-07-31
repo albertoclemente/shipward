@@ -12,7 +12,7 @@ An MCP server exposes the tracker as six tools. **Prefer them** — they hold a 
 | `recall` | search everything previously written down — by file, by kind, or by query |
 | `log` | add a backlog card the moment work is discovered or promised |
 | `start` | take a card — sets `claude`/`working`, names a branch, hands back the note |
-| `done` | hand a card back — `review` (or `pushed`), sets `commit`, appends to the note |
+| `done` | hand a card back — `review` (or `pushed`), sets `commit`, appends to the note, **and runs the card's check** |
 | `sync` | reconcile the board with git — `fromGit:true` reads the repository itself and reports the drift; add `apply:true` to write the fixes it can only infer |
 
 Registered in `.mcp.json`. Run it standalone with `node shipward/mcp.mjs`; it logs to stderr and speaks JSON-RPC on stdout.
@@ -81,6 +81,46 @@ The tracker records what someone remembered to write down. Git records what happ
 Every automatic correction appends a dated `[git audit …]` line to the card's note saying why, and writes one feed entry. The rules live in `shipward/git.mjs`; the single writer is `shipward/reconcile.mjs`.
 
 **The certain tier is monotonic** — it fills blanks and confirms landed work, and nothing in it moves a card backwards. So if you move a card ahead of what git can see, the audit will never overrule you. What it cannot do is invent `backlog`, `review` or a priority: those are intent, and no commit records intent.
+
+## What `done` proves
+
+Git outranks the claim about the *commit*. A check outranks the claim about the
+*work*: `done` runs one before it hands anything back.
+
+A check is **declared by a human on the project**, as an argv array, and a card
+carries only its **name**:
+
+```jsonc
+"projects": [{ "id": "shipward", "…": "…",
+  "checks": { "default": ["node", "--test"] }, "checkTimeoutMs": 120000 }]
+"cards":    [{ "id": "SW-043", "…": "…", "check": "default" }]
+```
+
+You may **select** a declared check (`done({check: "e2e"})`); you may never
+define one. That is not ceremony — this file is written by you and by an
+unauthenticated `PUT /api/tracker`, so a command stored in it would be an exec
+for anything that can write the tracker. Argv arrays run with no shell, so
+nothing inside a check is ever parsed as syntax.
+
+What happens then:
+
+| Outcome | Card | Note |
+|---|---|---|
+| exits 0 | `review` / `pushed` as asked | `evidence`, stamped with the sha it ran against |
+| exits non-zero | **stays `claude`/`working`** | `finding`, with the exit code and the output |
+| timed out, could not spawn, or names a check nobody declares | **stays `claude`/`working`** | `finding` — absence of evidence, neither pass nor fail |
+| no check declared anywhere | `review` / `pushed` as asked | nothing; the reply alone says it proved nothing |
+
+Nothing here blocks the write: the note, the commit and the record all land. What
+a check governs is the **status granted**, not whether `done` may speak. To hand
+back over a check that did not pass, use `force: true` — which writes a
+`decision` entry naming the exit code, because an override nobody can find is
+indistinguishable from a check that passed.
+
+A pass proves that a declared command exited zero on a named tree. It does not
+prove the work is correct, and the note says so in those words. If the tree was
+dirty when the check ran, the evidence says that too — a pass over uncommitted
+changes is not reproducible from the sha.
 
 ## Onboarding another repo
 

@@ -1,0 +1,319 @@
+// Verification gating tests. Run: node --test
+//
+// SW-043. The rules are pure and get exercised exhaustively without spawning
+// anything; the spawn and the git read get real processes and one throwaway
+// repository, because a mock of spawn would only prove I can predict spawn —
+// and spawn's behaviour is the thing being relied on for safety here.
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import { mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import {
+  resolveCheck, timeoutOf, clip, readOutcome, kindFor, verdictText,
+  spawnCheck, runCheck, verificationOf, cmdOf,
+  DEFAULT_TIMEOUT_MS, OUTPUT_BUDGET,
+} from './verify.mjs';
+import { headState } from './git.mjs';
+import { verifyMsg } from './public/lib.js';
+
+const run = promisify(execFile);
+
+const project = (over = {}) => ({ id: 'test', name: 'Test', prefix: 'TS', ...over });
+const card = (over = {}) => ({ id: 'TS-001', p: 'test', title: 'a card', ...over });
+
+const repo = async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-verify-'));
+  await run('git', ['init', '-q', '-b', 'main'], { cwd: dir });
+  await run('git', ['config', 'user.email', 't@t'], { cwd: dir });
+  await run('git', ['config', 'user.name', 'T'], { cwd: dir });
+  await writeFile(join(dir, 'a.txt'), 'one\n');
+  await run('git', ['add', '.'], { cwd: dir });
+  await run('git', ['commit', '-qm', 'first'], { cwd: dir });
+  return dir;
+};
+
+/* ── resolution: a card selects, it never defines ────────── */
+
+test('a card names a check and the project declares it', () => {
+  const r = resolveCheck(project({ checks: { unit: ['node', '--test'] } }), card({ check: 'unit' }));
+  assert.deepEqual(r.argv, ['node', '--test']);
+  assert.equal(r.name, 'unit');
+});
+
+test('a card with no check falls back to the project default', () => {
+  const r = resolveCheck(project({ checks: { default: ['node', '-v'] } }), card());
+  assert.equal(r.name, 'default');
+  assert.deepEqual(r.argv, ['node', '-v']);
+});
+
+test('a name the project does not declare resolves to nothing executable, and says which name', () => {
+  const r = resolveCheck(project({ checks: { unit: ['node', '-v'] } }), card({ check: 'typo' }));
+  assert.equal(r.argv, null);
+  assert.match(r.reason, /"typo"/, 'the reply must name the check that is missing, or a typo is unfindable');
+});
+
+test('a project declaring nothing promises nothing', () => {
+  const r = resolveCheck(project(), card());
+  assert.equal(r.argv, null);
+  assert.equal(r.name, null, 'no name means nothing was promised — distinct from a name that resolves to nothing');
+});
+
+// The security property this whole design exists to hold. The tracker is
+// written by an agent and by an unauthenticated PUT; if a card could carry a
+// command, writing the file would be writing an exec.
+test('a card carrying a command instead of a name executes nothing', () => {
+  for (const hostile of [
+    ['rm', '-rf', '/'],
+    'rm -rf /',
+    { argv: ['rm', '-rf', '/'] },
+  ]) {
+    const r = resolveCheck(project({ checks: { default: ['node', '-v'] } }), card({ check: hostile }));
+    assert.equal(r.argv, null, `a card check of ${JSON.stringify(hostile)} must resolve to nothing`);
+  }
+});
+
+test('an empty argv is not a check', () => {
+  assert.equal(resolveCheck(project({ checks: { default: [] } }), card()).argv, null);
+});
+
+test('the timeout is the project\'s when it declares a sane one, and the default otherwise', () => {
+  assert.equal(timeoutOf(project({ checkTimeoutMs: 5000 })), 5000);
+  for (const bad of [0, -1, 1.5, '5000', null, undefined]) {
+    assert.equal(timeoutOf(project({ checkTimeoutMs: bad })), DEFAULT_TIMEOUT_MS);
+  }
+});
+
+/* ── reading an outcome ──────────────────────────────────── */
+
+test('exit zero passes, anything else fails', () => {
+  assert.equal(readOutcome({ exit: 0 }).state, 'pass');
+  assert.equal(readOutcome({ exit: 0 }).ok, true);
+  for (const exit of [1, 2, 127, null]) assert.equal(readOutcome({ exit }).ok, false);
+});
+
+test('a timeout outranks the exit code it raced with', () => {
+  // The kill can land after the child has already exited zero. Reading the exit
+  // code first would report a pass for a check that never finished.
+  const r = readOutcome({ exit: 0, timedOut: true });
+  assert.equal(r.state, 'timeout');
+  assert.equal(r.ok, false);
+});
+
+test('a spawn failure is not a test failure', () => {
+  assert.equal(readOutcome({ exit: null, spawnError: true }).state, 'error');
+});
+
+test('only a pass is filed as evidence', () => {
+  assert.equal(kindFor({ ran: true, state: 'pass' }), 'evidence');
+  for (const state of ['fail', 'timeout', 'error']) {
+    assert.equal(kindFor({ ran: true, state }), 'finding', `${state} is a finding, not evidence`);
+  }
+  assert.equal(kindFor({ ran: false }), 'finding');
+});
+
+/* ── what the note says ──────────────────────────────────── */
+
+test('a pass names the sha and refuses to claim the work is correct', () => {
+  const text = verdictText(
+    { ran: true, state: 'pass', name: 'unit', sha: 'abc1234', dirty: false, ms: 12 },
+    { cmd: 'node --test' },
+  );
+  assert.match(text, /abc1234/);
+  assert.match(text, /not that the work is correct/);
+});
+
+test('a pass over a dirty tree says so in the same breath as the sha', () => {
+  const text = verdictText(
+    { ran: true, state: 'pass', name: 'unit', sha: 'abc1234', dirty: true, ms: 12 },
+    { cmd: 'x' },
+  );
+  assert.match(text, /uncommitted/);
+  assert.match(text, /not reproducible/);
+});
+
+test('a failure carries the exit code and the output', () => {
+  const text = verdictText(
+    { ran: true, state: 'fail', name: 'unit', exit: 3, sha: 'abc1234', ms: 9, out: 'boom' },
+    { cmd: 'x' },
+  );
+  assert.match(text, /exit 3/);
+  assert.match(text, /boom/);
+});
+
+test('a timeout is neither a pass nor a failure', () => {
+  const text = verdictText({ ran: true, state: 'timeout', name: 'u', sha: null, ms: 100, out: '' }, { cmd: 'x' });
+  assert.match(text, /absence of evidence/);
+  assert.doesNotMatch(text, /passed/);
+});
+
+test('nothing run says plainly that nothing was proved', () => {
+  const text = verdictText({ ran: false, reason: 'no check declared' }, { cmd: '' });
+  assert.match(text, /proved nothing/);
+});
+
+test('a feed line for a held card never claims a move', () => {
+  for (const state of ['fail', 'timeout', 'error', 'unresolved']) {
+    const msg = verifyMsg('TS-001', state);
+    assert.doesNotMatch(msg, /Review|moved/i, `"${msg}" would read as a promotion that did not happen`);
+  }
+  assert.match(verifyMsg('TS-001', 'fail', { forced: true }), /override/);
+});
+
+/* ── clipping ────────────────────────────────────────────── */
+
+test('output under budget is untouched', () => {
+  assert.equal(clip('short'), 'short');
+});
+
+test('output over budget keeps both ends and states the cut', () => {
+  const long = `HEAD${'x'.repeat(9000)}TAIL`;
+  const out = clip(long, 400);
+  assert.ok(out.length < long.length);
+  assert.match(out, /^HEAD/, 'the head is where the failure usually is');
+  assert.match(out, /TAIL$/, 'the tail is where the summary usually is');
+  assert.match(out, /elided/, 'a silent clip is how a reader comes to believe they saw it all');
+});
+
+/* ── the spawn itself ────────────────────────────────────── */
+
+test('a passing command reports exit zero and its output', async () => {
+  const r = await spawnCheck(['node', '-e', 'console.log("hello")'], { cwd: process.cwd(), timeoutMs: 10000 });
+  assert.equal(r.exit, 0);
+  assert.match(r.out, /hello/);
+  assert.equal(r.timedOut, false);
+});
+
+test('a failing command reports its code and its stderr', async () => {
+  const r = await spawnCheck(
+    ['node', '-e', 'console.error("nope"); process.exit(3)'],
+    { cwd: process.cwd(), timeoutMs: 10000 },
+  );
+  assert.equal(r.exit, 3);
+  assert.match(r.out, /nope/);
+});
+
+test('a command that will not finish is killed and reported as a timeout', async () => {
+  const started = Date.now();
+  const r = await spawnCheck(['node', '-e', 'setInterval(() => {}, 1000)'], { cwd: process.cwd(), timeoutMs: 300 });
+  assert.equal(r.timedOut, true);
+  assert.ok(Date.now() - started < 5000, 'the timeout must bound the wait, not merely be recorded');
+});
+
+test('a program that does not exist is an error, not a throw', async () => {
+  const r = await spawnCheck(['definitely-not-a-program-xyz'], { cwd: process.cwd(), timeoutMs: 5000 });
+  assert.equal(r.spawnError, true);
+  assert.equal(r.exit, null);
+});
+
+// No shell means shell syntax is not syntax — it is just a filename that does
+// not exist. This is the belt that makes a hostile checks map inert.
+test('shell metacharacters are not interpreted', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-shell-'));
+  try {
+    const r = await spawnCheck([`echo hi > ${join(dir, 'pwned')}`], { cwd: dir, timeoutMs: 5000 });
+    assert.equal(r.spawnError, true);
+    await assert.rejects(stat(join(dir, 'pwned')), 'the redirect must not have been honoured by a shell');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+/* ── what tree it ran against ────────────────────────────── */
+
+test('headState reports the sha and a clean tree', async () => {
+  const dir = await repo();
+  try {
+    const h = await headState(dir);
+    assert.match(h.sha, /^[0-9a-f]{7,}$/);
+    assert.equal(h.dirty, false);
+    assert.equal(h.known, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('an uncommitted change makes the tree dirty, so the evidence cannot claim the sha', async () => {
+  const dir = await repo();
+  try {
+    await writeFile(join(dir, 'a.txt'), 'two\n');
+    assert.equal((await headState(dir)).dirty, true);
+    // Untracked files count too: a check that passes because of a file nobody
+    // else has is the same unreproducible claim.
+    await writeFile(join(dir, 'a.txt'), 'one\n');
+    await writeFile(join(dir, 'b.txt'), 'new\n');
+    assert.equal((await headState(dir)).dirty, true);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('outside a repository the sha is unknown rather than absent-and-clean', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-norepo-'));
+  try {
+    const h = await headState(dir);
+    assert.equal(h.sha, null);
+    assert.equal(h.known, false);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+/* ── the whole run ───────────────────────────────────────── */
+
+test('runCheck merges the outcome with the tree it ran against', async () => {
+  const dir = await repo();
+  try {
+    const r = await runCheck(
+      project({ checks: { default: ['node', '-e', 'process.exit(0)'] } }), card(), { cwd: dir },
+    );
+    assert.equal(r.ran, true);
+    assert.equal(r.ok, true);
+    assert.equal(r.dirty, false);
+    assert.match(r.sha, /^[0-9a-f]{7,}$/);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('runCheck with nothing declared runs nothing at all', async () => {
+  let called = false;
+  const r = await runCheck(project(), card(), { run: () => { called = true; } });
+  assert.equal(r.ran, false);
+  assert.equal(called, false, 'an undeclared check must not reach the spawn');
+  assert.equal(r.state, 'none');
+});
+
+test('a promised-but-missing check is its own state, not silence', async () => {
+  const r = await runCheck(project({ checks: { unit: ['node', '-v'] } }), card({ check: 'typo' }), {
+    run: () => assert.fail('nothing should be spawned'),
+  });
+  assert.equal(r.state, 'unresolved');
+  assert.equal(r.ok, false);
+});
+
+test('the record written to the card carries what a later session needs to expire it', () => {
+  const v = verificationOf(
+    { name: 'unit', argv: ['node', '--test'], exit: 0, ok: true, ms: 8, sha: 'abc1234', dirty: false, state: 'pass' },
+    '2026-07-31T10:00:00.000Z',
+  );
+  // SW-044 reads sha and at; SW-045 counts ok.
+  assert.deepEqual(v, {
+    check: 'unit', argv: ['node', '--test'], exit: 0, ok: true,
+    at: '2026-07-31T10:00:00.000Z', sha: 'abc1234', dirty: false, ms: 8,
+  });
+});
+
+test('a timed-out record says so and carries no exit code', () => {
+  const v = verificationOf({ name: 'u', argv: ['x'], exit: null, ok: false, ms: 300, sha: null, state: 'timeout' }, 'now');
+  assert.equal(v.timedOut, true);
+  assert.equal(v.exit, null);
+});
+
+test('the budget and the default timeout are the values the design ratified', () => {
+  assert.equal(OUTPUT_BUDGET, 2000);
+  assert.equal(DEFAULT_TIMEOUT_MS, 120000);
+  assert.equal(cmdOf(['node', '--test']), 'node --test');
+});

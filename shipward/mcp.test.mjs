@@ -886,3 +886,127 @@ test('a resolves-only close is exempt — the assertion is the note', async () =
   const card = (await doc()).cards.find((x) => x.id === 'TS-001');
   assert.equal(card.note[card.note.length - 1].resolves, 'TS-003');
 });
+
+/* ── SW-043: what done() proves ──────────────────────────── */
+
+// The seed project declares nothing, so every test above exercises the
+// unverified path. These write a board that does.
+const withChecks = async (checks, over = {}) => {
+  const d = seed();
+  d.projects[0].checks = checks;
+  Object.assign(d.cards[0], over);
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+};
+
+const PASS = ['node', '-e', 'process.exit(0)'];
+const FAIL = ['node', '-e', 'console.error("two tests failed"); process.exit(1)'];
+
+test('a passing check hands the card back and files evidence', async () => {
+  await withChecks({ default: PASS });
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', commit: 'abc1234', note: 'swapped the parser because the old one buffered' });
+  assert.match(text, /→ review at abc1234/);
+  assert.match(text, /passed/);
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.status, 'review');
+  assert.equal(card.verification.ok, true);
+  assert.equal(card.verification.exit, 0);
+  assert.equal(card.verification.check, 'default');
+  const last = card.note[card.note.length - 1];
+  assert.equal(last.kind, 'evidence', 'a pass is the one kind standup marks perishable');
+  assert.match(last.text, /not that the work is correct/);
+});
+
+test('a failing check leaves the card in progress and says so first', async () => {
+  await withChecks({ default: FAIL });
+  const { c } = await handshake();
+  await c.call('start', { id: 'TS-001' });
+  const { text, isError } = await c.call('done', { id: 'TS-001', commit: 'abc1234', note: 'think this is done' });
+
+  assert.equal(isError, false, 'the write lands — what the check governs is the status, not whether done may speak');
+  assert.match(text.split('\n')[0], /NOT handed back/, 'the verdict leads: a reply skimmed from the top must not read as success');
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.status, 'claude');
+  assert.equal(card.claude, 'working', 'still being worked on, which is what a refuted card is');
+  assert.equal(card.commit, 'abc1234', 'the commit is still recorded');
+  assert.equal(card.verification.ok, false);
+  assert.equal(card.verification.exit, 1);
+  assert.match(noteStr(card.note), /think this is done/, 'the agent\'s own note is not discarded');
+  const last = card.note[card.note.length - 1];
+  assert.equal(last.kind, 'finding');
+  assert.match(last.text, /two tests failed/, 'the output is what makes the finding actionable');
+  assert.equal((await doc()).feed[0].msg, 'TS-001 did not pass its check — still in progress');
+});
+
+test('force hands it back anyway and records the override where it can be found', async () => {
+  await withChecks({ default: FAIL });
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', note: 'shipping it, the check is wrong', force: true });
+  assert.match(text, /→ review/);
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.status, 'review');
+  const decision = card.note.find((e) => e.kind === 'decision');
+  assert.ok(decision, 'an override nobody can find is indistinguishable from a check that passed');
+  assert.match(decision.text, /exited 1/);
+  assert.match((await doc()).feed[0].msg, /override/);
+});
+
+test('a check the project does not declare is not a pass by typo', async () => {
+  await withChecks({ unit: PASS }, { check: 'unti' });
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', note: 'done here' });
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.status, 'claude', 'a promised check that cannot be run does not earn the promotion');
+  assert.match(text, /"unti"/, 'the reply names the check that is missing');
+  assert.equal(card.verification, undefined, 'nothing ran, so nothing is recorded as having run');
+});
+
+test('a project declaring no checks promotes as before, and says nothing was proved', async () => {
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', note: 'swapped the parser because the old one buffered' });
+  assert.match(text, /→ review/);
+  assert.match(text, /Unverified/);
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.note.length, 1, 'silence in the note when nothing was ever promised — the standup pays for every entry');
+  assert.equal(card.verification, undefined);
+});
+
+test('a check named at hand-back becomes the card\'s check', async () => {
+  await withChecks({ default: PASS, slow: FAIL });
+  const { c } = await handshake();
+  await c.call('done', { id: 'TS-001', check: 'slow', note: 'ran the slow one', force: true });
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.check, 'slow', 'the next done() is held to the same standard without being told again');
+  assert.equal(card.verification.check, 'slow');
+});
+
+test('a card may select a declared check but never define one', async () => {
+  await withChecks({ default: PASS });
+  const { c } = await handshake();
+  const { text, isError } = await c.call('done', { id: 'TS-001', check: ['rm', '-rf', '/'] });
+  assert.equal(isError, true, 'a check is a NAME; anything else is refused at the tool boundary');
+  assert.match(text, /must be a string/);
+  const d = await doc();
+  assert.equal(d.projects[0].checks.default[0], 'node', 'no tool call may edit the declared map');
+});
+
+test('the tracker lock is not held while a check runs', async () => {
+  // D3. mutate() holds the cross-process lock for the length of its callback
+  // and waiters give up at 60s, so a check run inside one would starve the desk
+  // and every other session for as long as the suite takes.
+  await withChecks({ default: ['node', '-e', 'setTimeout(() => process.exit(0), 1500)'] });
+  const { c } = await handshake();
+  const reader = await handshake();
+
+  const order = [];
+  const slow = c.call('done', { id: 'TS-001', note: 'a slow suite' }).then(() => order.push('done'));
+  const quick = reader.c.call('standup', {}).then(() => order.push('standup'));
+  await Promise.all([slow, quick]);
+
+  assert.deepEqual(order, ['standup', 'done'], 'a reader must not queue behind a running check');
+});

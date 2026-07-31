@@ -40,6 +40,22 @@
           "prefix": {
             "type": "string",
             "description": "card id prefix, e.g. 'BW'"
+          },
+          "checks": {
+            "type": "object",
+            "description": "Named checks done() may run, declared by a HUMAN (SW-043). No MCP tool writes this map. Each value is an argv array run without a shell, so a check cannot carry a payload.",
+            "additionalProperties": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "checkTimeoutMs": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "how long a check may run before it counts as absence of evidence; default 120000"
           }
         }
       }
@@ -170,6 +186,70 @@
               }
             ],
             "description": "context / decisions; Claude Code appends here. String prose or an array of dated entries."
+          },
+          "check": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "NAME of a check declared in this card's project. A name nothing declares is unverified, never executed (SW-043)."
+          },
+          "verification": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "description": "What the last check proved, and about which tree (SW-043). Absence means nothing was ever run.",
+            "required": [
+              "check",
+              "exit",
+              "ok",
+              "at",
+              "sha"
+            ],
+            "properties": {
+              "check": {
+                "type": "string",
+                "description": "the name that was resolved"
+              },
+              "argv": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "exit": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "description": "null when the check timed out or could not be spawned"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "sha": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "HEAD when the check ran — what SW-044 reads to expire this evidence"
+              },
+              "dirty": {
+                "type": "boolean",
+                "description": "true if the tree carried uncommitted changes; a pass nobody else can reproduce"
+              },
+              "ms": {
+                "type": "integer"
+              },
+              "timedOut": {
+                "type": "boolean"
+              }
+            }
           },
           "created": {
             "type": "string",

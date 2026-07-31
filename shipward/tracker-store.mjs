@@ -136,6 +136,176 @@ export class ConflictError extends Error {
 // bytes do — unlike mtime, which a heartbeat or a touch would move.
 export const etagOf = (raw) => `"${createHash('sha256').update(raw).digest('hex').slice(0, 16)}"`;
 
+/* ── the notes sidecar (SW-039) ──────────────────────────────
+   Note text is 68-73% of every tracker measured (shipward 116 KB of 169 KB,
+   Catch 38 KB of 52 KB), it is append-only by protocol, and cards are never
+   deleted — so the one file grew without bound and took `git diff` and the
+   documented MCP-offline fallback ("read → modify → write the whole file")
+   down with it.
+
+   So note ENTRIES live in .shipward/notes.jsonl and the tracker holds board
+   state. This module is the only code that knows: read() hydrates card.note
+   from the sidecar and every writer strips it back out, so all fifteen call
+   sites above the store still see card.note as an array and still append to it
+   through appendedNote(). Nothing above this file changed.
+
+   SW-007 rejected a sidecar for the MCP heartbeat, on the grounds that one
+   occasionally dirty file beats two that can disagree. That objection does not
+   reach here, and the difference is the whole design: these two files hold
+   DISJOINT facts. The tracker never carries note text after a write, the
+   sidecar never carries board state, so there is no fact for them to disagree
+   about — where the heartbeat would have been duplicated in both.
+
+   Append-only, oldest first, one JSON object per line. Never rewritten and
+   never compacted: it is the memory, and the protocol above it says push an
+   entry, never edit one. */
+export const NOTES = process.env.SHIPWARD_NOTES || join(DIR, 'notes.jsonl');
+
+// Identity of a note entry, and the reason a duplicate append is survivable.
+// NUL-joined for the same reason feedKey is: no timestamp, card id or note
+// body can contain it, so two different entries cannot collide by containing
+// the separator.
+const noteKey = (card, e) => [card, e?.t, e?.text].join('\u0000');
+
+// Claude appends prose segments with " || ". Duplicated from memory-lib's
+// SEGMENT_SEP rather than imported: the store deliberately imports nothing
+// from public/, the same way NOTE_KIND mirrors ALL_KINDS below.
+const SEGMENT_SEP = ' || ';
+
+// A card's note as entries, whatever form the caller left it in. A plain-string
+// note is legacy (CLAUDE.md still blesses hand-editing) and converts here,
+// stamped with the card's own clock — the date a reader would have guessed for
+// it anyway, and the same fallback appendedNote() uses.
+function noteEntries(card) {
+  const n = card?.note;
+  if (n == null || n === '') return [];
+  if (Array.isArray(n)) return n.filter((e) => isObj(e) && isStr(e.text) && e.text.trim());
+  if (!isStr(n)) return [];
+  return n.split(SEGMENT_SEP).map((s) => s.trim()).filter(Boolean)
+    .map((text) => ({ t: card.created, text }));
+}
+
+// Everything the entry carries, plus the card it belongs to. Deliberately NOT
+// a field list: the first version of this copied t/text/kind/resolves, and
+// SW-053 landed `sha` and `dirty` on entries the same week — the sidecar
+// dropped them silently, and only SW-053's own round-trip test noticed. A
+// store that has to be edited every time an entry grows a field is a store
+// that will lose one.
+const noteRecord = (cardId, e) => ({ card: cardId, ...e });
+
+// A missing sidecar is a board that has never written a note, not an error —
+// every one of the ten onboarded repos starts that way. A line that will not
+// parse is skipped and COUNTED on stderr: silently dropping memory is the
+// failure this file exists to prevent, and the tracker is in git.
+async function readNotes() {
+  let raw = '';
+  try {
+    raw = await readFile(NOTES, 'utf8');
+  } catch (err) {
+    if (err.code !== 'ENOENT') throw new TrackerReadError(`cannot read ${NOTES}: ${err.code}`);
+    return { raw: '', byCard: new Map(), keys: new Set() };
+  }
+  return { raw, ...parseNotes(raw) };
+}
+
+// The pure half, with no path in it. Exported because the tests need to read a
+// board the way every consumer sees it, and a second implementation of this in
+// the test files would be free to drift from the one that ships.
+export function parseNotes(raw) {
+  const byCard = new Map();
+  const keys = new Set();
+  let skipped = 0;
+  for (const line of raw.split('\n')) {
+    const s = line.trim();
+    if (!s) continue;
+    let e;
+    try { e = JSON.parse(s); } catch { skipped++; continue; }
+    if (!isObj(e) || !isStr(e.card) || !isStr(e.text) || !isStr(e.t)) { skipped++; continue; }
+    const k = noteKey(e.card, e);
+    if (keys.has(k)) continue;             // a re-append after a failed write
+    keys.add(k);
+    // Everything but `card`, for the same reason noteRecord writes everything
+    // but `card`: a field list here would drop whatever an entry grows next.
+    const { card, ...entry } = e;
+    if (!byCard.has(card)) byCard.set(card, []);
+    byCard.get(card).push(entry);
+  }
+  if (skipped) {
+    process.stderr.write(`shipward: skipped ${skipped} unreadable line${skipped === 1 ? '' : 's'} in ${NOTES}\n`);
+  }
+  return { byCard, keys };
+}
+
+// Sidecar entries onto the cards. Any note still inline is legacy or a
+// half-finished migration; it is merged rather than ignored, deduped by
+// identity so a re-append cannot double it, and ordered by its own clock.
+// Array.prototype.sort is stable, so entries stamped in the same millisecond
+// keep the order they were appended in.
+export function hydrate(doc, byCard) {
+  return {
+    ...doc,
+    cards: doc.cards.map((c) => {
+      const seen = new Set();
+      const merged = [];
+      for (const e of [...noteEntries(c), ...(byCard.get(c.id) || [])]) {
+        const k = noteKey(c.id, e);
+        if (seen.has(k)) continue;
+        seen.add(k);
+        merged.push(e);
+      }
+      merged.sort((a, b) => (Date.parse(a.t) || 0) - (Date.parse(b.t) || 0));
+      // Stripped and re-added rather than spread over, so `note` lands in the
+      // same place whatever the input looked like. A hand-written tracker puts
+      // it mid-object and a written one has no `note` key at all, and without
+      // this a read-only tool call appeared to rewrite the whole board — the
+      // document was identical, only the key order moved.
+      const { note, ...rest } = c;
+      return { ...rest, note: merged };
+    }),
+  };
+}
+
+// The write half: the document as it goes to disk, plus the lines the sidecar
+// does not have yet. On a tracker that has never been split, EVERY entry is
+// new — which is exactly the migration, performed by the first write and
+// needing no separate step or flag day.
+//
+// Entries the incoming document has DROPPED are not removed from the sidecar.
+// Cards are never deleted by protocol and notes are append-only, so a
+// disappearing entry is a caller mistake or a stale base, and the next read
+// hands it back. The sidecar can gain memory it should not have; it cannot
+// lose memory it should.
+function extract(doc, keys) {
+  const lines = [];
+  const cards = doc.cards.map((c) => {
+    for (const e of noteEntries(c)) {
+      const k = noteKey(c.id, e);
+      if (keys.has(k)) continue;
+      keys.add(k);                         // also dedups within this one write
+      lines.push(JSON.stringify(noteRecord(c.id, e)));
+    }
+    const { note, ...rest } = c;
+    return rest;
+  });
+  return { stripped: { ...doc, cards }, lines };
+}
+
+// Unlike archiveDropped, this one THROWS. The feed archive is a copy of
+// something the tracker still holds; this is the only copy there is, so a
+// sidecar that will not take the write must fail the write rather than let the
+// tracker be rewritten without it.
+async function appendNotes(lines) {
+  if (!lines.length) return '';
+  const body = `${lines.join('\n')}\n`;
+  await appendFile(NOTES, body, 'utf8');
+  return body;
+}
+
+// One etag over BOTH files: the desk's If-Match has to notice a note that
+// landed as surely as a card that moved, and after SW-039 those live in
+// different files.
+const stateEtag = (trackerRaw, notesRaw) => etagOf(`${trackerRaw}\u0000${notesRaw}`);
+
 /* ── validation ──────────────────────────────────────────────
    The tracker is Claude Code's memory: a write that satisfies the caller but
    not .shipward/schema.json poisons the next session. */
@@ -512,25 +682,43 @@ async function sweepTmp() {
   } catch { /* directory unreadable — nothing to sweep */ }
 }
 
-// Returns the bytes as well as the parsed document: GET serves the file's own
-// bytes, so a poll cannot silently reformat what Claude Code wrote.
+// Returns the serialized document as well as the parsed one, because GET
+// serves those bytes directly.
+//
+// Before SW-039 `raw` was literally the file's bytes, so a poll could not
+// reformat what Claude Code wrote by hand. It is now the serialization of the
+// HYDRATED document: the notes live in a second file, and bytes from one file
+// alone would serve the desk a board with no memory on it. The guarantee that
+// replaced it is the etag, which spans both files — a hand edit still cannot
+// be silently overwritten, it is just detected by content rather than by
+// identity of bytes.
 export async function readRaw() {
-  let raw;
+  let fileRaw;
   try {
-    raw = await readFile(TRACKER, 'utf8');
+    fileRaw = await readFile(TRACKER, 'utf8');
   } catch (err) {
     if (err.code === 'ENOENT') throw new MissingTrackerError(`tracker.json not found at ${TRACKER}`);
     throw new TrackerReadError(`cannot read ${TRACKER}: ${err.code}`);
   }
-  let doc;
+  let parsed;
   try {
-    doc = JSON.parse(raw);
+    parsed = JSON.parse(fileRaw);
   } catch {
     throw new ValidationError('tracker.json is not valid JSON');
   }
-  const bad = validate(doc);
+  const bad = validate(parsed);
   if (bad) throw new ValidationError(`tracker.json is not a valid tracker document: ${bad}`);
-  return { raw, doc, etag: etagOf(raw) };
+
+  const notes = await readNotes();
+  const doc = hydrate(parsed, notes.byCard);
+  // Validated AGAIN after hydration: the sidecar is a separate file that a
+  // human can edit, and an entry with a bad kind or a malformed `resolves`
+  // would otherwise reach every reader unchecked. readNotes only guarantees
+  // the line parsed and carried the three fields it is keyed by.
+  const badHydrated = validate(doc);
+  if (badHydrated) throw new ValidationError(`${NOTES} holds an entry the tracker schema rejects: ${badHydrated}`);
+
+  return { raw: serialize(doc), doc, etag: stateEtag(fileRaw, notes.raw), notes };
 }
 
 export const read = async () => (await readRaw()).doc;
@@ -565,11 +753,25 @@ async function atomicWrite(doc, held) {
   return body;
 }
 
+// The write half of every mutation, in the one order that cannot lose memory:
+// notes to the sidecar first, board to the tracker second. Same doctrine as
+// archiveDropped — if the tracker write then fails, the entries are already
+// durable and hydrate() dedups the re-append on the next attempt, whereas the
+// other order commits a board whose notes were never saved.
+async function commitDoc(out, held, notes) {
+  const { stripped, lines } = extract(out, notes.keys);
+  const appended = await appendNotes(lines);
+  const fileRaw = await atomicWrite(stripped, held);
+  // The caller is handed the HYDRATED document, byte-identical to what the
+  // next readRaw() will serve — the desk PUTs back what it was given.
+  return { body: serialize(out), etag: stateEtag(fileRaw, notes.raw + appended) };
+}
+
 // Read-modify-write under one lock. `fn` receives the current document and
 // returns the replacement, or null/undefined for a deliberate no-op.
 export async function mutate(fn, { signal } = {}) {
   return withLock(async (held) => {
-    const doc = await read();
+    const { doc, notes } = await readRaw();
     const before = serialize(doc);
     // Snapshot the feed BEFORE fn runs: fn gets the live document, and a
     // callback that reassigns doc.feed would otherwise destroy the only record
@@ -600,8 +802,8 @@ export async function mutate(fn, { signal } = {}) {
     // miss exactly the drops the cap causes.
     warnCardLoss(JSON.parse(before).cards, out.cards);
     await archiveDropped(feedBefore, out.feed);
-    const body = await atomicWrite(out, held);
-    return { doc: out, body, changed: true, etag: etagOf(body) };
+    const { body, etag } = await commitDoc(out, held, notes);
+    return { doc: out, body, changed: true, etag };
   }, { signal });
 }
 
@@ -632,7 +834,10 @@ export async function replace(doc, ifMatch) {
     }
     warnCardLoss(current?.doc?.cards, out.cards);
     await archiveDropped(current?.doc?.feed, out.feed);
-    const body = await atomicWrite(out, held);
-    return { doc: out, body, changed: true, etag: etagOf(body) };
+    // No tracker on disk means nothing to preserve and no sidecar to dedup
+    // against — every entry in the incoming body is new.
+    const notes = current?.notes || { raw: '', byCard: new Map(), keys: new Set() };
+    const { body, etag } = await commitDoc(out, held, notes);
+    return { doc: out, body, changed: true, etag };
   });
 }

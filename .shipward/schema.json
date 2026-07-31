@@ -142,6 +142,7 @@
             "description": "short sha of the latest relevant commit"
           },
           "note": {
+            "description": "Since SW-039 note entries are STORED in .shipward/notes.jsonl, not here — a written tracker carries no note text at all. This field remains valid because the store hydrates it on every read (so every consumer still sees card.note) and because hand-editing a note straight into the tracker is still supported: the next write moves it to the sidecar.",
             "oneOf": [
               {
                 "type": "string",

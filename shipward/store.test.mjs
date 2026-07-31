@@ -530,3 +530,160 @@ test('mutate is guarded too — a callback that eats the board is announced', as
     await mutate((doc) => { doc.cards = []; return doc; });`);
   assert.match(stderr, /drops 6 of 6 cards/);
 });
+
+/* ── the notes sidecar (SW-039) ────────────────────────────────
+   Note text was 68-73% of every tracker measured, is append-only by protocol,
+   and cards are never deleted — so the board file grew without bound. Entries
+   now live in .shipward/notes.jsonl and the store is the only code that knows. */
+
+const notesPath = () => join(sandbox, '.shipward', 'notes.jsonl');
+const notesLines = async () => (await readFile(notesPath(), 'utf8').catch(() => ''))
+  .split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+
+const carded = (n, over = {}) => ({ ...card(n), ...over });
+
+// The existing withStore(), with the store already imported as `store`.
+const withStore = (body) => inChild(`import * as store from ${JSON.stringify(STORE)};\n${body}`);
+
+test('the first ordinary write migrates inline notes into the sidecar', async () => {
+  // No flag day and no migration step: a tracker that has never been split has
+  // every entry "missing" from the sidecar, so the first write moves them all.
+  const d = seed();
+  d.cards = [carded(1, { note: [{ t: '2026-07-02T00:00:00Z', kind: 'finding', text: 'the lock broke' }] })];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  await withStore('await store.mutate((doc) => doc);');
+
+  const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(onDisk.cards[0].note, undefined, 'the board file carries no note text at all');
+  assert.deepEqual(await notesLines(), [
+    { card: 'TS-001', t: '2026-07-02T00:00:00Z', kind: 'finding', text: 'the lock broke' },
+  ], 'and the sidecar carries it, keyed by card');
+
+  const { stdout } = await withStore('const { doc } = await store.readRaw(); process.stdout.write(JSON.stringify(doc.cards[0].note));');
+  assert.deepEqual(JSON.parse(stdout), [{ t: '2026-07-02T00:00:00Z', kind: 'finding', text: 'the lock broke' }],
+    'and a reader still sees exactly what it saw before the split');
+});
+
+test('a legacy prose note migrates as segments, stamped with the card clock', async () => {
+  const d = seed();
+  d.cards = [carded(1, { note: 'SPEC CAP-4. Split from SW-001. || SHIPPED: the table renders.' })];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  await withStore('await store.mutate((doc) => doc);');
+  assert.deepEqual(await notesLines(), [
+    { card: 'TS-001', t: '2026-07-01T00:00:00Z', text: 'SPEC CAP-4. Split from SW-001.' },
+    { card: 'TS-001', t: '2026-07-01T00:00:00Z', text: 'SHIPPED: the table renders.' },
+  ], 'hand-edited prose is still supported, and converts on the way out');
+});
+
+test('re-appending an entry the sidecar already holds does not double it', async () => {
+  // The write order is notes first, tracker second, so a tracker write that
+  // fails leaves entries already durable. The next attempt re-appends them, and
+  // that must be a no-op rather than a duplicated memory.
+  const d = seed();
+  d.cards = [carded(1, { note: [{ t: '2026-07-02T00:00:00Z', text: 'once' }] })];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  await withStore('await store.mutate((doc) => doc);');
+  await withStore('await store.mutate((doc) => doc);');
+  await withStore('const { doc } = await store.readRaw(); await store.replace(doc);');
+
+  assert.equal((await notesLines()).length, 1, 'one entry, however many writes touched it');
+});
+
+test('an entry the incoming document dropped is kept, not deleted', async () => {
+  // The sidecar can gain memory it should not have; it must never lose memory
+  // it should. Notes are append-only by protocol and cards are never deleted,
+  // so a vanished entry is a stale base or a caller mistake.
+  const d = seed();
+  d.cards = [carded(1, { note: [{ t: '2026-07-02T00:00:00Z', text: 'the finding' }] })];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  await withStore('await store.mutate((doc) => doc);');
+
+  await withStore('await store.mutate((doc) => { doc.cards[0].note = []; return doc; });');
+
+  assert.equal((await notesLines()).length, 1, 'the sidecar still holds it');
+  const { stdout } = await withStore('const { doc } = await store.readRaw(); process.stdout.write(String(doc.cards[0].note.length));');
+  assert.equal(stdout, '1', 'and the next read hands it back');
+});
+
+test('a malformed sidecar line is skipped and counted, never fatal', async () => {
+  const d = seed();
+  d.cards = [carded(1)];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  await writeFile(notesPath(), [
+    '{"card":"TS-001","t":"2026-07-02T00:00:00Z","text":"good one"}',
+    'not json at all',
+    '{"card":"TS-001","text":"no timestamp"}',
+    '',
+  ].join('\n') + '\n');
+
+  const { stdout, stderr } = await withStore(
+    'const { doc } = await store.readRaw(); process.stdout.write(JSON.stringify(doc.cards[0].note));',
+  );
+  assert.deepEqual(JSON.parse(stdout), [{ t: '2026-07-02T00:00:00Z', text: 'good one' }],
+    'the readable entry survives');
+  assert.match(stderr, /skipped 2 unreadable lines/, 'and the loss is reported, never silent');
+});
+
+test('a sidecar entry the schema rejects fails the read loudly', async () => {
+  // The sidecar is a second file a human can edit. An entry with an invalid
+  // kind used to be impossible; now it has its own door into every reader.
+  const d = seed();
+  d.cards = [carded(1)];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  await writeFile(notesPath(), '{"card":"TS-001","t":"2026-07-02T00:00:00Z","kind":"nonsense","text":"x"}\n');
+
+  await assert.rejects(
+    withStore('await store.readRaw();'),
+    (err) => /holds an entry the tracker schema rejects/.test(err.stderr),
+    'the reader refuses rather than passing an invalid kind to standup and recall',
+  );
+});
+
+test('the etag moves when only a note changed', async () => {
+  // The desk's If-Match has to notice a note that landed as surely as a card
+  // that moved, and after SW-039 those live in different files.
+  const d = seed();
+  d.cards = [carded(1)];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const tag = async () => (await withStore('const { etag } = await store.readRaw(); process.stdout.write(etag);')).stdout;
+  const before = await tag();
+  await withStore(`await store.mutate((doc) => {
+    doc.cards[0].note = [{ t: '2026-07-02T00:00:00Z', text: 'something learned' }];
+    return doc;
+  });`);
+  assert.notEqual(await tag(), before, 'a board whose memory changed is not the same board');
+});
+
+test('a board with no notes never creates the sidecar', async () => {
+  // Nine of the ten onboarded repos start here, and an empty file in every one
+  // of them is nine files that say nothing.
+  await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(1))}); return doc; });`);
+  await assert.rejects(stat(notesPath()), { code: 'ENOENT' });
+});
+
+test('the sidecar preserves every field an entry carries, not a known list', async () => {
+  // The first version of noteRecord copied t/text/kind/resolves. SW-053 landed
+  // `sha` and `dirty` on entries in the same week and the sidecar dropped them
+  // silently — caught only because SW-053 had its own round-trip test. A field
+  // list here is a slow leak, so this asserts on a field nobody has invented.
+  const d = seed();
+  d.cards = [carded(1)];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const entry = {
+    t: '2026-07-02T00:00:00Z', kind: 'evidence', text: 'node --test passed',
+    sha: 'abc1234', dirty: true, somethingAddedLater: { nested: 1 },
+  };
+  await withStore(`await store.mutate((doc) => {
+    doc.cards[0].note = [${JSON.stringify(entry)}];
+    return doc;
+  });`);
+
+  assert.deepEqual(await notesLines(), [{ card: 'TS-001', ...entry }], 'written whole');
+  const { stdout } = await withStore('const { doc } = await store.readRaw(); process.stdout.write(JSON.stringify(doc.cards[0].note));');
+  assert.deepEqual(JSON.parse(stdout), [entry], 'and read back whole');
+});

@@ -11,9 +11,18 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hydrate, parseNotes } from './tracker-store.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
+
+// The board as the hooks' own reader sees it: since SW-039 note entries live in
+// .shipward/notes.jsonl, so the tracker file on its own shows a board with no
+// memory on it.
+const boardOnDisk = async (trackerPath) => hydrate(
+  JSON.parse(await readFile(trackerPath, 'utf8')),
+  parseNotes(await readFile(join(dirname(trackerPath), 'notes.jsonl'), 'utf8').catch(() => '')).byCard,
+);
 const HOOK = join(ROOT, '.claude', 'hooks', 'shipward.mjs');
 
 let sandbox, tracker;
@@ -281,7 +290,7 @@ test('session-start FIXES what git can prove and only reports the rest', async (
     assert.match(ctx, /Claude working \(0\)/, 'and the standup is still there');
 
     // The claim has to be true on disk, not just in the prose.
-    const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    const onDisk = await boardOnDisk(tracker);
     const c = onDisk.cards.find((x) => x.id === 'TS-001');
     assert.ok(c.commit, 'the sha git already knew was written to the card');
     assert.equal(c.status, 'backlog', 'the inference was NOT applied — that needs an explicit ask');

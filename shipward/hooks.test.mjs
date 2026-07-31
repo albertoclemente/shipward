@@ -398,3 +398,61 @@ test('a commit-only correction is not announced as a status change', async () =>
     await rm(repo, { recursive: true, force: true });
   }
 });
+
+/* -- the memory has to be IN git (SW-055) ------------------- */
+
+// A repo whose board is on disk with the sidecar left untracked — the state
+// SW-039 put every board in the moment it migrated.
+async function repoWithLooseMemory({ commit = false } = {}) {
+  const { execFile: ex } = await import('node:child_process');
+  const { promisify: p } = await import('node:util');
+  const sh = p(ex);
+  const repo = await mkdtemp(join(tmpdir(), 'shipward-hookmem-'));
+  const g = (...a) => sh('git', a, { cwd: repo });
+  await g('init', '-q', '-b', 'main');
+  await g('config', 'user.email', 'test@example.com');
+  await g('config', 'user.name', 'Test');
+  await writeFile(join(repo, 'a.txt'), 'one');
+  await mkdir(join(repo, '.shipward'), { recursive: true });
+  await writeFile(join(repo, '.shipward', 'notes.jsonl'), '{"card":"TS-001","t":"2026-07-31T00:00:00Z","text":"x"}\n');
+  await g('add', '-A');
+  await g('commit', '-qm', 'first');
+  if (!commit) {
+    await g('rm', '-q', '--cached', '.shipward/notes.jsonl');
+    await g('commit', '-qm', 'untrack it');
+  }
+  return repo;
+}
+
+test('session-start says so when the memory is not in git, and how to fix it', async () => {
+  const repo = await repoWithLooseMemory();
+  try {
+    const { parsed, code } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const ctx = parsed?.hookSpecificOutput?.additionalContext ?? '';
+    assert.match(ctx, /Not in git: \.shipward\/notes\.jsonl/);
+    assert.match(ctx, /invisible to `git commit -a`/, 'says WHY it is easy to miss');
+    assert.match(ctx, /git add \.shipward\/notes\.jsonl/, 'and hands over the exact command');
+    assert.match(ctx, /Claude working/, 'and the standup is still there — this is an addition, not a takeover');
+    assert.equal(code, 0, 'a warning never fails the session');
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+test('session-start is silent about the memory once it is committed', async () => {
+  // The warning has to stop. One that fires every session is one a reader
+  // learns to skip, and a skipped warning protects nothing (SW-015).
+  const repo = await repoWithLooseMemory({ commit: true });
+  try {
+    const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const ctx = parsed?.hookSpecificOutput?.additionalContext ?? '';
+    assert.doesNotMatch(ctx, /Not in git/);
+    assert.match(ctx, /Claude working/, 'the standup is unaffected');
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+test('a repo with no board at all is not nagged about a file it never had', async () => {
+  const repo = await repoWithDrift();               // real repo, no .shipward/ in it
+  try {
+    const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    assert.doesNotMatch(parsed?.hookSpecificOutput?.additionalContext ?? '', /Not in git/);
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});

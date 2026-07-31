@@ -123,6 +123,47 @@ const NO_DRIFT = { text: '', changed: false };
 //
 // It still exits silently on every failure, and it still says NOTHING rather
 // than "all clear" when git cannot be read.
+// SW-055. The memory is only recoverable because it is in git, and SW-039 gave
+// this repo a SECOND memory file that arrives untracked — invisible to
+// `git commit -a`, easy to miss in `git status`. It went wrong within minutes
+// of landing: a board was committed with its 152 note entries left behind in a
+// working tree, and nothing anywhere said so.
+//
+// A warning, never a gate, like every other hook here. Untracked only, so it is
+// rare and it stops once the file is added — see untrackedMemory() for why
+// "modified" would have been noise.
+const MEMORY_BUDGET_MS = 1500;
+
+async function unsavedMemory(doc, project) {
+  try {
+    const { untrackedMemory } = await import(join(ROOT, 'shipward', 'git.mjs'));
+    const timeout = new Promise((resolve) => {
+      const t = setTimeout(() => resolve(null), MEMORY_BUDGET_MS);
+      t.unref?.();
+    });
+    const out = await Promise.race([untrackedMemory(), timeout]);
+    // Timed out, or git could not be read. Silence rather than a guess, the
+    // same rule the audit above follows.
+    if (!out?.known || !out.files.length) return '';
+
+    // Count what is actually at risk, so the warning is a measurement rather
+    // than a scold. The document is already in hand, so this costs nothing.
+    let entries = 0;
+    try {
+      const { memoryEntries } = await import(join(ROOT, 'shipward', 'public', 'memory-lib.js'));
+      entries = memoryEntries(doc.cards, project.id).length;
+    } catch { /* the count is a nicety; the warning is not */ }
+
+    const count = entries ? ` (${entries} ${entries === 1 ? 'entry' : 'entries'})` : '';
+    return `\n\n⚠ Not in git: ${out.files.join(', ')}. `
+      + `This is where the memory lives${count}, and an untracked file is invisible to \`git commit -a\`. `
+      + `The only reason a clobbered board is recoverable is that it was committed.\n`
+      + `  git add ${out.files.join(' ')}`;
+  } catch {
+    return '';
+  }
+}
+
 async function drift(doc, project) {
   try {
     const [git, rec] = await Promise.all([
@@ -193,11 +234,12 @@ async function sessionStart() {
     const { memoryEntries, anchors } = await import(join(ROOT, 'shipward', 'public', 'memory-lib.js'));
     driftMap = await driftSince(anchors(memoryEntries(doc.cards, project.id)));
   } catch { driftMap = undefined; }
+  const uncommitted = await unsavedMemory(doc, project);
   context('SessionStart',
     `Shipward — the tracker is your memory for this repo, and this is its current state. `
     + `You did not ask for it because a session that has to remember to look is a session that will not.\n\n`
     + `${standup.standupText(doc, project, { drift: driftMap })}`
-    + `${text}\n\n`
+    + `${text}${uncommitted}\n\n`
     + `Before editing a file you have not touched yet, call recall({file:"…"}).`);
 }
 

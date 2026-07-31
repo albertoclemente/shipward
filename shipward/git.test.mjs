@@ -12,7 +12,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   readGit, isOnTrunk, deriveFindings, summarise, driftSince, headState,
-  reconcilePlan, CERTAIN, PROPOSED, REPORTED,
+  reconcilePlan, CERTAIN, PROPOSED, REPORTED, untrackedMemory,
 } from './git.mjs';
 
 const run = promisify(execFile);
@@ -372,4 +372,67 @@ test('a board-only change alongside a source change is still dirty', async () =>
     assert.equal(h.dirty, true);
     assert.deepEqual(h.dirtyPaths, ['a.txt'], 'the board is filtered out, not the whole check');
   } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+/* -- the memory has to be IN git (SW-055) ------------------- */
+
+// A repo with a board on disk. `ignored` puts .shipward/notes.jsonl in
+// .gitignore, which is the case --exclude-standard would have hidden.
+async function repoWithBoard({ commit = false, ignored = false } = {}) {
+  const repo = await mkdtemp(join(tmpdir(), 'shipward-mem-'));
+  const g = (...a) => run('git', a, { cwd: repo });
+  await g('init', '-q', '-b', 'main');
+  await g('config', 'user.email', 'test@example.com');
+  await g('config', 'user.name', 'Test');
+  await writeFile(join(repo, 'a.txt'), 'one');
+  if (ignored) await writeFile(join(repo, '.gitignore'), '.shipward/notes.jsonl\n');
+  await mkdir(join(repo, '.shipward'), { recursive: true });
+  await writeFile(join(repo, '.shipward', 'tracker.json'), '{}');
+  await writeFile(join(repo, '.shipward', 'notes.jsonl'), '{"card":"SW-001","t":"2026-07-31T00:00:00Z","text":"x"}\n');
+  await g('add', '-A');
+  await g('commit', '-qm', 'first');
+  if (!commit) {
+    // Untrack the sidecar but leave it on disk — exactly the state SW-039 left
+    // every board in: the file exists, git has never heard of it.
+    await g('rm', '-q', '--cached', '.shipward/notes.jsonl').catch(() => {});
+    await g('commit', '-qm', 'drop it from the index').catch(() => {});
+  }
+  return repo;
+}
+
+test('an untracked notes.jsonl is reported — it is the memory, and git has never seen it', async () => {
+  const repo = await repoWithBoard();
+  try {
+    const out = await untrackedMemory(repo);
+    assert.equal(out.known, true);
+    assert.deepEqual(out.files, ['.shipward/notes.jsonl']);
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+test('a committed board reports nothing at all', async () => {
+  const repo = await repoWithBoard({ commit: true });
+  try {
+    const out = await untrackedMemory(repo);
+    assert.equal(out.known, true);
+    assert.deepEqual(out.files, [], 'and so the warning stops firing once it is fixed');
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+test('a GITIGNORED notes.jsonl is reported too, which is the worse case', async () => {
+  // --exclude-standard would have hidden this one. An ignored memory file is
+  // not safer than an untracked one; it is untracked forever and on purpose.
+  const repo = await repoWithBoard({ ignored: true });
+  try {
+    const out = await untrackedMemory(repo);
+    assert.deepEqual(out.files, ['.shipward/notes.jsonl']);
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+test('outside a repository it says "we do not know", never "nothing is wrong"', async () => {
+  const bare = await mkdtemp(join(tmpdir(), 'shipward-nogit-'));
+  try {
+    const out = await untrackedMemory(bare);
+    assert.equal(out.known, false, 'no claim without git');
+    assert.deepEqual(out.files, []);
+  } finally { await rm(bare, { recursive: true, force: true }); }
 });

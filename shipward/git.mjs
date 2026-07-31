@@ -140,6 +140,34 @@ const TRUNK_WINDOW = 5000;
 export const BOARD_DIR = '.shipward/';
 const DIRTY_SHOWN = 10;
 
+// The files that ARE the memory. Losing any of them loses what this repo knows,
+// and the whole recovery story for a clobber is "it is committed to git"
+// (SW-033) — which is only true if someone actually committed it.
+export const MEMORY_FILES = [
+  '.shipward/notes.jsonl',
+  '.shipward/tracker.json',
+  '.shipward/feed-archive.jsonl',
+];
+
+// UNTRACKED is the state worth warning about, and deliberately not "modified".
+// The board is dirty during virtually every session — notes get appended as
+// work happens — so warning on modification would fire every single time and
+// train a reader to skip the line, which is the failure mode SW-015 names: a
+// hook that gets in the way gets switched off, and a switched-off hook protects
+// nothing. Untracked is rare, dangerous and self-extinguishing: it is invisible
+// to `git commit -a`, easy to miss in `git status`, and it never fires again
+// once the file is added.
+//
+// `--others` WITHOUT `--exclude-standard` on purpose: an ignored notes.jsonl is
+// not safer than an untracked one, it is worse, and --exclude-standard would
+// hide exactly that case. Against three fixed paths, "other" simply means "not
+// tracked". One spawn.
+export async function untrackedMemory(cwd = REPO) {
+  const out = await git(['ls-files', '--others', '--', ...MEMORY_FILES], cwd);
+  if (out === null) return { known: false, files: [] };   // no git, no claim
+  return { known: true, files: lines(out) };
+}
+
 export async function headState(cwd = REPO) {
   const sha = await git(['rev-parse', '--short', 'HEAD'], cwd);
   if (sha === null) return { sha: null, dirty: false, known: false, dirtyPaths: [] };

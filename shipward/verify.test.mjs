@@ -14,7 +14,7 @@ import { join } from 'node:path';
 import {
   resolveCheck, timeoutOf, clip, readOutcome, kindFor, verdictText,
   spawnCheck, runCheck, verificationOf, cmdOf,
-  DEFAULT_TIMEOUT_MS, OUTPUT_BUDGET,
+  DEFAULT_TIMEOUT_MS, OUTPUT_BUDGET, checkEnv, CHECK_TRACKER,
 } from './verify.mjs';
 import { headState } from './git.mjs';
 import { verifyMsg } from './public/lib.js';
@@ -316,4 +316,61 @@ test('the budget and the default timeout are the values the design ratified', ()
   assert.equal(OUTPUT_BUDGET, 2000);
   assert.equal(DEFAULT_TIMEOUT_MS, 120000);
   assert.equal(cmdOf(['node', '--test']), 'node --test');
+});
+
+/* -- a check never inherits a pointer to the board (SW-050) ---- */
+
+test('checkEnv drops every SHIPWARD_ variable and keeps the rest', () => {
+  const out = checkEnv({
+    PATH: '/usr/bin', HOME: '/home/x',
+    SHIPWARD_TRACKER: '/live/.shipward/tracker.json',
+    SHIPWARD_REPO: '/live',
+    SHIPWARD_FEED_ARCHIVE: '/live/.shipward/feed-archive.jsonl',
+    SHIPWARD_NOTES: '/live/.shipward/notes.jsonl',
+  });
+  assert.equal(out.PATH, '/usr/bin', 'a check still needs an environment to run in');
+  assert.equal(out.HOME, '/home/x');
+  assert.equal(out.SHIPWARD_REPO, undefined);
+  assert.equal(out.SHIPWARD_FEED_ARCHIVE, undefined);
+  assert.equal(out.SHIPWARD_NOTES, undefined);
+});
+
+test('checkEnv PINS the tracker rather than merely unsetting it', () => {
+  // Unsetting would fall through to the store's cwd rung, and a check runs with
+  // cwd set to the repo root — which is where the live board is. The pin is the
+  // part that actually closes the door.
+  const out = checkEnv({ SHIPWARD_TRACKER: '/live/.shipward/tracker.json' });
+  assert.equal(out.SHIPWARD_TRACKER, CHECK_TRACKER);
+  assert.notEqual(out.SHIPWARD_TRACKER, '/live/.shipward/tracker.json');
+});
+
+test('the pinned path does not exist, so a check reaching for the board fails loudly', async () => {
+  await assert.rejects(stat(CHECK_TRACKER), { code: 'ENOENT' },
+    'a readable empty board would let a check write into a decoy in silence');
+});
+
+test('a real spawned check cannot see the caller\'s tracker', async () => {
+  // The end-to-end version, because the whole finding was about what a CHILD
+  // inherits and a pure-function test would not have caught the missing `env`.
+  const { stdout } = await new Promise((resolve) => {
+    spawnCheck(
+      [process.execPath, '-e', 'process.stdout.write(JSON.stringify({ t: process.env.SHIPWARD_TRACKER ?? null, r: process.env.SHIPWARD_REPO ?? null }))'],
+      { cwd: process.cwd(), timeoutMs: 20000 },
+    ).then((r) => resolve({ stdout: r.out }));
+  });
+  const seen = JSON.parse(stdout);
+  assert.equal(seen.t, CHECK_TRACKER, 'the child is pointed at the decoy, not at whatever the server had');
+  assert.equal(seen.r, null, 'and is told nothing about which repo the board lives in');
+});
+
+test('a check that imports the store cannot reach the live board through it', async () => {
+  // The failure this card exists to prevent, exercised rather than argued: the
+  // SW-033 shape was a suite resolving the real tracker and writing to it.
+  const probe = `import { readRaw } from ${JSON.stringify(join(process.cwd(), 'shipward', 'tracker-store.mjs'))};
+    try { await readRaw(); process.stdout.write('READ-A-BOARD'); }
+    catch (e) { process.stdout.write(e.name); }`;
+  const r = await spawnCheck([process.execPath, '--input-type=module', '-e', probe],
+    { cwd: process.cwd(), timeoutMs: 20000 });
+  assert.match(r.out, /MissingTrackerError/, 'it finds nothing, and says so');
+  assert.doesNotMatch(r.out, /READ-A-BOARD/, 'it must not have found a board at all');
 });

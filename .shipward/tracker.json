@@ -11,6 +11,94 @@
   ],
   "cards": [
     {
+      "id": "SW-042",
+      "p": "shipward",
+      "title": "standup’s \"shipped in the last 7 days\" list is uncapped",
+      "type": "chore",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:27:53.037Z",
+          "kind": "brief",
+          "text": "FOUND WHILE filing SW-039..041 on 2026-07-31, by reading standup’s own output: every other list in standupText has a cap and an \"…and N more\" line — review 5 (standup.mjs:55), backlog 3 (:60), open STANDUP_OPEN (:82), decisions STANDUP_DECISIONS (:88). The shipped-in-7-days loop at standup.mjs:70 has neither, and on this board it printed 38 lines — 2,700 of the standup’s 4,574 chars, i.e. the majority of what a session is handed unasked.\n\nNot a runaway: the window is 7 days, so it is bounded by throughput, not by time, and a quiet week costs nothing. But it is the one section whose size a burst week decides, and it is the least decision-relevant thing in the report — a session needs to know what it must not reverse and what is unresolved far more than it needs 38 titles of finished work.\n\nFix is the same shape as its four neighbours: a cap plus the \"…and N more\" line the others already carry. Deliberately P3 — this is a tidy-up, not a cost the way SW-039/040/041 are."
+        }
+      ],
+      "created": "2026-07-31T09:27:53.037Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-041",
+      "p": "shipward",
+      "title": "recall caps entry count but not bytes",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:27:16.750Z",
+          "kind": "brief",
+          "text": "MEASURED 2026-07-31 against this repo’s own memory (117 entries): mcp.mjs:330 renders each hit with line(e) and no max, so the COUNT is clamped to 50 (mcp.mjs:312) while the BYTES are not. recall({kind:\"finding\", limit:50}) returns 37,013 chars ≈ 9.3k tokens in a single tool result; kind:\"outcome\" 10,623 chars; kind:\"decision\" 7,754. The default limit of 10 keeps the common case near 2k, so this bites exactly when a session raises the limit — i.e. when it is hunting for something and least wants its context eaten.\n\nstandup already has the answer: line(e, {max}) and excerpt() are shared code this caller simply does not use. Fix is a max that tightens as the hit count rises, plus keeping the \"raise limit to see them\" hint honest by reporting that entries were CLIPPED as well as dropped."
+        }
+      ],
+      "created": "2026-07-31T09:27:16.750Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-040",
+      "p": "shipward",
+      "title": "start() hands back the whole note, unclipped",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:27:16.688Z",
+          "kind": "brief",
+          "text": "MEASURED 2026-07-31: mcp.mjs:398 renders the handoff with noteText(card.note) and no clip, unlike standup, which passes a max to excerpt() (standup.mjs:82 uses 240, :88 uses 200). Biggest notes today — CA-011 6,187 chars ≈ 1.5k tokens, CA-013 5,511, SW-024 4,873 — and a card that is started repeatedly grows without bound. start() sits on the mandatory protocol path (CLAUDE.md rule 2), so every task pays this.\n\nThe machinery already exists: excerpt(entry, max) in public/memory-lib.js:191 leads with the point via pointIndex() instead of the preamble. The judgement call is that start() is the one surface where a session legitimately wants the WHOLE note — it is about to work that card. So the likely shape is: keep the most recent N entries in full, clip the older ones, and SAY how many were clipped and that recall reaches them. A silent truncation here would be worse than the tokens, for the same reason recall reports its dropped count."
+        }
+      ],
+      "created": "2026-07-31T09:27:16.688Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-039",
+      "p": "shipward",
+      "title": "Archive shipped cards’ notes out of the hot tracker",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "L",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:27:16.660Z",
+          "kind": "brief",
+          "text": "MEASURED 2026-07-31 on this repo’s own board: .shipward/tracker.json is 138 KB across 38 cards (15 pushed, 23 shipped), and note text is 69% of those bytes (95 KB). Catch’s tracker: 47 KB / 13 cards, notes 73%. Cards are never deleted by protocol and notes are append-only, so the hot file only grows — nothing does for card notes what FEED_CAP + feed-archive.jsonl (tracker-store.mjs:65, :106) already do for the feed.\n\nThe cost is NOT the standup: that is capped by design (STANDUP_OPEN/STANDUP_DECISIONS, entries clipped to 240/200) and measures ~4.4k chars ≈ 1.1k tokens on this tracker, roughly flat as the board grows. The cost is the MCP-offline fallback CLAUDE.md documents as supported — \"read → modify → write the whole file\" — which is ~35k tokens to read and a full rewrite to save, scaling linearly with the file. It also makes git diff on the tracker unreadable, and the tracker is committed to git precisely so it can be recovered by hand (see the SW-033 clobber).\n\nThe design question to settle BEFORE code: where do shipped-card notes go, and how does recall still reach them? feed-archive.jsonl can be write-only because nothing ever reads it back; card notes cannot, because recall({file}) is the mandatory pre-edit step (CLAUDE.md rule 0) and a finding filed under a long-shipped card is exactly what it must still surface. So the archive needs a reader, or the split has to be by entry age/kind rather than by card status."
+        }
+      ],
+      "created": "2026-07-31T09:27:16.660Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-038",
       "p": "shipward",
       "title": "A way back — the desk links to the fleet that opened it",
@@ -1245,6 +1333,30 @@
   ],
   "feed": [
     {
+      "t": "2026-07-31T09:27:53.037Z",
+      "p": "shipward",
+      "msg": "You added SW-042 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:27:16.750Z",
+      "p": "shipward",
+      "msg": "You added SW-041 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:27:16.688Z",
+      "p": "shipward",
+      "msg": "You added SW-040 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:27:16.660Z",
+      "p": "shipward",
+      "msg": "You added SW-039 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-07-28T16:04:53.646Z",
       "p": "shipward",
       "msg": "Reconciled with git — SW-038 review → pushed",
@@ -2026,7 +2138,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-28T13:18:03.689Z",
-    "pid": 87930
+    "lastSeen": "2026-07-31T09:28:56.257Z",
+    "pid": 43558
   }
 }

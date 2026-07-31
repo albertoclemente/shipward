@@ -1172,3 +1172,70 @@ test('an entry carrying a sha nothing can resolve is not reported as current', a
   const { text } = await c.call('recall', { kind: 'evidence' });
   assert.doesNotMatch(text, /still at deadbee/);
 });
+
+/* ── the shipped list is capped like its neighbours (SW-042) ──── */
+
+const daysAgo = (n) => new Date(Date.now() - n * 86400_000).toISOString();
+
+test('the shipped list caps and says how many it left out', async () => {
+  const d = seed();
+  d.cards = [0, 1, 2, 3, 4, 5, 6].map((age) => mkCard({
+    id: `TS-${String(100 + age).padStart(3, '0')}`,
+    title: `shipped ${age} days ago`, status: 'pushed', pushed: daysAgo(age),
+  }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('standup', {});
+
+  assert.match(text, /Shipped in the last 7 days \(7\)/, 'the COUNT is still the whole truth');
+  assert.match(text, /…and 2 more/, 'and the two it did not print are declared, not dropped silently');
+  assert.equal((text.match(/shipped \d days ago/g) || []).length, 5, 'five lines, not seven');
+});
+
+test('the five it shows are the most recent, not an arbitrary five', async () => {
+  // Capping is what makes the sort necessary: the cards arrive in board order,
+  // so slicing an unsorted list would have called an arbitrary subset "recent".
+  const d = seed();
+  // Deliberately shuffled in the file, oldest first-ish.
+  d.cards = [5, 2, 6, 0, 4, 1, 3].map((age) => mkCard({
+    id: `TS-${String(100 + age).padStart(3, '0')}`,
+    title: `shipped ${age} days ago`, status: 'pushed', pushed: daysAgo(age),
+  }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('standup', {});
+
+  const shown = (text.match(/shipped (\d) days ago/g) || []).map((s) => Number(s.match(/\d/)[0]));
+  assert.deepEqual(shown, [0, 1, 2, 3, 4], 'newest first, and the two oldest are the ones left out');
+});
+
+test('a short shipped list is printed whole, with nothing appended', async () => {
+  const d = seed();
+  d.cards = [0, 1].map((age) => mkCard({
+    id: `TS-${String(100 + age).padStart(3, '0')}`,
+    title: `shipped ${age} days ago`, status: 'pushed', pushed: daysAgo(age),
+  }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('standup', {});
+  assert.match(text, /Shipped in the last 7 days \(2\)/);
+  assert.doesNotMatch(text, /…and \d+ more/, 'no cap notice when nothing was capped');
+});
+
+test('Claude working is NOT capped — it is the one list you cannot summarise', async () => {
+  // Guarding a decision, not a behaviour that fell out. This is what you are in
+  // the middle of; "…and 2 more" here would hide a card that is actively yours.
+  const d = seed();
+  d.cards = Array.from({ length: 8 }, (_, i) => mkCard({
+    id: `TS-${String(100 + i).padStart(3, '0')}`,
+    title: `in flight ${i}`, status: 'claude', claude: 'working',
+  }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('standup', {});
+  assert.equal((text.match(/in flight \d/g) || []).length, 8, 'every card in flight is named');
+});

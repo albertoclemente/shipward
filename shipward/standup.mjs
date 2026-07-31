@@ -12,6 +12,12 @@ import { memoryEntries, recall, stillOpen, excerpt, freshness } from './public/m
 // never behind a second call.
 export const STANDUP_OPEN = 5;
 export const STANDUP_DECISIONS = 6;
+// SW-042. Every other list here caps and says "…and N more"; this one did
+// neither, and on a burst week it was the MAJORITY of the report — 38 lines,
+// 2,700 of 4,574 characters, all of it finished work. It is the least
+// decision-relevant section in the standup: what is unresolved and what must
+// not be reversed matter more than the titles of things already done.
+export const STANDUP_SHIPPED = 5;
 
 // Every recalled entry carries its card id and its date. A session is being
 // handed something it did not write and cannot verify; without a provenance
@@ -86,6 +92,13 @@ export function standupText(doc, project, { drift } = {}) {
   const of = (s) => mine.filter((c) => c.status === s);
   const lines = [`${project.name} (${project.prefix}) — ${mine.length} cards`];
 
+  // Deliberately UNCAPPED, and left that way by SW-042 which capped its
+  // neighbour. This is the one list a session cannot afford a summary of: it is
+  // what you are in the middle of, and "…and 2 more" here would hide a card
+  // that is actively yours. It is also self-limiting in a way the shipped list
+  // is not — a board with many cards in flight at once is already wrong.
+  // (mcp.test's pipe-buffer regression test builds its oversized frame from
+  // these titles for exactly that reason; capping this would need a new one.)
   const working = of('claude');
   lines.push(`Claude working (${working.length})`);
   for (const c of working) {
@@ -103,13 +116,22 @@ export function standupText(doc, project, { drift } = {}) {
 
   // "Shipped" here means it reached production, whether or not it has since
   // been filed to the archive.
+  //
+  // Sorted before it is capped, which capping is what makes necessary: the
+  // cards come in board order, so slicing an unsorted list would have shown an
+  // arbitrary five of thirty-eight and called them the recent ones.
   const weekAgo = Date.now() - 7 * 86400_000;
-  const recent = mine.filter((c) => {
-    const t = Date.parse(c.shipped || c.pushed);
-    return !Number.isNaN(t) && t >= weekAgo;
-  });
+  const shippedAt = (c) => Date.parse(c.shipped || c.pushed);
+  const recent = mine
+    .filter((c) => { const t = shippedAt(c); return !Number.isNaN(t) && t >= weekAgo; })
+    .sort((a, b) => shippedAt(b) - shippedAt(a));
   lines.push(`Shipped in the last 7 days (${recent.length})`);
-  for (const c of recent) lines.push(`  ${c.id} ${fmtDate(c.shipped || c.pushed)} — ${c.title}`);
+  for (const c of recent.slice(0, STANDUP_SHIPPED)) {
+    lines.push(`  ${c.id} ${fmtDate(c.shipped || c.pushed)} — ${c.title}`);
+  }
+  if (recent.length > STANDUP_SHIPPED) {
+    lines.push(`  …and ${recent.length - STANDUP_SHIPPED} more`);
+  }
 
   // The memory, which standup used to return none of. Bounded on purpose: the
   // notes are thousands of words and growing, so this carries the two kinds

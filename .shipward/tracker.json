@@ -17,6 +17,51 @@
   ],
   "cards": [
     {
+      "id": "SW-051",
+      "p": "shipward",
+      "title": "Ignore .claude/worktrees — a stray add would commit a whole worktree",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": null,
+      "commit": "07f4e7b",
+      "note": [
+        {
+          "t": "2026-07-31T10:23:59.608Z",
+          "kind": "brief",
+          "text": "BRIEF. EnterWorktree and `git worktree add` both put worktrees under .claude/worktrees/, and .gitignore does not mention it — so `git status` on main shows an untracked directory containing a full second checkout, and one inattentive `git add -A` would commit it into the repo. Two are live right now (SW-043 and the concurrent session's bound-memory-reads). The fix is one line. Noted because the near-miss is not theoretical: this repo tracks 1,525 files under .claude/skills, so .claude is a directory people DO add wholesale."
+        },
+        {
+          "t": "2026-07-31T10:25:01.394Z",
+          "text": "SHIPPED to main. One line — `.claude/worktrees/` — plus the reason above it, because an ignore rule with no comment is the kind of line someone deletes while tidying. Committed straight to main rather than on a branch: switching branches in the shared checkout would have disturbed the concurrent session working out of it, and the change is one ignore line with no code path. Verified by the gate SW-043 added, which is the point of running it on something this small: the check ran against main's working tree while tracker.json was dirty with this very card's log entry, so the evidence records dirty:true and says it is not reproducible from the sha alone. That is the honest reading and it is what the caveat exists for.",
+          "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T10:25:01.394Z",
+          "text": "Check \"default\" (node --test) passed at 07f4e7b with uncommitted changes in the tree, so this is not reproducible from the sha alone, in 16572ms. That is what it proves: this command exited zero on this tree, not that the work is correct.",
+          "kind": "evidence"
+        }
+      ],
+      "created": "2026-07-31T10:23:59.608Z",
+      "pushed": "2026-07-31T10:25:01.394Z",
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T10:25:01.394Z",
+        "sha": "07f4e7b",
+        "dirty": true,
+        "ms": 16572
+      }
+    },
+    {
       "id": "SW-050",
       "p": "shipward",
       "title": "A check inherits SHIPWARD_TRACKER — a suite could reach the live board",
@@ -1548,6 +1593,18 @@
   ],
   "feed": [
     {
+      "t": "2026-07-31T10:25:01.394Z",
+      "p": "shipward",
+      "msg": "SW-051 landed on main — nice work",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:23:59.608Z",
+      "p": "shipward",
+      "msg": "You added SW-051 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-07-31T10:01:56.461Z",
       "p": "shipward",
       "msg": "SW-043 moved to Review — give it a look",
@@ -2443,7 +2500,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T10:02:41.538Z",
-    "pid": 65359
+    "lastSeen": "2026-07-31T10:25:44.658Z",
+    "pid": 70052
   }
 }

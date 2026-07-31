@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   classify, refs, symbols, mentionsAny, distinctiveTokens, recall, excerpt,
-  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP, appendedNote, noteText } from './public/memory-lib.js';
+  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP, appendedNote, noteText, noteDigest } from './public/memory-lib.js';
 
 const card = (over = {}) => ({
   id: 'SW-001', p: 'shipward', title: 'A card', type: 'feature', pri: 'P2', effort: 'M',
@@ -511,4 +511,46 @@ test('junk inside a structured note is skipped, not thrown on', () => {
   assert.equal(entries.length, 1);
   assert.equal(entries[0].text, 'the real one');
   assert.equal(entries[0].kind, 'brief', 'an invalid stored kind falls back to the classifier — first surviving entry reads as the brief');
+});
+
+/* ── noteDigest — the bounded form of noteText (SW-040) ────────── */
+
+test('noteDigest keeps the newest entries whole and clips the older ones', () => {
+  const note = Array.from({ length: 5 }, (_, i) => ({
+    t: `2026-07-0${i + 1}T00:00:00Z`, kind: 'finding', text: `e${i} ${'x'.repeat(1000)}`,
+  }));
+  const d = noteDigest(note, { full: 2, max: 100 });
+  assert.equal(d.entries, 5);
+  assert.equal(d.clipped, 3, 'everything but the newest two lost content');
+  assert.ok(d.text.includes(`e4 ${'x'.repeat(1000)}`), 'the newest entry renders whole');
+  assert.ok(d.text.includes(`e3 ${'x'.repeat(1000)}`), 'and so does the one before it');
+  assert.ok(!d.text.includes(`e0 ${'x'.repeat(1000)}`), 'the oldest does not');
+  assert.match(d.text, /e0 x+…/, 'but it is still present, clipped');
+  assert.ok(d.text.indexOf('e0') < d.text.indexOf('e4'), 'and the note stays in order');
+});
+
+test('noteDigest does not count an entry that only moved to its point as clipped', () => {
+  // excerpt repositions to the marker as well as truncating. An entry that was
+  // merely repositioned lost nothing, and reporting it as clipped would send a
+  // session looking for content that is already in front of it.
+  const d = noteDigest([
+    { t: '2026-07-01T00:00:00Z', kind: 'finding', text: 'preamble sentence. ROOT CAUSE: short.' },
+    { t: '2026-07-02T00:00:00Z', text: 'the newest' },
+  ], { full: 1, max: 400 });
+  assert.equal(d.clipped, 0);
+  assert.match(d.text, /…ROOT CAUSE: short\./);
+});
+
+test('noteDigest reads prose notes and empty ones', () => {
+  assert.deepEqual(noteDigest(''), { text: '', clipped: 0, entries: 0 });
+  assert.deepEqual(noteDigest(null), { text: '', clipped: 0, entries: 0 });
+  const d = noteDigest(`first thing${SEGMENT_SEP}second thing`, { full: 1, max: 5 });
+  assert.equal(d.entries, 2, 'a prose note still splits into its segments');
+  assert.equal(d.clipped, 1);
+  assert.match(d.text, /second thing$/, 'and the newest segment survives whole');
+});
+
+test('noteDigest with full at or beyond the entry count clips nothing', () => {
+  const note = [{ t: '2026-07-01T00:00:00Z', text: 'a'.repeat(500) }];
+  assert.equal(noteDigest(note, { full: 3, max: 10 }).clipped, 0);
 });

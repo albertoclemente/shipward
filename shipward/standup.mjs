@@ -35,6 +35,30 @@ export function line(e, { max = 0 } = {}) {
   return `  ${stamp(e)}${caveat} ${max ? excerpt(e, max) : e.text}`;
 }
 
+// What a recall result is allowed to cost (SW-041). recall clamps how many
+// entries come back but never how long they are, so the size of the answer was
+// decided by how much someone once wrote: measured 2026-07-31 on this repo's
+// own memory, recall({kind:"finding", limit:50}) rendered 37,013 chars — about
+// 9.3k tokens in a single tool result — because line() was called with no max.
+//
+// A flat per-entry clip would be wrong in both directions: too mean when one
+// hit came back, too generous when fifty did. So the budget is for the WHOLE
+// list and each entry gets a share of it.
+export const RECALL_BUDGET = 9000;
+// The floor wins over the budget on purpose. Fifty entries clipped to 180
+// chars each is fifty entries that say nothing, which is a worse answer than an
+// oversized one — and a caller only reaches fifty by explicitly asking. The
+// ceiling is the other half of the same judgement: a single hit should read
+// almost whole.
+export const RECALL_ENTRY_MIN = 320;
+export const RECALL_ENTRY_MAX = 1600;
+
+export function entryMax(count, budget = RECALL_BUDGET) {
+  const n = Number.isFinite(count) && count > 0 ? Math.floor(count) : 1;
+  const share = Math.floor((Number.isFinite(budget) ? budget : RECALL_BUDGET) / n);
+  return Math.min(RECALL_ENTRY_MAX, Math.max(RECALL_ENTRY_MIN, share));
+}
+
 const PRI_ORDER = { P1: 0, P2: 1, P3: 2 };
 export const byPriThenAge = (a, b) =>
   (PRI_ORDER[a.pri] ?? 9) - (PRI_ORDER[b.pri] ?? 9) || Date.parse(a.created) - Date.parse(b.created);

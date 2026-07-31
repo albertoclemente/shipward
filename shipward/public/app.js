@@ -8,7 +8,7 @@ import {
 } from './lib.js';
 import {
   memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen,
-  noteSegments, appendedNote,
+  noteSegments, appendedNote, freshness,
 } from './memory-lib.js';
 
 const POLL_MS = 3000;
@@ -20,6 +20,7 @@ const state = {
   editing: null,    // card id | 'new' | null
   dragOver: null,
   dragging: null,
+  drift: null,      // SW-044: git's answer about each anchored sha, from /api/drift
   memoryQuery: '',   // memory view: free-text filter
   memoryFile: null,  // memory view: narrow to one file's accumulated knowledge
   logBy: null,       // log view: null = everyone, 'claude' | 'user'
@@ -543,6 +544,24 @@ function renderMemoryGroup(group) {
   );
 }
 
+// Evidence, and only evidence, carries a currency badge. It fades as the tree
+// moves out from under it — opacity is the signal, because a red flag would
+// read as "wrong" when the honest claim is only "older than the code".
+//
+// state.drift is undefined until /api/drift answers, and stays undefined if it
+// never does. freshness() then reports every entry as unanchored, which is the
+// correct thing to say when nobody has checked: the badge must never go green
+// because the server was unreachable.
+function renderFreshness(e) {
+  const f = freshness(e, state.drift || {});
+  if (!f) return null;
+  return el('span', {
+    class: `mem-entry-flag mem-fresh mem-fresh-${f.state}`,
+    text: { fresh: 'current', drifted: 'code moved on', unanchored: 'unanchored', unknown: 'uncheckable' }[f.state],
+    title: f.label,
+  });
+}
+
 function renderMemoryEntry(e) {
   return el('article', { class: `mem-entry kind-${e.kind}${e.superseded ? ' is-superseded' : ''}` },
     el('div', { class: 'mem-entry-top' },
@@ -566,6 +585,10 @@ function renderMemoryEntry(e) {
                 title: `Open ${e.settledBy}`, onclick: () => openDialog(e.settledBy) })
             : el('span', { class: 'mem-entry-flag', text: 'answered later on this card' }))
         : null,
+      // SW-044. How far the tree has moved since this was true — the same
+      // freshness() the standup and recall read, so the desk cannot tell a
+      // reader a different story from the one the session was told.
+      renderFreshness(e),
       el('span', { class: 'text-muted mem-entry-date', text: fmtDate(e.at) }),
     ),
     el('p', { class: 'mem-entry-text', text: e.text }),
@@ -848,11 +871,38 @@ async function poll() {
 
 // Sequential, not setInterval: a GET slower than the interval used to overlap
 // with the next one and let an older document land after a newer one.
+// SW-044. Drift is a git question, so only the server can answer it — and it
+// changes when commits land, not when the board does. Polled on its own slow
+// timer rather than beside the tracker: at the tracker's 3s it would spawn git
+// twenty times a minute for an answer that moves a few times a day.
+const DRIFT_POLL_MS = 60000;
+
+async function pollDrift() {
+  try {
+    const res = await fetch('/api/drift', { cache: 'no-store' });
+    if (!res.ok) return;
+    const next = await res.json();
+    // Repaint only when the answer actually changed, so a badge does not
+    // flicker once a minute for nothing.
+    if (JSON.stringify(next) === JSON.stringify(state.drift)) return;
+    state.drift = next;
+    if (state.doc) render();
+  } catch { /* the tracker poll owns the offline banner; this stays quiet */ }
+}
+
 (async function loop() {
   await poll();
+  await pollDrift();
   lastPaint = Date.now();
   for (;;) {
     await new Promise((r) => setTimeout(r, POLL_MS));
     await poll();
+  }
+})();
+
+(async function driftLoop() {
+  for (;;) {
+    await new Promise((r) => setTimeout(r, DRIFT_POLL_MS));
+    await pollDrift();
   }
 })();

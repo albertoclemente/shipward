@@ -5,7 +5,7 @@
 // asked for anything. If each built its own, the hook and the tool would drift
 // and a session would be told two different stories about the same board.
 import { cardsOf, fmtDate } from './public/lib.js';
-import { memoryEntries, recall, stillOpen, excerpt } from './public/memory-lib.js';
+import { memoryEntries, recall, stillOpen, excerpt, freshness } from './public/memory-lib.js';
 
 // How much memory standup carries unasked. Small enough that a session start
 // stays cheap, large enough that the things which change what you do next are
@@ -27,10 +27,24 @@ export const stamp = (e) => {
 
 // Evidence rots. "45 tests pass" was true the morning it was written and is
 // false now. Say so at the point of use, not in a doc nobody reads.
+//
+// SW-044: this remains the caveat for evidence nothing can measure. Where the
+// entry carries a sha, the measurement replaces it — the same warning said
+// identically about an entry from an hour ago and one from March taught a
+// reader to skip it.
 export const PERISHABLE = 'as of then, not a claim about now';
 
-export function line(e, { max = 0 } = {}) {
-  const caveat = e.kind === 'evidence' ? ` (${PERISHABLE})` : '';
+export function line(e, { max = 0, drift } = {}) {
+  const f = drift ? freshness(e, drift) : null;
+  // Evidence with no sha keeps the wording it has always had. PERISHABLE says
+  // exactly what "unanchored" means — as of then, not a claim about now — and
+  // replacing it with a second phrase for the same fact would only teach a
+  // reader that the caveat changes when nothing has. A dirty tree IS new
+  // information, so that one speaks for itself.
+  const measured = f && (f.state !== 'unanchored' || e.dirty) ? f.label : null;
+  const caveat = measured
+    ? ` (${measured})`
+    : (e.kind === 'evidence' ? ` (${PERISHABLE})` : '');
   // Clipped entries lead with the point, not the preamble — see excerpt().
   return `  ${stamp(e)}${caveat} ${max ? excerpt(e, max) : e.text}`;
 }
@@ -63,7 +77,11 @@ const PRI_ORDER = { P1: 0, P2: 1, P3: 2 };
 export const byPriThenAge = (a, b) =>
   (PRI_ORDER[a.pri] ?? 9) - (PRI_ORDER[b.pri] ?? 9) || Date.parse(a.created) - Date.parse(b.created);
 
-export function standupText(doc, project) {
+// `drift` is optional and always will be: standupText is pure, and the two
+// callers that have a repository to ask (the MCP tool and the SessionStart
+// hook) pass one. Without it every evidence line falls back to PERISHABLE,
+// which is exactly what a caller with no git should say.
+export function standupText(doc, project, { drift } = {}) {
   const mine = cardsOf(doc.cards, project.id);
   const of = (s) => mine.filter((c) => c.status === s);
   const lines = [`${project.name} (${project.prefix}) — ${mine.length} cards`];
@@ -103,13 +121,13 @@ export function standupText(doc, project) {
     const open = stillOpen(memory);
     if (open.length) {
       lines.push('', `Still open, from the card notes (${open.length})`);
-      for (const e of open.slice(0, STANDUP_OPEN)) lines.push(line(e, { max: 240 }));
+      for (const e of open.slice(0, STANDUP_OPEN)) lines.push(line(e, { max: 240, drift }));
       if (open.length > STANDUP_OPEN) lines.push(`  …and ${open.length - STANDUP_OPEN} more — recall({kind:"open"})`);
     }
     const decisions = recall(memory, { kind: 'decision', limit: STANDUP_DECISIONS });
     if (decisions.total) {
       lines.push('', `Decisions not to reverse (${decisions.total})`);
-      for (const e of decisions.entries) lines.push(line(e, { max: 200 }));
+      for (const e of decisions.entries) lines.push(line(e, { max: 200, drift }));
       if (decisions.dropped) lines.push(`  …and ${decisions.dropped} more — recall({kind:"decision"})`);
     }
     const words = memory.reduce((n, e) => n + e.text.split(/\s+/).length, 0);

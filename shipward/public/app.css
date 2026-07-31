@@ -371,6 +371,18 @@ textarea.input { min-height: 90px; resize: vertical; }
   font-size: 10px; letter-spacing: 0.04em; text-transform: uppercase;
   color: var(--color-neutral-700); border: 1px solid var(--color-neutral-400); padding: 1px 6px;
 }
+/* SW-044. How current a piece of evidence is. Opacity carries it, not colour:
+   drifted evidence is not WRONG, it is older than the code, and a red badge
+   would claim the stronger thing. Only "current" gets ink, because that is the
+   only state making a positive claim. The SW-030 contrast floor still applies —
+   these fade toward the muted text colour, never past legibility. */
+.mem-fresh { border-style: dashed; }
+.mem-fresh-fresh {
+  color: var(--color-accent-700); border-color: var(--color-accent-700); border-style: solid;
+}
+.mem-fresh-drifted { opacity: 0.72; }
+.mem-fresh-unanchored, .mem-fresh-unknown { opacity: 0.55; }
+
 .mem-entry-date { font-size: 11px; margin-left: auto; flex: none; }
 .mem-entry-text { margin: 0; font-size: 13.5px; line-height: 1.6; max-width: 92ch; }
 .mem-entry-refs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: var(--space-2); }

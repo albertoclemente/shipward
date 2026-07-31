@@ -17,6 +17,73 @@
   ],
   "cards": [
     {
+      "id": "SW-053",
+      "p": "shipward",
+      "title": "The tracker dirties its own tree, so every piece of evidence is born unanchored",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T10:47:58.772Z",
+          "kind": "brief",
+          "text": "FINDING, caught by SW-044's own hand-back within a minute of shipping it. done() computes `dirty` from `git status --porcelain` over the whole tree. But .shipward/tracker.json is version-controlled here BY DESIGN — git is the authority, so the board is committed — and the MCP server rewrites mcp.lastSeen into it every 60 seconds as a heartbeat. The tracker file is therefore ALWAYS modified while a session is open. Measured at 10:46 on 2026-07-31: SW-044's check passed at 4ecfeaf with exactly one dirty path, `.shipward/tracker.json`, and nothing else. The consequence is not cosmetic: dirty:true makes freshness() report `unanchored` at birth, permanently, so no evidence this product ever writes can be current and the whole of SW-044 renders one state forever. SW-043's dirty caveat is equally defeated — it fires on every card and therefore says nothing. FIX, small: the tree that matters is the code under test, not the board describing it. Exclude .shipward/ when computing `dirty` in headState() — `git status --porcelain -- ':(exclude).shipward/'` or filter the porcelain lines — and say in the comment WHY the exclusion is honest rather than convenient: a tracker write is not a change to the thing the check exercised. Consider also whether the heartbeat belongs in tracker.json at all; mcp.mjs already records that tradeoff as chosen deliberately (one file occasionally dirty beat two files that can disagree), and this is the first real cost of it. Do NOT fix by dropping the dirty flag: a pass over genuinely uncommitted source is exactly the claim it exists to qualify."
+        }
+      ],
+      "created": "2026-07-31T10:47:58.772Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-052",
+      "p": "shipward",
+      "title": "tracker-store.mjs is a binary file to git",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": null,
+      "commit": "c0d17b3",
+      "note": [
+        {
+          "t": "2026-07-31T10:35:58.883Z",
+          "kind": "brief",
+          "text": "FOUND WHILE starting SW-039 on 2026-07-31: `git diff` on shipward/tracker-store.mjs prints \"Binary files … differ\" and shows nothing. git blame, code review and conflict resolution all degrade to nothing on it — and that file's own header comment enumerates eight separate lost-write bugs, so it is the last file in this repo whose changes should be unreviewable.\n\nROOT CAUSE, and it is NOT corruption: feedKey (line 79) was changed from .join(' ') to join on a NUL — a good hardening, since NUL cannot occur inside a timestamp, project id, author or message, so two entries can no longer collide by containing the separator. But it was written as a RAW NUL BYTE in the source rather than the escape. git's binary heuristic looks for a NUL in the first 8000 bytes; this one is at offset 4573, so the whole file is classified binary.\n\nFIX is one character and semantically identical at runtime: write '\\u0000' (or '\\0') in the string literal instead of embedding the byte. The joined key is unchanged, so nothing about feed archiving changes.\n\nNote for whoever picks this up: `grep` on this machine returns nothing at all (it is broken — verified 2026-07-31, it produced no output even for `grep -c \"\"`), so a NUL hunt with grep will report a clean file. Use node, or rg. That is also why this went unnoticed."
+        },
+        {
+          "t": "2026-07-31T10:38:36.375Z",
+          "text": "SHIPPED and pushed to main (c0d17b3). feedKey's NUL separator is now the escape form instead of an embedded byte — byte-identical at runtime, so no archived feed line changes. git classifies the file as text again, which is the whole point: shipward/tracker-store.mjs is the file whose header comment enumerates eight lost-write bugs, and its diffs were showing \"Binary files differ\".\n\nFOUND WHILE starting SW-039 (which rewrites this file, so I needed its diffs readable).\n\nGOTCHA worth keeping: git's binary heuristic only scans the first 8000 bytes, so this is silent for a NUL further in — and `grep` on this machine is broken (returns nothing for any pattern, verified with `grep -c \"\"`), so the usual NUL hunt reports a clean file. Use node or rg.",
+          "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T10:38:36.375Z",
+          "text": "Check \"default\" (node --test) passed at c0d17b3, in 15082ms. That is what it proves: this command exited zero on this tree, not that the work is correct.",
+          "kind": "evidence"
+        }
+      ],
+      "created": "2026-07-31T10:35:58.883Z",
+      "pushed": "2026-07-31T10:38:36.375Z",
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T10:38:36.375Z",
+        "sha": "c0d17b3",
+        "dirty": false,
+        "ms": 15082
+      }
+    },
+    {
       "id": "SW-051",
       "p": "shipward",
       "title": "Ignore .claude/worktrees — a stray add would commit a whole worktree",
@@ -200,20 +267,45 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/evidence-expires-recall",
+      "commit": "4ecfeaf",
       "note": [
         {
           "t": "2026-07-31T09:39:59.480Z",
           "kind": "brief",
           "text": "BRIEF. standup.mjs already says evidence rots — the PERISHABLE caveat, 'as of then, not a claim about now'. Make it mechanical instead of textual: an evidence entry carries the sha it was written against, and git.mjs can answer whether that sha is still reachable from HEAD and whether the files the entry concerned have been touched since. Then recall({file}) stops reporting '252 tests pass' flatly and reports '252 tests passed at 1942e8c — N commits have touched this file since', and the desk fades a verified badge as the work drifts out from under it. Pairs with the verification-gating card, which is what starts stamping shas onto evidence in the first place; this card is cheap once that exists. Positioning value: 'memory that knows it is out of date' is a claim no competitor in this category makes, and it is the natural headline for the write-up."
+        },
+        {
+          "t": "2026-07-31T10:46:04.544Z",
+          "text": "SHIPPED. Evidence entries now carry the sha they were true of, and standup/recall/the desk all read one freshness() verdict over a driftSince() map that asks git once per DISTINCT sha. FOUR STATES, and the design point is that the two ways of NOT knowing are kept apart: a sha git cannot resolve is `unknown`, never `fresh`, because a rebased-away or foreign sha answering '0 commits since' would render as still-current — a confident lie, which is the exact failure this card exists to remove. DECIDED: evidence with no sha keeps the old PERISHABLE wording rather than getting a second phrase for the same fact; a caveat that changes when nothing has changed teaches a reader to ignore it. A dirty tree IS new information, so that one speaks for itself. THE BUG WORTH REMEMBERING, and it cost the most time here: inside the SessionStart hook I declared `let drift` for the drift map, but `drift` is ALREADY the name of the git-audit function called three lines earlier in the same scope — so that call hit the temporal dead zone and threw, and the hook's own catch-all (Rule 1: never break a session) turned the crash into SILENCE. SessionStart emitted nothing at all: no standup, no audit, no error, exit 0. Six hook tests went blank rather than red, which is what caught it. A shadowed binding plus a fail-open catch is an invisible outage; the variable is named driftMap and the reason is written above it. SCOPE NOTE: /api/drift polls on its own 60s timer, not the tracker's 3s — the answer changes when commits land, a few times a day, and spawning git twenty times a minute for it would be absurd. VERIFIED IN THE BROWSER, which is the part no test covers (see SW-047): the Memory tab rendered 35 badges on 35 evidence entries and zero on any other kind, all reading 'unanchored' at 0.55 opacity — correct, because every entry on the board predates sha stamping. This card's own hand-back writes the first anchored one. 330 tests pass, up from 302.",
+          "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T10:46:04.545Z",
+          "text": "Check \"default\" (node --test) passed at 4ecfeaf with uncommitted changes in the tree, so this is not reproducible from the sha alone, in 18237ms. That is what it proves: this command exited zero on this tree, not that the work is correct.",
+          "kind": "evidence",
+          "sha": "4ecfeaf",
+          "dirty": true
         }
       ],
       "created": "2026-07-31T09:39:59.480Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T10:46:04.544Z",
+        "sha": "4ecfeaf",
+        "dirty": true,
+        "ms": 18237
+      }
     },
     {
       "id": "SW-043",
@@ -222,7 +314,7 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/verification-gating-done",
       "commit": "d859d43",
@@ -241,10 +333,15 @@
           "t": "2026-07-31T10:01:56.461Z",
           "text": "Check \"default\" (node --test) passed at d859d43, in 14800ms. That is what it proves: this command exited zero on this tree, not that the work is correct.",
           "kind": "evidence"
+        },
+        {
+          "t": "2026-07-31T10:38:14.037Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-31] status → pushed — d859d43 is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-31T09:39:59.453Z",
-      "pushed": null,
+      "pushed": "2026-07-31T10:38:14.037Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -289,7 +386,7 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/bound-memory-reads",
       "commit": "a116bf2",
@@ -303,10 +400,15 @@
           "t": "2026-07-31T09:54:14.589Z",
           "text": "SHIPPED on chore/bound-memory-reads (a116bf2). recall clamped how MANY entries came back (50) but never how long they were, because line() was called with no max while standup passed 240/200. Entries now share ONE budget (RECALL_BUDGET 9000 chars in standup.mjs) and each takes a share of it, floored at 320 and ceilinged at 1600 — a flat per-entry clip would be too mean for one hit and too generous for fifty. The floor deliberately wins over the budget: fifty entries clipped to 180 chars each is fifty entries that say nothing, and a caller only reaches fifty by explicitly asking.\n\nFOUND WHILE FIXING IT, and fixed in the same card: the \"files:\" line was unbounded too — refs() pulls every path an entry names, and a note surveying a subsystem names dozens, so a text-only budget would have leaked straight through it. fileList() bounds it to 200 chars keeping WHOLE names, because a path clipped mid-segment is not a shorter path, it is a wrong one.\n\nClipped and dropped are reported as the different losses they are: one is an entry you never saw, the other an entry you saw the point of. Reporting only \"…N more\" while silently truncating the rest would make the answer read as complete.\n\nMEASURED, old server vs new against this repo's own tracker (120 entries), same document: recall(finding,50) 37,685 → 9,740 chars (9.4k → 2.4k tokens); recall(outcome,50) 10,985 → 7,311; recall(decision,50) 8,544 → 6,283; recall(file:\"shipward/mcp.mjs\",6) 8,777 → 6,859.\n\nTEST NOTE for whoever reads mcp.test.mjs next: \"a reply larger than the pipe buffer is not truncated when stdin closes\" (the SW-005 flush bug) built its >64KiB frame out of recall({kind:'finding',limit:50}). This card made that impossible, so the test was silently no longer testing the flush — it now builds the frame from standup's working-card titles, which are unclipped and uncapped. The assertion did not change; the vehicle did. If SW-042 ever caps that list, this test needs a new vehicle again.\n\n261 tests pass, 9 new (4 in memory.test.mjs for noteDigest, 5 in mcp.test.mjs over the real pipe).",
           "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T10:38:14.037Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-31] status → pushed — a116bf2 is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-31T09:27:16.750Z",
-      "pushed": null,
+      "pushed": "2026-07-31T10:38:14.037Z",
       "shipped": null
     },
     {
@@ -316,7 +418,7 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/bound-memory-reads",
       "commit": "a116bf2",
@@ -330,10 +432,15 @@
           "t": "2026-07-31T09:54:14.565Z",
           "text": "SHIPPED on chore/bound-memory-reads (a116bf2). start() now renders the note through noteDigest() instead of noteText(): the newest 3 entries exactly as before — that is the state a session is resuming and it should arrive whole — and everything older clipped to 400 chars through the same excerpt() standup already used, which leads with the point rather than the preamble. The reply says how many entries were clipped.\n\nDECISION worth not reversing: the pointer for the full note is the desk and .shipward/tracker.json, NOT recall. recall clips too (SW-041), so \"call recall for the rest\" would have been a promise this server cannot keep.\n\nMEASURED, old server vs new against the same live documents: CA-011 6,187 → 4,265 chars (1,547 → 1,066 tokens, 4 entries clipped), CA-013 5,672 → 4,741, CA-012 4,513 → 3,754, SW-024 4,873 → 3,286.\n\nKNOWN LIMIT, stated rather than hidden: a card whose newest 3 entries are themselves huge is still unbounded — SW-019, SW-015 and SW-020 have 3 or fewer entries and so clip to nothing, still handing back ~4,200 chars (~1k tokens). That is the design the card specified and it is defensible (you want the state you are resuming), but if start ever needs a hard ceiling, this is where it is missing. Also: noteText() now has no production caller — it survives as a public function of memory-lib with its own test, not as dead code, but nothing would break if the desk never picks it up.",
           "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T10:38:14.037Z",
+          "kind": "evidence",
+          "text": "[git audit 2026-07-31] status → pushed — a116bf2 is already on main (branch gone). The board said review."
         }
       ],
       "created": "2026-07-31T09:27:16.688Z",
-      "pushed": null,
+      "pushed": "2026-07-31T10:38:14.037Z",
       "shipped": null
     },
     {
@@ -343,9 +450,9 @@
       "type": "feature",
       "pri": "P2",
       "effort": "L",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/archive-shipped-cards",
       "commit": null,
       "note": [
         {
@@ -1593,6 +1700,48 @@
   ],
   "feed": [
     {
+      "t": "2026-07-31T10:47:58.772Z",
+      "p": "shipward",
+      "msg": "You added SW-053 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:46:04.545Z",
+      "p": "shipward",
+      "msg": "SW-044 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:38:36.375Z",
+      "p": "shipward",
+      "msg": "SW-052 landed on main — nice work",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:38:14.037Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 3 cards corrected from the repository",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:35:58.883Z",
+      "p": "shipward",
+      "msg": "You added SW-052 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:32:46.008Z",
+      "p": "shipward",
+      "msg": "SW-044 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T10:31:25.849Z",
+      "p": "shipward",
+      "msg": "SW-039 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-07-31T10:25:01.394Z",
       "p": "shipward",
       "msg": "SW-051 landed on main — nice work",
@@ -2500,7 +2649,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T10:25:44.658Z",
-    "pid": 70052
+    "lastSeen": "2026-07-31T10:48:58.751Z",
+    "pid": 95789
   }
 }

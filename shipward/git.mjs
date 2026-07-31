@@ -81,6 +81,34 @@ export async function readGit(cwd = REPO) {
   return { ok: true, trunk, branches };
 }
 
+// How far the tree has moved since a commit (SW-044) — the measurement behind
+// "evidence expires".
+//
+// Asked once per DISTINCT sha, never once per entry: a card can carry a dozen
+// evidence entries from the same commit, and spawning is the cost (see the note
+// on trunkIndex). The changed-file list is bounded for the same reason a note
+// is bounded — this is read into a reply a model pays for.
+const DRIFT_FILE_CAP = 200;
+
+export async function driftSince(shas, cwd = REPO) {
+  const out = {};
+  for (const sha of new Set((shas || []).filter(Boolean))) {
+    // Does this commit exist here at all? A sha from another machine, or from a
+    // branch that was rebased away, must read as unknown rather than as zero
+    // commits since — which would be indistinguishable from "still current".
+    const exists = await git(['rev-parse', '--verify', '--quiet', `${sha}^{commit}`], cwd);
+    if (!exists) { out[sha] = { known: false }; continue; }
+    const count = await git(['rev-list', '--count', `${sha}..HEAD`], cwd);
+    if (count === null) { out[sha] = { known: false }; continue; }
+    const commits = Number(count) || 0;
+    const changed = commits === 0
+      ? []
+      : lines(await git(['diff', '--name-only', `${sha}..HEAD`], cwd)).slice(0, DRIFT_FILE_CAP);
+    out[sha] = { known: true, commits, changed };
+  }
+  return out;
+}
+
 // One list of what is on the trunk, instead of one process per card.
 // merge-base --is-ancestor is cheap but a process spawn is not: 22 of them cost
 // 134ms sequentially and no less in parallel, because spawning is the cost.

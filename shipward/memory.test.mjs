@@ -6,7 +6,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   classify, refs, symbols, mentionsAny, distinctiveTokens, recall, excerpt,
-  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP, appendedNote, noteText, noteDigest } from './public/memory-lib.js';
+  memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen, SEGMENT_SEP, appendedNote, noteText, noteDigest, freshness, anchors } from './public/memory-lib.js';
 
 const card = (over = {}) => ({
   id: 'SW-001', p: 'shipward', title: 'A card', type: 'feature', pri: 'P2', effort: 'M',
@@ -553,4 +553,95 @@ test('noteDigest reads prose notes and empty ones', () => {
 test('noteDigest with full at or beyond the entry count clips nothing', () => {
   const note = [{ t: '2026-07-01T00:00:00Z', text: 'a'.repeat(500) }];
   assert.equal(noteDigest(note, { full: 3, max: 10 }).clipped, 0);
+});
+
+/* ── SW-044: evidence expires ────────────────────────────── */
+
+const ev = (over = {}) => ({ kind: 'evidence', text: '252 tests pass', refs: [], ...over });
+
+test('an entry carries the sha and the dirty flag it was written with', () => {
+  const c = card({ note: [{ t: '2026-07-31T00:00:00Z', kind: 'evidence', text: 'passed', sha: 'abc1234', dirty: true }] });
+  const [e] = memoryEntries([c], 'shipward');
+  assert.equal(e.sha, 'abc1234');
+  assert.equal(e.dirty, true);
+});
+
+test('a prose note has no anchor, and says so by having none', () => {
+  const [e] = memoryEntries([card({ note: 'verified by hand' })], 'shipward');
+  assert.equal(e.sha, null);
+  assert.equal(e.dirty, false);
+});
+
+test('only evidence can expire', () => {
+  for (const kind of ['decision', 'open', 'finding', 'outcome', 'brief']) {
+    assert.equal(freshness({ kind, sha: 'abc1234' }, {}), null, `${kind} is not a claim a commit can invalidate`);
+  }
+});
+
+test('a sha still at the head of the trunk is fresh', () => {
+  const f = freshness(ev({ sha: 'abc1234' }), { abc1234: { known: true, commits: 0, changed: [] } });
+  assert.equal(f.state, 'fresh');
+  assert.match(f.label, /abc1234/);
+});
+
+test('commits since the sha make it drifted, and the count is the point', () => {
+  const f = freshness(ev({ sha: 'abc1234' }), { abc1234: { known: true, commits: 4, changed: ['a.js'] } });
+  assert.equal(f.state, 'drifted');
+  assert.match(f.label, /4 commits since abc1234/);
+});
+
+test('one commit is not "1 commits"', () => {
+  const f = freshness(ev({ sha: 'abc1234' }), { abc1234: { known: true, commits: 1, changed: [] } });
+  assert.match(f.label, /1 commit since/);
+});
+
+test('drift names the files the entry itself cited, when they are among the changes', () => {
+  const f = freshness(
+    ev({ sha: 'abc1234', refs: ['tracker-store.mjs', 'git.mjs'] }),
+    { abc1234: { known: true, commits: 3, changed: ['shipward/tracker-store.mjs', 'shipward/other.mjs'] } },
+  );
+  assert.match(f.label, /1 file it names/);
+  assert.match(f.label, /tracker-store\.mjs/);
+});
+
+test('an entry whose files were not touched says so, and one that cites none claims nothing', () => {
+  const untouched = freshness(
+    ev({ sha: 'abc1234', refs: ['git.mjs'] }),
+    { abc1234: { known: true, commits: 2, changed: ['shipward/serve.mjs'] } },
+  );
+  assert.match(untouched.label, /none touching the files it names/);
+
+  const silent = freshness(ev({ sha: 'abc1234', refs: [] }), { abc1234: { known: true, commits: 2, changed: ['x'] } });
+  assert.doesNotMatch(silent.label, /none touching/, 'mentioning no file is not the same reassurance as touching no file');
+});
+
+test('a sha git cannot resolve is unknown, never fresh', () => {
+  // The dangerous confusion: a rebased-away or foreign sha resolving to zero
+  // commits would read exactly like "still current".
+  for (const d of [{}, { abc1234: { known: false } }]) {
+    const f = freshness(ev({ sha: 'abc1234' }), d);
+    assert.equal(f.state, 'unknown');
+    assert.doesNotMatch(f.label, /still at/);
+  }
+});
+
+test('evidence with no sha is unanchored — datable, not checkable', () => {
+  const f = freshness(ev({ sha: null }), {});
+  assert.equal(f.state, 'unanchored');
+});
+
+test('a dirty tree is unanchored at birth, whatever git says about the sha', () => {
+  const f = freshness(ev({ sha: 'abc1234', dirty: true }), { abc1234: { known: true, commits: 0, changed: [] } });
+  assert.equal(f.state, 'unanchored', 'zero commits since cannot rescue a pass that no commit describes');
+  assert.match(f.label, /dirty tree/);
+});
+
+test('anchors asks git about each sha once, and never about what it cannot place', () => {
+  const entries = [
+    ev({ sha: 'aaa1111' }), ev({ sha: 'aaa1111' }), ev({ sha: 'bbb2222' }),
+    ev({ sha: 'ccc3333', dirty: true }),
+    ev({ sha: null }),
+    { kind: 'decision', sha: 'ddd4444' },
+  ];
+  assert.deepEqual(anchors(entries).sort(), ['aaa1111', 'bbb2222']);
 });

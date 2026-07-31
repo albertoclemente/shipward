@@ -32,6 +32,9 @@ before(async () => {
   await cp(join(HERE, 'tracker-store.mjs'), join(sandbox, 'shipward', 'tracker-store.mjs'));
   await cp(join(HERE, 'public'), join(sandbox, 'shipward', 'public'), { recursive: true });
   await cp(join(HERE, 'serve.mjs'), join(sandbox, 'shipward', 'serve.mjs'));
+  // /api/drift (SW-044) asks git, so the sandbox needs that module too — without
+  // it the endpoint would fail soft forever and its test would prove nothing.
+  await cp(join(HERE, 'git.mjs'), join(sandbox, 'shipward', 'git.mjs'));
 
   // SHIPWARD_PORT=0 lets the OS pick. A fixed port meant a leftover server from
   // an earlier run kept the port, this spawn died on EADDRINUSE, and the suite
@@ -257,4 +260,22 @@ test('a second server on the same port fails loudly instead of dying silently', 
 test('unsupported methods are refused', async () => {
   assert.equal((await fetch(`${base}/api/tracker`, { method: 'DELETE' })).status, 405);
   assert.equal((await fetch(`${base}/`, { method: 'POST' })).status, 405);
+});
+
+/* ── SW-044: the desk asks the server what git says ──────── */
+
+test('GET /api/drift answers with a map the desk can render', async () => {
+  const res = await fetch(`${base}/api/drift`);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'application/json; charset=utf-8');
+  const body = await res.json();
+  assert.equal(typeof body, 'object');
+  assert.ok(!Array.isArray(body));
+});
+
+test('/api/drift is read-only', async () => {
+  // It spawns git. A write verb reaching it would be a way to make the desk do
+  // work on request, and there is nothing there to write anyway.
+  const res = await fetch(`${base}/api/drift`, { method: 'PUT', body: '{}' });
+  assert.equal(res.status, 405);
 });

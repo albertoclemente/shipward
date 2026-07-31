@@ -11,7 +11,7 @@ import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  readGit, isOnTrunk, deriveFindings, summarise,
+  readGit, isOnTrunk, deriveFindings, summarise, driftSince,
   reconcilePlan, CERTAIN, PROPOSED, REPORTED,
 } from './git.mjs';
 
@@ -250,4 +250,64 @@ test('a directory that is not a repository says so instead of throwing', async (
   } finally {
     await rm(plain, { recursive: true, force: true });
   }
+});
+
+/* ── SW-044: how far has the tree moved ──────────────────── */
+
+const stage = async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-drift-'));
+  const g = (...a) => run('git', a, { cwd: dir });
+  await g('init', '-q', '-b', 'main');
+  await g('config', 'user.email', 't@t'); await g('config', 'user.name', 'T');
+  await writeFile(join(dir, 'a.txt'), '1');
+  await g('add', '-A'); await g('commit', '-qm', 'one');
+  const first = (await g('rev-parse', '--short', 'HEAD')).stdout.trim();
+  return { dir, g, first };
+};
+
+test('nothing has landed since HEAD, which is what fresh means', async () => {
+  const { dir, first } = await stage();
+  try {
+    const d = await driftSince([first], dir);
+    assert.equal(d[first].known, true);
+    assert.equal(d[first].commits, 0);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('drift counts the commits since, and lists what they touched', async () => {
+  const { dir, g, first } = await stage();
+  try {
+    await writeFile(join(dir, 'b.txt'), '2'); await g('add', '-A'); await g('commit', '-qm', 'two');
+    await writeFile(join(dir, 'c.txt'), '3'); await g('add', '-A'); await g('commit', '-qm', 'three');
+    const d = await driftSince([first], dir);
+    assert.equal(d[first].commits, 2);
+    assert.deepEqual(d[first].changed.sort(), ['b.txt', 'c.txt']);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a sha this repository has never heard of is unknown, not unchanged', async () => {
+  const { dir } = await stage();
+  try {
+    // The failure this guards: a foreign or rebased-away sha answering "0
+    // commits since" would render as "still current" — a confident lie.
+    const d = await driftSince(['deadbee'], dir);
+    assert.equal(d.deadbee.known, false);
+    assert.equal(d.deadbee.commits, undefined);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('each distinct sha is asked about once, and blanks are dropped', async () => {
+  const { dir, first } = await stage();
+  try {
+    const d = await driftSince([first, first, null, undefined, ''], dir);
+    assert.deepEqual(Object.keys(d), [first]);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('outside a repository nothing is known, and nothing throws', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-norepo-'));
+  try {
+    const d = await driftSince(['abc1234'], dir);
+    assert.equal(d.abc1234.known, false);
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

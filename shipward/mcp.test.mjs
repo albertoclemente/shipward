@@ -1121,3 +1121,54 @@ test('the tracker lock is not held while a check runs', async () => {
 
   assert.deepEqual(order, ['standup', 'done'], 'a reader must not queue behind a running check');
 });
+
+/* ── SW-044: what done() anchors, and what recall reports ── */
+
+test('the evidence done() writes is anchored to the tree the check ran on', async () => {
+  await withChecks({ default: PASS });
+  const { c } = await handshake();
+  await c.call('done', { id: 'TS-001', note: 'swapped the parser because the old one buffered' });
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  const evidence = card.note.find((e) => e.kind === 'evidence');
+  // The invariant, not a particular sha: the note entry and the card record
+  // describe the SAME tree. They are written from one verdict for exactly this
+  // reason — two independent reads of HEAD would differ the moment anything
+  // commits between them, and then the card and its own evidence disagree.
+  assert.equal(evidence.sha ?? null, card.verification.sha);
+});
+
+test('where there is no repository to ask, the entry carries no anchor rather than a borrowed one', async () => {
+  const bare = await mkdtemp(join(tmpdir(), 'shipward-nogit-'));
+  sandboxes.push(bare);
+  await withChecks({ default: PASS });
+  const c = await handshakeIn(bare);
+  await c.call('done', { id: 'TS-001', note: 'swapped the parser because the old one buffered' });
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  // An invented anchor is worse than an honest absence: freshness() can report
+  // "unanchored", but it cannot detect a lie.
+  assert.equal(card.note.find((e) => e.kind === 'evidence').sha, undefined);
+  assert.equal(card.verification.sha, null);
+});
+
+test('a note entry round-trips its sha and dirty flag through the store', async () => {
+  const d = seed();
+  d.cards[0].note = [{ t: '2026-07-31T00:00:00Z', kind: 'evidence', text: 'passed here', sha: 'abc1234', dirty: true }];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  const { c } = await handshake();
+  await c.call('done', { id: 'TS-001', note: 'and then this happened' });
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.note[0].sha, 'abc1234', 'appending must not strip an anchor off an older entry');
+  assert.equal(card.note[0].dirty, true);
+});
+
+test('an entry carrying a sha nothing can resolve is not reported as current', async () => {
+  const d = seed();
+  d.cards[0].note = [{ t: '2026-07-31T00:00:00Z', kind: 'evidence', text: 'the suite passed', sha: 'deadbee' }];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+  const { c } = await handshake();
+  const { text } = await c.call('recall', { kind: 'evidence' });
+  assert.doesNotMatch(text, /still at deadbee/);
+});

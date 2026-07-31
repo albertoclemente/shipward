@@ -59,6 +59,27 @@ const enqueue = (fn) => {
   return run;
 };
 
+// SW-044. The desk cannot run git — it is a page — so the one question it
+// cannot answer for itself is answered here: how far has the tree moved since
+// each piece of evidence was written.
+//
+// Read-only, and it fails soft. A repository that cannot be read returns an
+// empty map, which renders as "unanchored" rather than as "current": the desk
+// must never show a fresh badge because the server could not check.
+async function readDrift(res) {
+  try {
+    const [{ driftSince }, { memoryEntries, anchors }, { doc }] = await Promise.all([
+      import('./git.mjs'),
+      import('./public/memory-lib.js'),
+      readRaw(),
+    ]);
+    const entries = doc.projects.flatMap((p) => memoryEntries(doc.cards, p.id));
+    return send(res, 200, JSON.stringify(await driftSince(anchors(entries))));
+  } catch {
+    return send(res, 200, '{}');
+  }
+}
+
 async function writeTracker(req, res) {
   const chunks = [];
   try {
@@ -125,6 +146,10 @@ const server = createServer((req, res) => {
     if (req.method === 'GET') return done(readTracker(res));
     if (req.method === 'PUT') return done(writeTracker(req, res));
     return fail(res, 405, 'use GET or PUT');
+  }
+  if (pathname === '/api/drift') {
+    if (req.method !== 'GET') return fail(res, 405, 'use GET');
+    return done(readDrift(res));
   }
   if (req.method !== 'GET') return fail(res, 405, 'use GET');
   done(serveStatic(pathname, res));

@@ -7,11 +7,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  readGit, isOnTrunk, deriveFindings, summarise,
+  readGit, isOnTrunk, deriveFindings, summarise, driftSince, headState,
   reconcilePlan, CERTAIN, PROPOSED, REPORTED,
 } from './git.mjs';
 
@@ -250,4 +250,126 @@ test('a directory that is not a repository says so instead of throwing', async (
   } finally {
     await rm(plain, { recursive: true, force: true });
   }
+});
+
+/* ── SW-044: how far has the tree moved ──────────────────── */
+
+const stage = async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-drift-'));
+  const g = (...a) => run('git', a, { cwd: dir });
+  await g('init', '-q', '-b', 'main');
+  await g('config', 'user.email', 't@t'); await g('config', 'user.name', 'T');
+  await writeFile(join(dir, 'a.txt'), '1');
+  await g('add', '-A'); await g('commit', '-qm', 'one');
+  const first = (await g('rev-parse', '--short', 'HEAD')).stdout.trim();
+  return { dir, g, first };
+};
+
+test('nothing has landed since HEAD, which is what fresh means', async () => {
+  const { dir, first } = await stage();
+  try {
+    const d = await driftSince([first], dir);
+    assert.equal(d[first].known, true);
+    assert.equal(d[first].commits, 0);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('drift counts the commits since, and lists what they touched', async () => {
+  const { dir, g, first } = await stage();
+  try {
+    await writeFile(join(dir, 'b.txt'), '2'); await g('add', '-A'); await g('commit', '-qm', 'two');
+    await writeFile(join(dir, 'c.txt'), '3'); await g('add', '-A'); await g('commit', '-qm', 'three');
+    const d = await driftSince([first], dir);
+    assert.equal(d[first].commits, 2);
+    assert.deepEqual(d[first].changed.sort(), ['b.txt', 'c.txt']);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a sha this repository has never heard of is unknown, not unchanged', async () => {
+  const { dir } = await stage();
+  try {
+    // The failure this guards: a foreign or rebased-away sha answering "0
+    // commits since" would render as "still current" — a confident lie.
+    const d = await driftSince(['deadbee'], dir);
+    assert.equal(d.deadbee.known, false);
+    assert.equal(d.deadbee.commits, undefined);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('each distinct sha is asked about once, and blanks are dropped', async () => {
+  const { dir, first } = await stage();
+  try {
+    const d = await driftSince([first, first, null, undefined, ''], dir);
+    assert.deepEqual(Object.keys(d), [first]);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('outside a repository nothing is known, and nothing throws', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-norepo-'));
+  try {
+    const d = await driftSince(['abc1234'], dir);
+    assert.equal(d.abc1234.known, false);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+/* ── SW-053: the board is not the code under test ────────── */
+
+test('a modified tracker does not make the tree dirty', async () => {
+  const { dir } = await stage();
+  try {
+    await mkdir(join(dir, '.shipward'), { recursive: true });
+    await writeFile(join(dir, '.shipward', 'tracker.json'), '{"version":1}');
+    const h = await headState(dir);
+    // The heartbeat rewrites this file every 60s. Counting it left every check
+    // reporting dirty:true forever — SW-044 rendered one freshness state.
+    assert.equal(h.dirty, false, 'a write to the board is not a change to the code the check ran on');
+    assert.deepEqual(h.dirtyPaths, []);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('uncommitted source still counts, which is the whole point of the flag', async () => {
+  const { dir } = await stage();
+  try {
+    await writeFile(join(dir, 'a.txt'), 'changed');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['a.txt']);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('an untracked source file counts too', async () => {
+  const { dir } = await stage();
+  try {
+    await writeFile(join(dir, 'new.js'), 'export default 1');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['new.js']);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a staged change counts, and the first path is not mangled', async () => {
+  const { dir, g } = await stage();
+  try {
+    // The parse this replaced read `status --porcelain` by column, and git()
+    // trims its output — so the FIRST line lost the leading space of its status
+    // field and its path came back with a character missing. One entry, always
+    // the first, silently wrong.
+    await writeFile(join(dir, 'a.txt'), 'staged');
+    await g('add', 'a.txt');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['a.txt'], 'the path is exact, not off by one');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a board-only change alongside a source change is still dirty', async () => {
+  const { dir } = await stage();
+  try {
+    await mkdir(join(dir, '.shipward'), { recursive: true });
+    await writeFile(join(dir, '.shipward', 'tracker.json'), '{}');
+    await writeFile(join(dir, 'a.txt'), 'changed');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['a.txt'], 'the board is filtered out, not the whole check');
+  } finally { await rm(dir, { recursive: true, force: true }); }
 });

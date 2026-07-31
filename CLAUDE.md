@@ -129,7 +129,28 @@ indistinguishable from a check that passed.
 A pass proves that a declared command exited zero on a named tree. It does not
 prove the work is correct, and the note says so in those words. If the tree was
 dirty when the check ran, the evidence says that too — a pass over uncommitted
-changes is not reproducible from the sha.
+changes is not reproducible from the sha. `.shipward/` does not count toward
+that: the board is not the code under test, and the heartbeat writes to it every
+minute, so counting it made every check dirty and the caveat meaningless.
+
+## Evidence expires
+
+Every evidence entry is written with the sha it was true of, so `standup` and
+`recall` can say how far the tree has moved since — `4 commits since d859d43,
+1 file it names among them` instead of the same blanket caveat on everything.
+Four readings, and the two ways of not knowing are kept apart:
+
+- **current** — the sha is still the head of the trunk
+- **code moved on** — commits have landed since, and it says whether any touched
+  the files the entry itself names
+- **unanchored** — no sha, or a dirty tree: datable, not checkable. Entries
+  written before this existed are all of these, and they keep the old
+  `as of then, not a claim about now` caveat
+- **uncheckable** — a sha git cannot resolve here. Never reported as current
+
+Read it as a narrowing, not a guarantee: *current* means nothing has landed
+since, which is not the same as still being true. The desk shows the same
+verdict on the Memory tab, fading as the work drifts out from under it.
 
 ## Onboarding another repo
 

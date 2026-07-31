@@ -11,6 +11,9 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { statusLine } from './status.mjs';
+// line() and PERISHABLE live in standup.mjs, but they are the same ambient
+// reporting surface this file already covers: what a reader is told, unasked.
+import { line, PERISHABLE } from './standup.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCRIPT = join(HERE, 'status.mjs');
@@ -214,4 +217,37 @@ test('the open-item scan is dropped rather than stalling a huge board', async ()
   } finally {
     await rm(sandbox, { recursive: true, force: true });
   }
+});
+
+/* ── SW-044: the caveat becomes a measurement ────────────── */
+
+const evLine = (over = {}) => ({
+  card: 'SW-043', at: '2026-07-31T10:00:00Z', kind: 'evidence', text: '252 tests pass', refs: [], ...over,
+});
+
+test('with no drift map every evidence line reads as it always has', () => {
+  assert.match(line(evLine({ sha: 'abc1234' })), new RegExp(PERISHABLE));
+});
+
+test('an anchored entry gets the measurement instead of the blanket warning', () => {
+  const out = line(evLine({ sha: 'abc1234' }), { drift: { abc1234: { known: true, commits: 5, changed: [] } } });
+  assert.match(out, /5 commits since abc1234/);
+  assert.doesNotMatch(out, new RegExp(PERISHABLE), 'a measurement and a blanket caveat in the same line is worse than either');
+});
+
+test('an unanchored entry keeps PERISHABLE even when a drift map is present', () => {
+  // Two phrasings for one fact would teach a reader the caveat means something
+  // when it changes. It does not.
+  const out = line(evLine({ sha: null }), { drift: { abc1234: { known: true, commits: 5 } } });
+  assert.match(out, new RegExp(PERISHABLE));
+});
+
+test('a dirty-tree entry says so, because that IS new information', () => {
+  const out = line(evLine({ sha: 'abc1234', dirty: true }), { drift: { abc1234: { known: true, commits: 0 } } });
+  assert.match(out, /dirty tree/);
+});
+
+test('a decision is never captioned with either', () => {
+  const out = line({ ...evLine({ sha: 'abc1234' }), kind: 'decision' }, { drift: { abc1234: { known: true, commits: 9 } } });
+  assert.doesNotMatch(out, /commits since|as of then/);
 });

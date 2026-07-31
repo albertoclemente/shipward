@@ -175,10 +175,28 @@ async function sessionStart() {
   // answers and no way to tell which one is now.
   const { text, changed } = await drift(first.doc, first.project);
   const { doc, project, standup } = changed ? await tracker() : first;
+  // SW-044. Ask git how far the tree has moved since each piece of evidence was
+  // written, so the caveat on a standup line is a measurement rather than the
+  // same sentence about every entry ever. Budgeted and swallowed like the audit
+  // above it: a session start is never worth failing over a git read, and
+  // without a drift map every evidence line simply falls back to PERISHABLE.
+  //
+  // NOT named `drift`: that is already the audit function above, and a `let
+  // drift` here put the call to it — three lines earlier, same scope — in the
+  // temporal dead zone. The throw was then swallowed by the hook's own
+  // catch-all and SessionStart emitted NOTHING: no standup, no audit, no error.
+  // Rule 1 (never break a session) and a shadowed binding make silence out of
+  // a crash, so the name matters more here than it looks.
+  let driftMap;
+  try {
+    const { driftSince } = await import(join(ROOT, 'shipward', 'git.mjs'));
+    const { memoryEntries, anchors } = await import(join(ROOT, 'shipward', 'public', 'memory-lib.js'));
+    driftMap = await driftSince(anchors(memoryEntries(doc.cards, project.id)));
+  } catch { driftMap = undefined; }
   context('SessionStart',
     `Shipward — the tracker is your memory for this repo, and this is its current state. `
     + `You did not ask for it because a session that has to remember to look is a session that will not.\n\n`
-    + `${standup.standupText(doc, project)}`
+    + `${standup.standupText(doc, project, { drift: driftMap })}`
     + `${text}\n\n`
     + `Before editing a file you have not touched yet, call recall({file:"…"}).`);
 }

@@ -375,6 +375,11 @@ export function validate(d) {
         if (!isStr(e.text)) return `${c.id}.note[${j}].text must be a string`;
         if (!isStr(e.t) || Number.isNaN(Date.parse(e.t))) return `${c.id}.note[${j}].t must be a date-time`;
         if (e.kind != null && !NOTE_KIND.has(e.kind)) return `${c.id}.note[${j}].kind is invalid`;
+        // SW-044. The sha an entry was true of. Optional forever: every entry
+        // written before this existed has none, and the honest reading of a
+        // missing sha is "cannot be expired", not "still current".
+        if (e.sha != null && !isStr(e.sha)) return `${c.id}.note[${j}].sha must be a string`;
+        if (e.dirty != null && typeof e.dirty !== 'boolean') return `${c.id}.note[${j}].dirty must be a boolean`;
         if (e.resolves != null && (!isStr(e.resolves) || !ID_RE.test(e.resolves))) {
           return `${c.id}.note[${j}].resolves must be a card id`;
         }

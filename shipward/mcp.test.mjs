@@ -11,6 +11,7 @@ import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hydrate, parseNotes } from './tracker-store.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SERVER = join(HERE, 'mcp.mjs');
@@ -108,7 +109,15 @@ async function handshake() {
   return { c, res };
 }
 
-const doc = async () => JSON.parse(await readFile(tracker, 'utf8'));
+// The board as every consumer sees it. Since SW-039 the note entries live in
+// .shipward/notes.jsonl and the tracker file alone shows a board with no memory
+// on it, so this hydrates through the store's own functions — a second copy of
+// that logic here would be free to drift from the one that ships.
+const doc = async () => {
+  const board = JSON.parse(await readFile(tracker, 'utf8'));
+  const raw = await readFile(join(sandbox, '.shipward', 'notes.jsonl'), 'utf8').catch(() => '');
+  return hydrate(board, parseNotes(raw).byCard);
+};
 
 // The whole note as one string, whichever form it is in — assertions read
 // content; the entry structure gets its own dedicated tests.
@@ -827,7 +836,7 @@ test('apply:true accepts the inferences and still refuses to demote a card', asy
     const c = await handshakeIn(repo);
     await c.call('sync', { summary: 'accepted', fromGit: true, apply: true });
 
-    const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    const onDisk = await doc();
     const by = (id) => onDisk.cards.find((x) => x.id === id);
     assert.equal(by('TS-001').status, 'pushed', 'certain: the commit is on main');
     assert.equal(by('TS-002').status, 'claude', 'proposed: accepted because it was asked for');
@@ -837,7 +846,10 @@ test('apply:true accepts the inferences and still refuses to demote a card', asy
     // an audit that could retract a human's claim is an audit nobody would let
     // run unattended.
     assert.equal(by('TS-003').status, 'pushed', 'reported: never written, even on an explicit apply');
-    assert.equal(by('TS-003').note, '', 'and not annotated either — nothing happened to it');
+    // "Not annotated" is zero note entries since SW-039, where it used to be an
+    // empty string: the card carries no note text in the tracker at all now, and
+    // the sidecar has nothing filed under it.
+    assert.deepEqual(by('TS-003').note, [], 'and not annotated either — nothing happened to it');
 
     // One card, two rules, two reasons, one note.
     const audits = by('TS-002').note.filter((e) => e.text.includes('[git audit'));

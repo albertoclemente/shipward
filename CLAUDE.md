@@ -19,9 +19,17 @@ Registered in `.mcp.json`. Run it standalone with `node shipward/mcp.mjs`; it lo
 
 **Fallback — editing `tracker.json` directly is supported and safe** when the MCP server is not connected (the header tag in the desk reads `MCP OFFLINE`, and `tools/list` will not show the six tools). Read → modify → write the whole file, keep it valid against `.shipward/schema.json`, pretty-print with 2 spaces. The desk polls the file, so your edits appear within about 3 seconds either way. The rules below apply whichever route you take.
 
-## The file
+To add a **note** this way you have two options, and the cheap one is better: append one JSON object to `.shipward/notes.jsonl` — `{"card":"SW-041","t":"…","kind":"finding","text":"…"}`, one per line, oldest first — which costs you no rewrite of anything. Or write the entry into the card's `note` array in `tracker.json` and let the next write move it across; that is supported, just more bytes.
 
-All state lives in `.shipward/tracker.json` (schema: `.shipward/schema.json`). Statuses:
+## The files
+
+Board state lives in `.shipward/tracker.json` (schema: `.shipward/schema.json`). **Note entries live in `.shipward/notes.jsonl`** — append-only, one JSON object per line, oldest first, never rewritten and never compacted. Both are committed; neither is ever deleted.
+
+The split is SW-039, and the reason is size: note text was 68–73% of every board measured, it only ever grows, and it took `git diff` and this fallback down with it. Migrating this repo's own board took `tracker.json` from 182 KB to 48 KB with zero entries lost. **You do not have to think about it** — the store hydrates `card.note` on every read and strips it on every write, so a card still has a `note` array everywhere you look. Migration is automatic: the first write after an upgrade moves whatever is inline.
+
+The two files hold disjoint facts — the tracker never carries note text after a write, the sidecar never carries board state — so there is nothing for them to disagree about.
+
+Statuses:
 
 - `backlog` — planned, not started
 - `claude` — you are actively working on it (set `claude` field: `queued` → `working` → `done`)
@@ -45,13 +53,14 @@ Card ids are `PREFIX-NNN` (zero-padded, monotonically increasing per project, ne
 
 ## Writing rules
 
-- ISO 8601 timestamps. Never renumber or reuse ids. Never remove `feed` history beyond the 200 cap (entries the cap trims are preserved automatically in `.shipward/feed-archive.jsonl` — never delete that file either).
+- ISO 8601 timestamps. Never renumber or reuse ids. Never remove `feed` history beyond the 200 cap (entries the cap trims are preserved automatically in `.shipward/feed-archive.jsonl` — never delete that file either). The same goes double for `.shipward/notes.jsonl`: it is the only copy of the memory, not a spill file.
 - Branch naming: `feat/…`, `fix/…`, `chore/…` (kebab, ≤3 words) — mirror the card's `type`.
 - Commit messages reference the card id: `BW-016: add bloom interval alerts`.
 - `note` is a **list of dated entries** — `{t, kind?, text, resolves?}` — and is append-only: push an entry, never rewrite one. It is the memory a future session reads.
   - **State the `kind`** (`open | finding | decision | evidence | outcome | brief`). A stated kind is a fact; an omitted one is classified from the text, and prose that merely *quotes* a marker word ("the hook failed OPEN") gets misfiled.
   - **`resolves: "SW-011"`** settles the open items of that card — the only way to close a question raised on *another* card. Use it whenever your work answers something an earlier card left open.
-  - A plain-string `note` (prose, segments joined by ` || `) is still valid when hand-editing; it converts to entries on the next tool append.
+  - A plain-string `note` (prose, segments joined by ` || `) is still valid when hand-editing; it converts to entries on the next tool append, stamped with the card's own clock.
+  - **An entry is never edited or removed once written.** The sidecar is append-only in fact, not just in spirit: a write whose document has dropped an entry does not delete it, and the next read hands it back.
 
 ## Hooks
 

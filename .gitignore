@@ -3,3 +3,8 @@ node_modules/
 *.log
 .shipward/*.tmp
 .shipward/*.lock*
+# Worktrees live here (EnterWorktree, git worktree add). Each is a full second
+# checkout, and .claude is a directory people add wholesale — 1,525 tracked
+# files live under .claude/skills — so without this one line a stray `git add
+# -A` commits an entire worktree into the repo.
+.claude/worktrees/

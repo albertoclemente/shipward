@@ -89,6 +89,23 @@ export async function readGit(cwd = REPO) {
 // directly, which is correct just slower.
 const TRUNK_WINDOW = 5000;
 
+// What tree a check just ran against (SW-043). Two facts, and the honest third
+// state: `sha` is null when git cannot answer, which must not read as a clean
+// tree at an unknown commit.
+//
+// `dirty` is the load-bearing one. A check that passed over uncommitted changes
+// proves something nobody else can reproduce and that no later session can
+// re-derive from the sha, so the evidence has to carry the caveat with it
+// rather than let a reader assume the commit is what was tested.
+export async function headState(cwd = REPO) {
+  const sha = await git(['rev-parse', '--short', 'HEAD'], cwd);
+  if (sha === null) return { sha: null, dirty: false, known: false };
+  // --porcelain covers staged, unstaged and untracked in one call; empty means
+  // the tree is exactly the commit.
+  const status = await git(['status', '--porcelain'], cwd);
+  return { sha, dirty: status === null ? false : status.length > 0, known: status !== null };
+}
+
 export async function trunkIndex(trunk, cwd = REPO) {
   const out = await git(['rev-list', `--max-count=${TRUNK_WINDOW}`, trunk], cwd);
   if (out === null) return null;

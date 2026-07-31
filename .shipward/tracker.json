@@ -23,20 +23,44 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/the-tracker-dirties",
+      "commit": "784fa32",
       "note": [
         {
           "t": "2026-07-31T10:47:58.772Z",
           "kind": "brief",
           "text": "FINDING, caught by SW-044's own hand-back within a minute of shipping it. done() computes `dirty` from `git status --porcelain` over the whole tree. But .shipward/tracker.json is version-controlled here BY DESIGN — git is the authority, so the board is committed — and the MCP server rewrites mcp.lastSeen into it every 60 seconds as a heartbeat. The tracker file is therefore ALWAYS modified while a session is open. Measured at 10:46 on 2026-07-31: SW-044's check passed at 4ecfeaf with exactly one dirty path, `.shipward/tracker.json`, and nothing else. The consequence is not cosmetic: dirty:true makes freshness() report `unanchored` at birth, permanently, so no evidence this product ever writes can be current and the whole of SW-044 renders one state forever. SW-043's dirty caveat is equally defeated — it fires on every card and therefore says nothing. FIX, small: the tree that matters is the code under test, not the board describing it. Exclude .shipward/ when computing `dirty` in headState() — `git status --porcelain -- ':(exclude).shipward/'` or filter the porcelain lines — and say in the comment WHY the exclusion is honest rather than convenient: a tracker write is not a change to the thing the check exercised. Consider also whether the heartbeat belongs in tracker.json at all; mcp.mjs already records that tradeoff as chosen deliberately (one file occasionally dirty beat two files that can disagree), and this is the first real cost of it. Do NOT fix by dropping the dirty flag: a pass over genuinely uncommitted source is exactly the claim it exists to qualify."
+        },
+        {
+          "t": "2026-07-31T11:05:40.555Z",
+          "text": "FIXED, and this hand-back is the proof: the heartbeat had already rewritten mcp.lastSeen into tracker.json before the check ran — the exact condition that made SW-044's evidence dirty an hour ago — and this check recorded dirty:false. headState() now excludes .shipward/ when deciding whether the tree is dirty. The reasoning is written at the call site so nobody reads it as convenience: a write to the BOARD is not a change to the thing the check exercised, while uncommitted SOURCE still counts, because that is the claim the flag exists to qualify. SECOND BUG FOUND WHILE FIXING THE FIRST, and it was latent in SW-043 from the start: the old code parsed `git status --porcelain` by column, but git() trims its own output, so the leading space of the FIRST line's two-character status field was already gone and that one path came back short by a character. Always the first entry, never the rest, and nothing would have caught it because dirty was only ever read as a boolean. Replaced with bare-path queries — `diff --name-only HEAD` plus `ls-files --others --exclude-standard` — which have no columns to misread. headState now also returns dirtyPaths (capped at 10), because 'dirty' with nothing to point at is a claim a reader cannot check. 335 tests pass, five of them new and specifically about this: board-only change is clean, source change is dirty, untracked source is dirty, a staged path is exact rather than off by one, and a board change ALONGSIDE a source change is still dirty.",
+          "kind": "outcome"
+        },
+        {
+          "t": "2026-07-31T11:05:40.556Z",
+          "text": "Check \"default\" (node --test) passed at 784fa32, in 18784ms. That is what it proves: this command exited zero on this tree, not that the work is correct.",
+          "kind": "evidence",
+          "sha": "784fa32"
         }
       ],
       "created": "2026-07-31T10:47:58.772Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T11:05:40.555Z",
+        "sha": "784fa32",
+        "dirty": false,
+        "ms": 18784
+      }
     },
     {
       "id": "SW-052",
@@ -1700,6 +1724,18 @@
   ],
   "feed": [
     {
+      "t": "2026-07-31T11:05:40.556Z",
+      "p": "shipward",
+      "msg": "SW-053 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T11:03:05.910Z",
+      "p": "shipward",
+      "msg": "SW-053 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-07-31T10:47:58.772Z",
       "p": "shipward",
       "msg": "You added SW-053 to Backlog — it's on the list",
@@ -2649,7 +2685,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T10:48:58.751Z",
-    "pid": 95789
+    "lastSeen": "2026-07-31T11:06:21.846Z",
+    "pid": 2443
   }
 }

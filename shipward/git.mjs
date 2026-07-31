@@ -125,13 +125,36 @@ const TRUNK_WINDOW = 5000;
 // proves something nobody else can reproduce and that no later session can
 // re-derive from the sha, so the evidence has to carry the caveat with it
 // rather than let a reader assume the commit is what was tested.
+// The board is not the code under test (SW-053). `.shipward/` is
+// version-controlled here by design — git is the authority, so the tracker is
+// committed — and the MCP server rewrites mcp.lastSeen into it every 60 seconds
+// as a heartbeat. Counting that as a dirty tree made EVERY check report
+// dirty:true: measured 2026-07-31, SW-044's own hand-back passed at 4ecfeaf
+// with exactly one modified path, `.shipward/tracker.json`, and nothing else.
+// Every piece of evidence was then born unanchored and the freshness states had
+// no way to differ.
+//
+// The exclusion is honest rather than convenient: a write to the board is not a
+// change to the thing the check exercised. Everything else still counts —
+// uncommitted SOURCE is exactly the claim the dirty flag exists to qualify.
+export const BOARD_DIR = '.shipward/';
+const DIRTY_SHOWN = 10;
+
 export async function headState(cwd = REPO) {
   const sha = await git(['rev-parse', '--short', 'HEAD'], cwd);
-  if (sha === null) return { sha: null, dirty: false, known: false };
-  // --porcelain covers staged, unstaged and untracked in one call; empty means
-  // the tree is exactly the commit.
-  const status = await git(['status', '--porcelain'], cwd);
-  return { sha, dirty: status === null ? false : status.length > 0, known: status !== null };
+  if (sha === null) return { sha: null, dirty: false, known: false, dirtyPaths: [] };
+  // Bare paths, deliberately, rather than parsing `status --porcelain`: those
+  // lines carry two status columns whose LEADING SPACE git() has already
+  // trimmed off the first line, so every column-based parse is off by one for
+  // exactly one entry. Asking for the paths themselves has no columns to
+  // misread. Two spawns, paid once per done().
+  const tracked = await git(['diff', '--name-only', 'HEAD'], cwd);
+  const untracked = await git(['ls-files', '--others', '--exclude-standard'], cwd);
+  if (tracked === null || untracked === null) return { sha, dirty: false, known: false, dirtyPaths: [] };
+  const paths = [...lines(tracked), ...lines(untracked)].filter((p) => !p.startsWith(BOARD_DIR));
+  // The paths come back too: "dirty" with nothing to point at is a claim a
+  // reader cannot check, and the note that quotes them is the memory.
+  return { sha, dirty: paths.length > 0, known: true, dirtyPaths: paths.slice(0, DIRTY_SHOWN) };
 }
 
 export async function trunkIndex(trunk, cwd = REPO) {

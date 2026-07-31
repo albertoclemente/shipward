@@ -120,7 +120,9 @@ indistinguishable from a check that passed.
 A pass proves that a declared command exited zero on a named tree. It does not
 prove the work is correct, and the note says so in those words. If the tree was
 dirty when the check ran, the evidence says that too — a pass over uncommitted
-changes is not reproducible from the sha.
+changes is not reproducible from the sha. `.shipward/` does not count toward
+that: the board is not the code under test, and the heartbeat writes to it every
+minute, so counting it made every check dirty and the caveat meaningless.
 
 ## Evidence expires
 

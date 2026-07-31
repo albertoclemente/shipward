@@ -77,6 +77,43 @@ export function noteText(note) {
     .join('\n\n');
 }
 
+// The bounded form of noteText, for the one caller that renders a whole note
+// into a model's context: the MCP `start` handoff (SW-040).
+//
+// noteText has no ceiling, and a note only ever grows — measured 2026-07-31,
+// the biggest live notes were CA-011 at 6,187 chars and CA-013 at 5,511, and
+// start() sits on the mandatory protocol path, so every task paid for the whole
+// history of its card.
+//
+// The split is by age rather than by a flat clip, because the two halves of a
+// note are not worth the same to a session about to work the card: the most
+// recent entries are the state it is resuming, and the older ones are context
+// it mostly needs to know EXISTS. So the newest `full` entries render exactly
+// as noteText renders them today, and everything older is clipped to its point
+// by excerpt(). `clipped` is returned rather than swallowed — the caller has to
+// say so, for the same reason recall reports its dropped count.
+export function noteDigest(note, { full = 3, max = 400 } = {}) {
+  const segs = noteSegments(note);
+  let clipped = 0;
+  // Notes are appended, so the array runs oldest to newest and the tail is what
+  // survives whole. Chronological order is preserved either way: a note read
+  // out of order is a different note.
+  const keepFrom = Math.max(0, segs.length - Math.max(0, full));
+  const text = segs.map((seg, i) => {
+    const stamp = [seg.t ? seg.t.slice(0, 10) : '', seg.kind || ''].filter(Boolean).join(' · ');
+    const head = stamp ? `[${stamp}${seg.resolves ? ` · resolves ${seg.resolves}` : ''}] ` : '';
+    if (i >= keepFrom) return head + seg.text;
+    // Compared against the UNCLIPPED excerpt, not against seg.text: excerpt
+    // also repositions to the point and prepends an ellipsis, so an entry that
+    // merely moved would otherwise be miscounted as one that lost content.
+    const whole = excerpt(seg, Infinity);
+    const short = excerpt(seg, max);
+    if (short !== whole) clipped++;
+    return head + short;
+  }).join('\n\n');
+  return { text, clipped, entries: segs.length };
+}
+
 // Ordered by how much it would cost to miss. A segment carrying several
 // markers takes the most expensive one: "SHIPPED … VERIFIED … LEFT STALE FOR
 // ALBERTO" is, to the person reading, an open item.

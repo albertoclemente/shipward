@@ -584,13 +584,25 @@ test('a reply larger than the pipe buffer is not truncated when stdin closes', a
   // process.exit() discarded whatever had not flushed: the last frame stopped
   // at exactly 65525 bytes, unparseable, with exit code 0 so nothing signalled
   // failure.
+  // The vehicle used to be recall({kind:'finding', limit:50}) over 50 padded
+  // notes. SW-041 gave recall a size budget, so it can no longer produce a
+  // frame this big and the test stopped testing the flush. It is the VEHICLE
+  // that changed, not the assertion: standup renders every card in `claude`
+  // with its title unclipped and no cap on how many there are, so the frame is
+  // still built out of ordinary tracker data.
   const d = seed();
-  d.cards = d.cards.map((x, i) => ({ ...x, note: `REPRODUCED: ${'padding '.repeat(4000)} ${i}` }));
+  d.cards = Array.from({ length: 200 }, (_, i) => ({
+    ...d.cards[0],
+    id: `SW-${String(i + 100).padStart(3, '0')}`,
+    status: 'claude',
+    claude: 'working',
+    title: `padded title ${'x'.repeat(500)} ${i}`,
+  }));
   await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
 
   const c = connect();
   await c.request('initialize', { protocolVersion: PROTOCOL, capabilities: {} });
-  const pending = c.request('tools/call', { name: 'recall', arguments: { kind: 'finding', limit: 50 } });
+  const pending = c.request('tools/call', { name: 'standup', arguments: {} });
   c.close();                                   // stdin ends with a big reply in flight
 
   const res = await pending;
@@ -885,4 +897,92 @@ test('a resolves-only close is exempt — the assertion is the note', async () =
   assert.doesNotMatch(text, /Note check/);
   const card = (await doc()).cards.find((x) => x.id === 'TS-001');
   assert.equal(card.note[card.note.length - 1].resolves, 'TS-003');
+});
+
+/* ── what a read hands back is bounded (SW-040, SW-041) ────────── */
+
+test('start keeps the newest note entries whole and clips the older ones', async () => {
+  const d = seed();
+  // No trailing space: noteSegments trims, so a fixture ending in one could
+  // never appear verbatim in the output and the assertion would be unfalsifiable.
+  const body = (tag) => `${tag} ${Array(200).fill('padding').join(' ')}`;
+  d.cards[0].note = Array.from({ length: 6 }, (_, i) => ({
+    t: `2026-07-0${i + 1}T00:00:00Z`, kind: 'finding', text: body(`entry${i}`),
+  }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('start', { id: 'TS-001' });
+
+  assert.ok(text.includes(body('entry5')), 'the entry a session is resuming arrives whole');
+  assert.ok(text.includes(body('entry3')), 'and so do the two before it');
+  assert.ok(!text.includes(body('entry0')), 'the oldest does not');
+  assert.match(text, /entry0 (?:padding ?)+…/, 'but it is there, clipped to its point');
+  assert.match(text, /3 older of 6 note entries clipped/, 'and the clip is declared, not silent');
+  assert.match(text, /tracker\.json/, 'with somewhere to go for the whole thing');
+});
+
+test('start says nothing about clipping when it clipped nothing', async () => {
+  const d = seed();
+  d.cards[0].note = [{ t: '2026-07-01T00:00:00Z', text: 'short and complete' }];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('start', { id: 'TS-001' });
+  assert.match(text, /short and complete/);
+  assert.doesNotMatch(text, /clipped/, 'a note that fits is handed over untouched and unremarked');
+});
+
+test('recall shares one size budget across its hits, so more hits means shorter ones', async () => {
+  const d = seed();
+  d.cards = Array.from({ length: 12 }, (_, i) => mkCard({
+    id: `TS-${String(i + 100).padStart(3, '0')}`,
+    note: [{ t: '2026-07-02T00:00:00Z', kind: 'finding', text: `finding ${i}: ${'padding '.repeat(300)}` }],
+  }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const many = await c.call('recall', { kind: 'finding', limit: 12 });
+  const few = await c.call('recall', { kind: 'finding', limit: 2 });
+
+  // Before SW-041 this corpus rendered every hit in full: ~29k chars.
+  assert.ok(many.text.length < 12000, `12 hits rendered ${many.text.length} chars`);
+  assert.match(many.text, /12 of the 12 shown are clipped to \d+ chars/);
+  assert.ok(few.text.length / 2 > many.text.length / 12,
+    'the same entries come back longer when fewer of them are asked for');
+});
+
+test('recall reports being clipped and being truncated as the different losses they are', async () => {
+  const d = seed();
+  d.cards = Array.from({ length: 14 }, (_, i) => mkCard({
+    id: `TS-${String(i + 100).padStart(3, '0')}`,
+    note: [{ t: '2026-07-02T00:00:00Z', kind: 'finding', text: `finding ${i}: ${'padding '.repeat(300)}` }],
+  }));
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('recall', { kind: 'finding', limit: 10 });
+  assert.match(text, /…4 more not shown — raise limit to see them\./, 'entries never seen');
+  assert.match(text, /10 of the 10 shown are clipped/, 'entries seen only in part');
+});
+
+test('recall bounds the files line without ever truncating a path', async () => {
+  const paths = Array.from({ length: 60 }, (_, i) => `src/module-${i}/handler.mjs`);
+  const d = seed();
+  d.cards = [mkCard({
+    id: 'TS-100',
+    note: [{ t: '2026-07-02T00:00:00Z', kind: 'finding', text: `ROOT CAUSE: it touched ${paths.join(' ')}` }],
+  })];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const { c } = await handshake();
+  const { text } = await c.call('recall', { kind: 'finding' });
+  const filesLine = text.split('\n').find((l) => l.includes('files:'));
+
+  assert.ok(filesLine.length < 300, `the files line was ${filesLine.length} chars`);
+  assert.match(filesLine, /\+\d+ more$/, 'and says how many it left out');
+  for (const name of filesLine.replace(/^\s*files: /, '').split(', ')) {
+    if (/^\+\d+ more$/.test(name)) continue;
+    assert.ok(paths.includes(name), `"${name}" is a whole path, not a truncated one`);
+  }
 });

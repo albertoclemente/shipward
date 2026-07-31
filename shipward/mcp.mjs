@@ -22,9 +22,9 @@ import {
   nextId, autoBranch, applyTransition, feedAdd, moveMsg, addMsg, fmtDate,
 } from './public/lib.js';
 import {
-  memoryEntries, recall as recallEntries, ALL_KINDS, noteText, appendedNote,
+  memoryEntries, recall as recallEntries, ALL_KINDS, noteDigest, appendedNote,
 } from './public/memory-lib.js';
-import { standupText, line } from './standup.mjs';
+import { standupText, line, entryMax } from './standup.mjs';
 import { auditBoard, summarise, reconcilePlan, CERTAIN, REPO } from './git.mjs';
 import { today } from './reconcile.mjs';
 
@@ -143,7 +143,7 @@ const TOOLS = [
           description: 'open = unresolved; finding = bugs and gotchas; decision = choices not to reverse; evidence = past verification, perishable.',
         },
         query: str('Free text matched against the notes, card ids and titles.'),
-        limit: { type: 'number', description: 'Max entries, default 10, capped at 50.' },
+        limit: { type: 'number', description: 'Max entries, default 10, capped at 50. Entries share a fixed size budget, so asking for more returns each one shorter — the reply says when it has clipped.' },
         project: str('Project id or name. Defaults to the active project.'),
       },
       additionalProperties: false,
@@ -325,13 +325,30 @@ async function recall({ file, kind, query, limit = 10, project: wanted }) {
       + (file ? '; notes name code however they like, so try recall({query:"…"}) with a concept.' : '.');
   }
 
+  // One budget shared across the hits, so the answer is sized by what recall is
+  // allowed to cost rather than by how much someone once wrote.
+  const max = entryMax(hit.entries.length);
+  let clipped = 0;
   const lines = [`${hit.total} recalled for ${asked}${hit.dropped ? `, showing ${hit.entries.length}` : ''}:`, ''];
   for (const e of hit.entries) {
-    lines.push(line(e));
-    if (e.refs.length) lines.push(`     files: ${e.refs.join(', ')}`);
+    const rendered = line(e, { max });
+    // Against the unclipped EXCERPT, not the raw line: excerpt repositions to
+    // the point as well as truncating, so an entry that only moved is not one
+    // that lost anything.
+    if (rendered !== line(e, { max: Infinity })) clipped++;
+    lines.push(rendered);
+    if (e.refs.length) lines.push(`     files: ${fileList(e.refs)}`);
     lines.push('');
   }
-  if (hit.dropped) lines.push(`…${hit.dropped} more not shown — raise limit to see them.`);
+  // Dropped and clipped are different losses and are reported as such: one is
+  // an entry you never saw, the other an entry you saw the point of. Saying
+  // only "…N more" while silently truncating the rest would make the answer
+  // read as complete when it is not.
+  const tail = [
+    hit.dropped && `…${hit.dropped} more not shown — raise limit to see them.`,
+    clipped && `…${clipped} of the ${hit.entries.length} shown ${clipped === 1 ? 'is' : 'are'} clipped to ${max} chars, leading with the point. Narrow the search, or read the card, for the whole entry.`,
+  ].filter(Boolean);
+  if (tail.length) lines.push(tail.join('\n'));
   return lines.join('\n').trimEnd();
 }
 
@@ -365,6 +382,34 @@ async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note
   return `${created.id} added to ${created.project.name} backlog — ${text}`;
 }
 
+// The other half of a recalled entry, and the half a text budget alone would
+// miss: refs() pulls every path an entry names, and a note that surveys a
+// subsystem names dozens. Whole names only — a path clipped mid-segment is not
+// a shorter path, it is a wrong one.
+const FILES_MAX = 200;
+function fileList(refs) {
+  const all = refs.join(', ');
+  if (all.length <= FILES_MAX) return all;
+  const kept = [];
+  let used = 0;
+  for (const r of refs) {
+    if (used + r.length + 2 > FILES_MAX) break;
+    kept.push(r);
+    used += r.length + 2;
+  }
+  // Every name too long to fit even alone: say the count rather than nothing.
+  return kept.length
+    ? `${kept.join(', ')}, +${refs.length - kept.length} more`
+    : `${refs.length} files`;
+}
+
+// How much of a card's note the start handoff carries (SW-040). Three entries
+// is a session's working memory of the card — what it last did, what it decided,
+// what it left — and everything before that is context it mainly needs to know
+// exists.
+const START_FULL_ENTRIES = 3;
+const START_OLDER_MAX = 400;
+
 async function startCard({ id, branch }, signal) {
   let out;
   await mutate((doc) => {
@@ -395,8 +440,18 @@ async function startCard({ id, branch }, signal) {
     `Title: ${card.title}`,
     `Type ${card.type} · ${card.pri} · effort ${card.effort}`,
   ];
-  const rendered = noteText(card.note);
-  lines.push(rendered ? `Note:\n${rendered}` : 'Note: (empty)');
+  // The newest entries whole — they are the state being resumed — and the older
+  // ones clipped to their point. See noteDigest: this handoff is paid on every
+  // single task, and a note only ever grows.
+  const digest = noteDigest(card.note, { full: START_FULL_ENTRIES, max: START_OLDER_MAX });
+  lines.push(digest.text ? `Note:\n${digest.text}` : 'Note: (empty)');
+  if (digest.clipped) {
+    // Deliberately NOT "call recall for the rest": recall clips too, so that
+    // would be a promise this server cannot keep. The tracker is the only place
+    // that always holds the whole note.
+    lines.push(`(${digest.clipped} older of ${digest.entries} note entries clipped to their point. `
+      + 'The whole note is on the card in the desk, and in .shipward/tracker.json.)');
+  }
   lines.push(already ? `Next: git checkout ${card.branch}` : `Next: git checkout -b ${card.branch}`);
   return lines.join('\n');
 }

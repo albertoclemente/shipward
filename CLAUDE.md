@@ -17,6 +17,23 @@ An MCP server exposes the tracker as six tools. **Prefer them** — they hold a 
 
 Registered in `.mcp.json`. Run it standalone with `node shipward/mcp.mjs`; it logs to stderr and speaks JSON-RPC on stdout.
 
+The same six are also a **command line**, for any agent that is not Claude Code
+and any repo without hook support:
+
+```bash
+node shipward/cli.mjs standup
+node shipward/cli.mjs recall --file tracker-store.mjs
+node shipward/cli.mjs log "the desk overflows below 444px" --type bug --pri P1
+node shipward/cli.mjs start SW-042
+node shipward/cli.mjs done SW-042 --commit 9a1f2c3 --note "…" --kind outcome
+node shipward/cli.mjs sync --from-git
+```
+
+It dispatches over the same tool table the MCP server advertises and calls the
+same handlers — a subcommand the server does not have, or a tool the CLI cannot
+reach, is impossible by construction. Results go to stdout, mistakes to stderr
+with exit 1, and a crash to stderr with exit 2.
+
 **Fallback — editing `tracker.json` directly is supported and safe** when the MCP server is not connected (the header tag in the desk reads `MCP OFFLINE`, and `tools/list` will not show the six tools). Read → modify → write the whole file, keep it valid against `.shipward/schema.json`, pretty-print with 2 spaces. The desk polls the file, so your edits appear within about 3 seconds either way. The rules below apply whichever route you take.
 
 To add a **note** this way you have two options, and the cheap one is better: append one JSON object to `.shipward/notes.jsonl` — `{"card":"SW-041","t":"…","kind":"finding","text":"…"}`, one per line, oldest first — which costs you no rewrite of anything. Or write the entry into the card's `note` array in `tracker.json` and let the next write move it across; that is supported, just more bytes.

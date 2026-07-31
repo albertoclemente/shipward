@@ -185,12 +185,13 @@ function noteEntries(card) {
     .map((text) => ({ t: card.created, text }));
 }
 
-const noteRecord = (cardId, e) => {
-  const rec = { card: cardId, t: e.t, text: e.text };
-  if (e.kind != null) rec.kind = e.kind;
-  if (e.resolves != null) rec.resolves = e.resolves;
-  return rec;
-};
+// Everything the entry carries, plus the card it belongs to. Deliberately NOT
+// a field list: the first version of this copied t/text/kind/resolves, and
+// SW-053 landed `sha` and `dirty` on entries the same week — the sidecar
+// dropped them silently, and only SW-053's own round-trip test noticed. A
+// store that has to be edited every time an entry grows a field is a store
+// that will lose one.
+const noteRecord = (cardId, e) => ({ card: cardId, ...e });
 
 // A missing sidecar is a board that has never written a note, not an error —
 // every one of the ten onboarded repos starts that way. A line that will not
@@ -223,11 +224,11 @@ export function parseNotes(raw) {
     const k = noteKey(e.card, e);
     if (keys.has(k)) continue;             // a re-append after a failed write
     keys.add(k);
-    const entry = { t: e.t, text: e.text };
-    if (e.kind != null) entry.kind = e.kind;
-    if (e.resolves != null) entry.resolves = e.resolves;
-    if (!byCard.has(e.card)) byCard.set(e.card, []);
-    byCard.get(e.card).push(entry);
+    // Everything but `card`, for the same reason noteRecord writes everything
+    // but `card`: a field list here would drop whatever an entry grows next.
+    const { card, ...entry } = e;
+    if (!byCard.has(card)) byCard.set(card, []);
+    byCard.get(card).push(entry);
   }
   if (skipped) {
     process.stderr.write(`shipward: skipped ${skipped} unreadable line${skipped === 1 ? '' : 's'} in ${NOTES}\n`);

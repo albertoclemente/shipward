@@ -664,3 +664,26 @@ test('a board with no notes never creates the sidecar', async () => {
   await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(1))}); return doc; });`);
   await assert.rejects(stat(notesPath()), { code: 'ENOENT' });
 });
+
+test('the sidecar preserves every field an entry carries, not a known list', async () => {
+  // The first version of noteRecord copied t/text/kind/resolves. SW-053 landed
+  // `sha` and `dirty` on entries in the same week and the sidecar dropped them
+  // silently — caught only because SW-053 had its own round-trip test. A field
+  // list here is a slow leak, so this asserts on a field nobody has invented.
+  const d = seed();
+  d.cards = [carded(1)];
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const entry = {
+    t: '2026-07-02T00:00:00Z', kind: 'evidence', text: 'node --test passed',
+    sha: 'abc1234', dirty: true, somethingAddedLater: { nested: 1 },
+  };
+  await withStore(`await store.mutate((doc) => {
+    doc.cards[0].note = [${JSON.stringify(entry)}];
+    return doc;
+  });`);
+
+  assert.deepEqual(await notesLines(), [{ card: 'TS-001', ...entry }], 'written whole');
+  const { stdout } = await withStore('const { doc } = await store.readRaw(); process.stdout.write(JSON.stringify(doc.cards[0].note));');
+  assert.deepEqual(JSON.parse(stdout), [entry], 'and read back whole');
+});

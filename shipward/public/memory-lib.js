@@ -44,6 +44,10 @@ export function noteSegments(note) {
         kind: VALID_KIND(e.kind) ? e.kind : undefined,
         t: typeof e.t === 'string' ? e.t : undefined,
         resolves: typeof e.resolves === 'string' ? e.resolves : undefined,
+        // SW-044: the commit this was true of, carried through so freshness()
+        // can ask git about it later. Prose notes never have one.
+        sha: typeof e.sha === 'string' ? e.sha : undefined,
+        dirty: e.dirty === true ? true : undefined,
       }));
   }
   if (typeof note !== 'string' || !note) return [];
@@ -218,6 +222,79 @@ export function pointIndex(text, kindKey) {
   const stop = Math.max(text.lastIndexOf('. ', best), text.lastIndexOf('? ', best), text.lastIndexOf('! ', best));
   return stop === -1 ? best : stop + 2;
 }
+
+/* ── evidence expires (SW-044) ───────────────────────────────
+   standup has always said evidence rots — the PERISHABLE caveat, "as of then,
+   not a claim about now". It said it identically about a note written an hour
+   ago and one written in March, because it had nothing to compare against.
+
+   Now some entries carry the sha they were true of, so the caveat can be a
+   measurement. What it must never become is a promise: "fresh" here means only
+   that no commit has landed since the entry was written, which is not the same
+   as the entry still being TRUE. This function narrows the claim; it cannot
+   verify it.
+
+   Four states, because the two ways of not knowing are different facts:
+     fresh       — the sha is still the head of the trunk
+     drifted     — commits have landed since, and possibly on the files it names
+     unanchored  — no sha: written before anything stamped one, or on a dirty
+                   tree, which is unanchored at birth
+     unknown     — a sha nobody can resolve; git could not be read, or the
+                   commit is gone. Distinct from fresh, always. */
+export const FRESHNESS = ['fresh', 'drifted', 'unanchored', 'unknown'];
+
+const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+export function freshness(entry, drift = {}) {
+  // Only evidence makes a claim about a state of the world that a commit can
+  // invalidate. A decision stays a decision; an open item stays open.
+  if (!entry || entry.kind !== 'evidence') return null;
+
+  if (entry.dirty) {
+    return {
+      state: 'unanchored',
+      label: entry.sha
+        ? `ran on a dirty tree at ${entry.sha} — never reproducible from that commit`
+        : 'ran on a dirty tree — never reproducible from a commit',
+    };
+  }
+  if (!entry.sha) {
+    return { state: 'unanchored', label: 'no commit recorded — datable, not checkable' };
+  }
+
+  const d = drift[entry.sha];
+  if (!d || d.known !== true) {
+    return { state: 'unknown', label: `at ${entry.sha}, which git cannot resolve here` };
+  }
+  if (d.commits === 0) return { state: 'fresh', label: `still at ${entry.sha}` };
+
+  // The files the entry itself names, intersected with what has actually
+  // changed. An entry that cites no file gets the commit count alone rather
+  // than a fabricated zero, because "touches nothing it mentions" and
+  // "mentions nothing" are not the same reassurance.
+  const named = Array.isArray(entry.refs) ? entry.refs : [];
+  const changed = Array.isArray(d.changed) ? d.changed : [];
+  const hits = named.filter((f) => changed.some((c) => c === f || c.endsWith(`/${f}`) || f.endsWith(`/${c}`)));
+  const tail = named.length === 0
+    ? ''
+    : hits.length
+      ? `, ${plural(hits.length, 'file')} it names among them (${hits.slice(0, 3).join(', ')})`
+      : ', none touching the files it names';
+  return { state: 'drifted', label: `${plural(d.commits, 'commit')} since ${entry.sha}${tail}` };
+}
+
+// The one-line caveat a reader sees, whatever surface they are on. Kept beside
+// freshness() so the wording cannot fork between standup, recall and the desk.
+export const staleness = (entry, drift) => {
+  const f = freshness(entry, drift);
+  return f ? `${f.label}` : null;
+};
+
+// Every distinct sha a set of entries is anchored to — what to ask git about,
+// asked once each rather than once per entry.
+export const anchors = (entries) => [...new Set(
+  (entries || []).filter((e) => e?.kind === 'evidence' && e.sha && !e.dirty).map((e) => e.sha),
+)];
 
 // A clip that leads with the point, marked with a leading ellipsis when it
 // starts partway in so the reader knows text was skipped rather than absent.
@@ -416,6 +493,8 @@ export function memoryEntries(cards, projectId) {
         superseded: kind === 'open' && settledBy != null,
         settledBy: kind === 'open' ? settledBy : null,
         resolves: seg.resolves || null,
+        sha: seg.sha || null,
+        dirty: seg.dirty === true,
         text: seg.text,
         refs: refs(seg.text),
         syms: symbols(seg.text),

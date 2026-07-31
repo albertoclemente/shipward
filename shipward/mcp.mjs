@@ -22,10 +22,10 @@ import {
   nextId, autoBranch, applyTransition, feedAdd, moveMsg, verifyMsg, addMsg, fmtDate,
 } from './public/lib.js';
 import {
-  memoryEntries, recall as recallEntries, ALL_KINDS, noteDigest, appendedNote,
+  memoryEntries, recall as recallEntries, ALL_KINDS, noteDigest, appendedNote, anchors,
 } from './public/memory-lib.js';
 import { standupText, line, entryMax } from './standup.mjs';
-import { auditBoard, summarise, reconcilePlan, CERTAIN, REPO } from './git.mjs';
+import { auditBoard, summarise, reconcilePlan, driftSince, CERTAIN, REPO } from './git.mjs';
 import { today } from './reconcile.mjs';
 import { runCheck, verificationOf, verdictText, kindFor, cmdOf } from './verify.mjs';
 
@@ -269,7 +269,12 @@ const TOOLS = [
 
 async function standup({ project: wanted }) {
   const { doc } = await readRaw();
-  return standupText(doc, projectOf(doc, wanted));
+  const project = projectOf(doc, wanted);
+  // SW-044. The evidence standup carries is only as good as its currency, and
+  // currency is a git question. Asked once per distinct sha, and only for the
+  // handful of entries standup actually renders.
+  const drift = await driftSince(anchors(memoryEntries(doc.cards, project.id)), REPO);
+  return standupText(doc, project, { drift });
 }
 
 // The bridge between "the file I am about to edit" and "what the notes call
@@ -331,14 +336,15 @@ async function recall({ file, kind, query, limit = 10, project: wanted }) {
   // One budget shared across the hits, so the answer is sized by what recall is
   // allowed to cost rather than by how much someone once wrote.
   const max = entryMax(hit.entries.length);
+  const drift = await driftSince(anchors(hit.entries), REPO);
   let clipped = 0;
   const lines = [`${hit.total} recalled for ${asked}${hit.dropped ? `, showing ${hit.entries.length}` : ''}:`, ''];
   for (const e of hit.entries) {
-    const rendered = line(e, { max });
+    const rendered = line(e, { max, drift });
     // Against the unclipped EXCERPT, not the raw line: excerpt repositions to
     // the point as well as truncating, so an entry that only moved is not one
     // that lost anything.
-    if (rendered !== line(e, { max: Infinity })) clipped++;
+    if (rendered !== line(e, { max: Infinity, drift })) clipped++;
     lines.push(rendered);
     if (e.refs.length) lines.push(`     files: ${fileList(e.refs)}`);
     lines.push('');
@@ -355,10 +361,15 @@ async function recall({ file, kind, query, limit = 10, project: wanted }) {
   return lines.join('\n').trimEnd();
 }
 
-const entryOf = (text, { kind, resolves } = {}) => {
+const entryOf = (text, { kind, resolves, sha, dirty } = {}) => {
   const e = { t: nowIso(), text };
   if (kind) e.kind = kind;
   if (resolves) e.resolves = resolves;
+  // SW-044. The commit this entry was true of, so a later session can ask git
+  // whether it still is. Written only where it is actually known — an invented
+  // sha would be worse than none, because none is honestly unanchored.
+  if (sha) e.sha = sha;
+  if (dirty) e.dirty = true;
   return e;
 };
 
@@ -567,7 +578,14 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
     // command did is a different kind of claim from what the agent says it did,
     // and only one of them is checkable.
     if (sayVerdict) {
-      moved.note = appendedNote(moved.note, moved.created, entryOf(verdictText(verdict, { cmd }), { kind: kindFor(verdict) }));
+      moved.note = appendedNote(moved.note, moved.created, entryOf(verdictText(verdict, { cmd }), {
+        kind: kindFor(verdict),
+        // Anchored to the tree the check ran on, not to HEAD at write time —
+        // those differ the moment anything commits between the run and the
+        // write, and the entry is a claim about the former.
+        sha: verdict.sha,
+        dirty: verdict.dirty,
+      }));
     }
     if (refuted && force) {
       moved.note = appendedNote(moved.note, moved.created, entryOf(

@@ -180,6 +180,14 @@
                       "type": "string",
                       "pattern": "^[A-Z]+-[0-9]{3}$",
                       "description": "card id whose open items this entry settles"
+                    },
+                    "sha": {
+                      "type": "string",
+                      "description": "the commit this entry was true of (SW-044). Evidence without one cannot be expired — it can only be dated."
+                    },
+                    "dirty": {
+                      "type": "boolean",
+                      "description": "the tree carried uncommitted changes, so this entry is not reproducible from its sha"
                     }
                   }
                 }

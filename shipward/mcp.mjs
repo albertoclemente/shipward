@@ -15,6 +15,7 @@
 // Writes go through tracker-store.mjs, which holds a cross-process lock. The
 // desk, this server and a direct file edit can all be writing at once.
 import { readFile, readdir } from 'node:fs/promises';
+import { realpathSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readRaw, mutate, TRACKER } from './tracker-store.mjs';
@@ -896,6 +897,18 @@ const onWriteQueue = (fn) => {
   return run;
 };
 
+// SW-048. Everything above is the library — the six tools and the rules they
+// apply. Everything below is the SERVER, and it only starts when this file is
+// the process entry point.
+//
+// The guard is what lets cli.mjs import the same handlers instead of
+// reimplementing them: two implementations of `done` would eventually disagree
+// about what a hand-back means, which is the drift this codebase spends most of
+// its comments preventing. Importing an unguarded server would attach stdin
+// listeners, log "ready" to stderr and arrange to exit when stdin closed — all
+// wrong for a one-shot command, and the same mistake fleet-client.js made by
+// calling setInterval at module scope (SW-047).
+export function serve() {
 process.stdin.setEncoding('utf8');
 process.stdin.on('data', (chunk) => {
   buffer += chunk;
@@ -958,3 +971,15 @@ const heart = setInterval(() => onWriteQueue(beat), HEARTBEAT_MS);
 heart.unref?.();
 
 log(`ready — ${TOOLS.length} tools, tracker ${TRACKER}`);
+}
+
+// Entry point, not import. realpath on both sides so a symlinked bin — which is
+// how a CLI usually ends up on PATH — still compares equal.
+if (process.argv[1] && realpathSync(process.argv[1]) === realpathSync(fileURLToPath(import.meta.url))) {
+  serve();
+}
+
+// The tool table is exported so cli.mjs dispatches over the SAME six entries
+// the MCP server advertises: a subcommand the server does not have, or a tool
+// the CLI cannot reach, is drift by construction.
+export { TOOLS, ToolError };

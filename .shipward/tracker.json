@@ -11,6 +11,160 @@
   ],
   "cards": [
     {
+      "id": "SW-049",
+      "p": "shipward",
+      "title": "Publish — licence, README, and strip the scaffolding before the repo goes public",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:41:22.961Z",
+          "kind": "brief",
+          "text": "BRIEF. Decision taken 2026-07-31: open source this under MIT rather than trying to charge for it. Reasoning, so nobody reopens it cheaply — there is nothing to gate (local-first, zero-dep, no auth, readable ES modules; a licence check is a three-line delete), the competition is free AND bundled with the tool you already pay for (Claude Code shipped built-in Tasks in v2.1.16), and distribution in this niche is stars, HN and the Claude Code ecosystem, where closed source is not premium, it is invisible. The asset is the judgment (git-as-truth tiers, note epistemics), which only pays out if it can be read. Timing matters: publish while 'Tasks has no repo awareness, no web UI, no MCP server, no git integration' is still true — Beads went from side project to absorbed-by-the-platform in months. WORK, all verified against the repo on 2026-07-31: (1) there is NO LICENSE and NO README at all; (2) git tracks 1,525 files under .claude/skills plus 72 under _bmad, none of which carry a bundled LICENSE file — third-party scaffolding that must be stripped or its terms verified before publishing; (3) a 43KB 'App progress tracker prototypes.zip' is committed at the root; (4) the shippable product is 26 files in shipward/, 3 in .shipward/, and CLAUDE.md; (5) design_handoff_shipward/ came from Claude Design — check what may be redistributed; (6) .shipward/tracker.json is real working memory about ten of Alberto's projects, including the incident write-ups. Publishing it is the single best demo this project has — a live board with real notes beats any screenshot — but read it end to end first, because it is a publishing decision, not a code one. README should carry the measurement that answers Beads' token argument: tools/list is 6,843 bytes (~1.7k tokens) for all six tools, measured 2026-07-31."
+        }
+      ],
+      "created": "2026-07-31T09:41:22.961Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-048",
+      "p": "shipward",
+      "title": "A CLI surface so the protocol is not Claude-Code-shaped only",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:39:59.559Z",
+          "kind": "brief",
+          "text": "BRIEF. The four hooks are Claude Code specific, but the protocol is not — and today an agent that is not Claude Code has no cheap way in. Ship a thin CLI (shipward standup | log | start | done) over the same tracker-store and lib.js rules, so any agent that can run a shell command gets the protocol and any repo gets it without hook support. Cost is low: standup.mjs and status.mjs already run standalone by design. Secondary benefit — it strengthens an argument this project can already win. Beads' MCP README recommends CLI+hooks over MCP for Claude Code on token grounds, '~1-2k tokens vs 10-50k for MCP schemas'; measured 2026-07-31, this server's tools/list response is 6,843 bytes (~1.7k tokens) for all six tools, i.e. an MCP surface already at parity with their CLI. Worth stating in the README with the measurement, and worth a regression test so it stays true."
+        }
+      ],
+      "created": "2026-07-31T09:39:59.559Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-047",
+      "p": "shipward",
+      "title": "Render through pure functions so the desk is testable without a DOM",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:39:59.539Z",
+          "kind": "brief",
+          "text": "BRIEF. SW-038 shipped a regression that no test could have caught: the fleet page's origin validator rejected the new ?fleet= URLs and silently unlinked every board — ten rows, zero anchors, no error — and it surfaced only in the live browser. That card already recorded the known limit (zero-dep means no jsdom, so row rendering has no DOM-level test). Fix it in the grain of the codebase rather than by adding Playwright and losing the zero-dependency story: push markup generation into pure functions in lib.js that take data and return strings, and test those under node --test — the same move that made fleetLinkFrom() testable. The bug class to target is producer/consumer drift, which is precisely what a pure function pins."
+        }
+      ],
+      "created": "2026-07-31T09:39:59.539Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-046",
+      "p": "shipward",
+      "title": "The fleet answers questions — one standup across every board",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:39:59.519Z",
+          "kind": "brief",
+          "text": "BRIEF. fleet.mjs lists boards and spawns a desk per board; it does not yet answer anything that needs more than one board at a time. Add the aggregate view: one standup across every onboarded repo, what has been sitting in review longest anywhere, which repo has not shipped in N weeks, everything currently in flight. Mostly aggregation over the walk and the per-repo trackers that already exist. Strategic reason to prioritise it: cross-repo unification is the axis Alberto's 2026-07-10 sweep found agent-native tools worst at, AND it is the axis Claude Code's built-in Tasks structurally cannot reach — that system has no repo awareness and its task-list ids can collide across repos. Per-repo trackers (never pooled) plus a fleet that reads across them is the right shape and is already half-built."
+        }
+      ],
+      "created": "2026-07-31T09:39:59.519Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-045",
+      "p": "shipward",
+      "title": "Trust panel — surface the reported tier the desk never shows",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:39:59.499Z",
+          "kind": "brief",
+          "text": "BRIEF. The reported tier is defined in git.mjs and deliberately never written by anything automatic — which means the most interesting data in the system is currently invisible. Give it a desk surface: cards claiming pushed whose commit is nowhere on the trunk, branches no card claims, files changed with no card in flight, review cards ageing past N days, notes carrying no evidence entry at all. Nothing here writes to the board — it reports, and a human decides, which is exactly the tier's existing rule. Why it matters commercially: the actual pain of running an agent solo is not knowing what happened while you were away, and every competing tracker assumes the agent's report is true. This repo has the machinery to contradict it and does not yet show the contradiction to anyone."
+        }
+      ],
+      "created": "2026-07-31T09:39:59.499Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-044",
+      "p": "shipward",
+      "title": "Evidence expires — recall and the desk mark notes git has moved past",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:39:59.480Z",
+          "kind": "brief",
+          "text": "BRIEF. standup.mjs already says evidence rots — the PERISHABLE caveat, 'as of then, not a claim about now'. Make it mechanical instead of textual: an evidence entry carries the sha it was written against, and git.mjs can answer whether that sha is still reachable from HEAD and whether the files the entry concerned have been touched since. Then recall({file}) stops reporting '252 tests pass' flatly and reports '252 tests passed at 1942e8c — N commits have touched this file since', and the desk fades a verified badge as the work drifts out from under it. Pairs with the verification-gating card, which is what starts stamping shas onto evidence in the first place; this card is cheap once that exists. Positioning value: 'memory that knows it is out of date' is a claim no competitor in this category makes, and it is the natural headline for the write-up."
+        }
+      ],
+      "created": "2026-07-31T09:39:59.480Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-043",
+      "p": "shipward",
+      "title": "Verification gating — done() runs the card's check and records what it proved",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "L",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "note": [
+        {
+          "t": "2026-07-31T09:39:59.453Z",
+          "kind": "brief",
+          "text": "BRIEF. Strategy card, from a 2026-07-31 market read: Anthropic shipped built-in Tasks in Claude Code v2.1.16 (persistent via CLAUDE_CODE_TASK_LIST_ID, credited to Beads) and Beads now has a community web dashboard. The 'what should I work on next' half of this category is commoditised. The half nobody owns is 'prove it was done'. Today done() accepts a claim: the note nudge asks for prose, nothing checks the work. Build: a card carries a `verify` command (e.g. `node --test`); done() runs it, captures exit code plus the head of the output, and writes an evidence entry stamped WITH THE SHA IT RAN AGAINST. Three outcomes mirroring the git tiers in git.mjs — verified (ran, passed, at this sha), unverified (no check declared, and it says so rather than implying success), refuted (ran, failed: done is refused or the card returns to claude with the failure in the note). This is the existing thesis extended one step: git outranks the claim about the commit, the test run outranks the claim about the work. Alberto's 2026-07-10 sweep of 69 agents found verification gating 'barely exists anywhere'; it still does not exist as of 2026-07-31. It is also the hardest thing here to copy, because it only means anything on top of the tier and provenance machinery already in git.mjs and reconcile.mjs. DECIDED NOT TO BUILD (same session): dependency DAG, ready-queries, leases, multi-agent coordination — that is Beads' engine and competing on it head-on with a zero-dep solo project loses."
+        }
+      ],
+      "created": "2026-07-31T09:39:59.453Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-042",
       "p": "shipward",
       "title": "standup’s \"shipped in the last 7 days\" list is uncapped",
@@ -1333,6 +1487,48 @@
   ],
   "feed": [
     {
+      "t": "2026-07-31T09:41:22.961Z",
+      "p": "shipward",
+      "msg": "You added SW-049 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:39:59.559Z",
+      "p": "shipward",
+      "msg": "You added SW-048 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:39:59.539Z",
+      "p": "shipward",
+      "msg": "You added SW-047 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:39:59.519Z",
+      "p": "shipward",
+      "msg": "You added SW-046 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:39:59.499Z",
+      "p": "shipward",
+      "msg": "You added SW-045 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:39:59.480Z",
+      "p": "shipward",
+      "msg": "You added SW-044 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T09:39:59.453Z",
+      "p": "shipward",
+      "msg": "You added SW-043 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-07-31T09:27:53.037Z",
       "p": "shipward",
       "msg": "You added SW-042 to Backlog — it's on the list",
@@ -2138,7 +2334,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T09:28:56.257Z",
-    "pid": 43558
+    "lastSeen": "2026-07-31T09:41:22.925Z",
+    "pid": 47555
   }
 }

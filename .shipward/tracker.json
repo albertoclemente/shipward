@@ -223,13 +223,26 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/the-fleet-answers",
+      "commit": "71e7e1e",
       "created": "2026-07-31T09:39:59.519Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T13:46:13.191Z",
+        "sha": "71e7e1e",
+        "dirty": false,
+        "ms": 23589
+      }
     },
     {
       "id": "SW-045",
@@ -322,13 +335,26 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/cap-shipped-list",
-      "commit": null,
+      "commit": "69b54a7",
       "created": "2026-07-31T09:27:53.037Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-07-31T13:41:25.336Z",
+        "sha": "69b54a7",
+        "dirty": false,
+        "ms": 93093
+      }
     },
     {
       "id": "SW-041",
@@ -960,6 +986,24 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-07-31T13:46:13.192Z",
+      "p": "shipward",
+      "msg": "SW-046 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T13:41:25.337Z",
+      "p": "shipward",
+      "msg": "SW-042 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-07-31T13:38:29.441Z",
+      "p": "shipward",
+      "msg": "SW-046 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-31T13:34:31.951Z",
       "p": "shipward",
@@ -1982,7 +2026,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T13:34:31.918Z",
-    "pid": 12640
+    "lastSeen": "2026-07-31T13:46:49.408Z",
+    "pid": 34403
   }
 }

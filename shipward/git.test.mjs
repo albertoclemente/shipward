@@ -7,11 +7,11 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
-  readGit, isOnTrunk, deriveFindings, summarise, driftSince,
+  readGit, isOnTrunk, deriveFindings, summarise, driftSince, headState,
   reconcilePlan, CERTAIN, PROPOSED, REPORTED,
 } from './git.mjs';
 
@@ -309,5 +309,67 @@ test('outside a repository nothing is known, and nothing throws', async () => {
   try {
     const d = await driftSince(['abc1234'], dir);
     assert.equal(d.abc1234.known, false);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+/* ── SW-053: the board is not the code under test ────────── */
+
+test('a modified tracker does not make the tree dirty', async () => {
+  const { dir } = await stage();
+  try {
+    await mkdir(join(dir, '.shipward'), { recursive: true });
+    await writeFile(join(dir, '.shipward', 'tracker.json'), '{"version":1}');
+    const h = await headState(dir);
+    // The heartbeat rewrites this file every 60s. Counting it left every check
+    // reporting dirty:true forever — SW-044 rendered one freshness state.
+    assert.equal(h.dirty, false, 'a write to the board is not a change to the code the check ran on');
+    assert.deepEqual(h.dirtyPaths, []);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('uncommitted source still counts, which is the whole point of the flag', async () => {
+  const { dir } = await stage();
+  try {
+    await writeFile(join(dir, 'a.txt'), 'changed');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['a.txt']);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('an untracked source file counts too', async () => {
+  const { dir } = await stage();
+  try {
+    await writeFile(join(dir, 'new.js'), 'export default 1');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['new.js']);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a staged change counts, and the first path is not mangled', async () => {
+  const { dir, g } = await stage();
+  try {
+    // The parse this replaced read `status --porcelain` by column, and git()
+    // trims its output — so the FIRST line lost the leading space of its status
+    // field and its path came back with a character missing. One entry, always
+    // the first, silently wrong.
+    await writeFile(join(dir, 'a.txt'), 'staged');
+    await g('add', 'a.txt');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['a.txt'], 'the path is exact, not off by one');
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test('a board-only change alongside a source change is still dirty', async () => {
+  const { dir } = await stage();
+  try {
+    await mkdir(join(dir, '.shipward'), { recursive: true });
+    await writeFile(join(dir, '.shipward', 'tracker.json'), '{}');
+    await writeFile(join(dir, 'a.txt'), 'changed');
+    const h = await headState(dir);
+    assert.equal(h.dirty, true);
+    assert.deepEqual(h.dirtyPaths, ['a.txt'], 'the board is filtered out, not the whole check');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

@@ -10,6 +10,7 @@ import {
   memoryEntries, groupByKind, fileIndex, searchEntries, memoryLede, stillOpen,
   noteSegments, appendedNote, freshness,
 } from './memory-lib.js';
+import { trustLede, HEADING } from './trust-lib.js';
 
 const POLL_MS = 3000;
 const root = document.getElementById('app');
@@ -21,6 +22,7 @@ const state = {
   dragOver: null,
   dragging: null,
   drift: null,      // SW-044: git's answer about each anchored sha, from /api/drift
+  trust: null,      // SW-045: {known, findings} from /api/trust — null until it answers
   memoryQuery: '',   // memory view: free-text filter
   memoryFile: null,  // memory view: narrow to one file's accumulated knowledge
   logBy: null,       // log view: null = everyone, 'claude' | 'user'
@@ -226,7 +228,8 @@ function render() {
   const feed = latestFeed(doc.feed, project.id);
   const stats = deriveStats(doc.cards, project.id);
 
-  const view = state.view === 'archive' ? renderArchive(doc, project)
+  const view = state.view === 'trust' ? renderTrust()
+    : state.view === 'archive' ? renderArchive(doc, project)
     : state.view === 'memory' ? renderMemory(doc, project)
       : state.view === 'log' ? renderFeed(doc, project)
         : renderBoard(doc, project);
@@ -303,10 +306,14 @@ function renderTabs(doc, project) {
   const archived = cardsOf(doc.cards, project.id).filter((c) => c.status === 'shipped').length;
   const open = stillOpen(memoryEntries(doc.cards, project.id)).length;
   const logged = doc.feed.filter((f) => f.p === project.id).length;
+  // SW-045. Only ever a count on the tab: the panel is quiet when the repo is
+  // honest, and a badge that is always lit is a badge nobody reads.
+  const unsettled = state.trust?.findings?.length || 0;
   const tabs = [
     ['board', 'Board'],
     ['log', `Log · ${logged}`],
     ['memory', `Memory${open ? ` · ${open} open` : ''}`],
+    ['trust', `Trust${unsettled ? ` · ${unsettled}` : ''}`],
     ['archive', `Archive · ${archived}`],
   ];
   return el('div', { class: 'tabs' }, tabs.map(([key, label]) =>
@@ -316,6 +323,44 @@ function renderTabs(doc, project) {
       'aria-current': state.view === key ? 'page' : null,
       onclick: () => { if (state.view !== key) { state.view = key; render(); } },
     })));
+}
+
+// SW-045. The reported tier, finally visible. Nothing here writes: every row is
+// a question a human answers, which is the tier's own rule.
+//
+// state.trust is null until /api/trust answers and stays null if it never does,
+// which renders as "still checking" rather than as an all-clear — an empty
+// panel and an unanswered one must never look the same.
+function renderTrust() {
+  const known = state.trust?.known !== false;
+  const findings = state.trust?.findings || [];
+  const groups = [];
+  for (const f of findings) {
+    const last = groups[groups.length - 1];
+    if (last && last.rule === f.rule) last.items.push(f);
+    else groups.push({ rule: f.rule, items: [f] });
+  }
+
+  return el('main', { class: 'view-wrap' },
+    el('h3', { text: 'What nothing can settle for you' }),
+    el('p', { class: 'text-muted trust-lede',
+      text: state.trust ? trustLede(findings, { known }) : 'Asking git…' }),
+    ...groups.map((g) => el('section', { class: 'trust-group' },
+      el('h6', { class: 'trust-heading', text: `${HEADING[g.rule]} · ${g.items.length}` }),
+      ...g.items.map((f) => el('article', { class: `trust-row trust-${f.rule}` },
+        el('div', { class: 'trust-row-top' },
+          f.card
+            ? el('button', { class: 'mem-entry-card', text: f.card, title: 'Open the card',
+                onclick: () => openDialog(f.card) })
+            : el('span', { class: 'mem-entry-flag', text: 'no card' }),
+          el('span', { class: 'trust-headline', text: f.headline }),
+        ),
+        el('p', { class: 'trust-detail text-muted', text: f.detail }),
+      )),
+    )),
+    el('div', { class: 'text-muted board-caption',
+      text: 'Shipward changes nothing here. git can prove some of these are wrong; none of them can be settled without you.' }),
+  );
 }
 
 function renderArchive(doc, project) {
@@ -877,6 +922,17 @@ async function poll() {
 // twenty times a minute for an answer that moves a few times a day.
 const DRIFT_POLL_MS = 60000;
 
+async function pollTrust() {
+  try {
+    const res = await fetch('/api/trust', { cache: 'no-store' });
+    if (!res.ok) return;
+    const next = await res.json();
+    if (JSON.stringify(next) === JSON.stringify(state.trust)) return;
+    state.trust = next;
+    if (state.doc) render();
+  } catch { /* the tracker poll owns the offline banner */ }
+}
+
 async function pollDrift() {
   try {
     const res = await fetch('/api/drift', { cache: 'no-store' });
@@ -893,6 +949,7 @@ async function pollDrift() {
 (async function loop() {
   await poll();
   await pollDrift();
+  await pollTrust();
   lastPaint = Date.now();
   for (;;) {
     await new Promise((r) => setTimeout(r, POLL_MS));
@@ -904,5 +961,6 @@ async function pollDrift() {
   for (;;) {
     await new Promise((r) => setTimeout(r, DRIFT_POLL_MS));
     await pollDrift();
+    await pollTrust();
   }
 })();

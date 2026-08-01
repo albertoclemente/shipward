@@ -193,13 +193,26 @@
       "type": "chore",
       "pri": "P2",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/publish-licence-readme",
-      "commit": null,
+      "commit": "048e238",
       "created": "2026-07-31T09:41:22.961Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-01T08:25:35.967Z",
+        "sha": "048e238",
+        "dirty": false,
+        "ms": 25533
+      }
     },
     {
       "id": "SW-048",
@@ -1027,6 +1040,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-01T08:25:35.967Z",
+      "p": "shipward",
+      "msg": "SW-049 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-08-01T08:12:32.072Z",
       "p": "shipward",

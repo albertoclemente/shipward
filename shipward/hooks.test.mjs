@@ -6,11 +6,11 @@
 // degrades the session it was meant to protect.
 import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hydrate, parseNotes } from './tracker-store.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -270,29 +270,126 @@ async function repoWithDrift() {
   return repo;
 }
 
-test('session-start FIXES what git can prove and only reports the rest', async () => {
+// Drives the reconciler the way the SessionStart hook drives it — same call,
+// same `certain` tier, same defaults — with the hook's Promise.race removed, so
+// there is no clock anywhere in this path to lose a race to.
+//
+// In a child process on purpose, and not for tidiness: the store resolves
+// SHIPWARD_TRACKER once, at import, and this file has already imported it. An
+// in-process reconcile() would take the lock on THIS repo's real board and
+// rewrite it — the SW-033 clobber, launched from the test suite. A spawn is the
+// only place SHIPWARD_TRACKER can still be pointed at a sandbox.
+const mod = (name) => JSON.stringify(pathToFileURL(join(ROOT, 'shipward', name)).href);
+const RECONCILE_DIRECTLY = `
+import { readRaw } from ${mod('tracker-store.mjs')};
+import { activeProject } from ${mod('standup.mjs')};
+import { reconcile, describeApplied, summarise } from ${mod('reconcile.mjs')};
+const { doc } = await readRaw();
+const out = await reconcile(doc.cards, activeProject(doc).id);
+process.stdout.write(JSON.stringify({
+  ok: out.ok, reason: out.reason, applied: out.applied,
+  held: out.held.map((f) => ({ id: f.id, rule: f.rule })),
+  described: describeApplied(out.applied), summary: summarise(out.held),
+}));
+`;
+
+const auditDirectly = (repo) => new Promise((res, rej) => {
+  execFile(process.execPath, ['--input-type=module', '-e', RECONCILE_DIRECTLY], {
+    cwd: sandbox,
+    env: { ...process.env, SHIPWARD_TRACKER: tracker, SHIPWARD_REPO: repo },
+  }, (err, stdout, stderr) => (err ? rej(new Error(`${err.message}\n${stderr}`)) : res(JSON.parse(stdout))));
+});
+
+// SW-054 SPLIT THE NEXT TWO TESTS APART, AND THEY MUST STAY APART.
+//
+// One test used to spawn session-start and assert what the audit had fixed. But
+// the hook budgets that audit at AUDIT_BUDGET_MS and renders NOTHING when the
+// budget expires — deliberately: a slow repository must never delay a session
+// start, and "we do not know" must never read as "nothing is wrong". So
+// "assert it fixed something" was secretly an assertion about how busy the
+// machine was. It went red once at 7408ms inside a full-suite run, green in
+// three runs either side and green alone in ~467ms, with the hook behaving
+// exactly as specified the whole time.
+//
+// Raising the budget was the obvious fix and the wrong one: 2500ms is a
+// decision about how long a session start may be delayed, and a test does not
+// get to buy itself time out of that. What was actually wrong was asking one
+// spawn to prove two unrelated things. So:
+//
+//   * the hook behaved             — first test, asserting only what holds
+//                                    whether or not the audit finished, so load
+//                                    cannot make it lie
+//   * the audit's output is right  — second test, driven directly with no
+//                                    budget in the path at all, so it cannot
+//                                    flake and it fails the moment a rule,
+//                                    a tier or a written note changes
+//
+// Do not merge them back into one. A single spawn can only carry both by
+// asserting "fixed OR timed out", and an audit that has quietly stopped fixing
+// anything satisfies that forever.
+
+test('session-start survives the git audit, however long git takes', async () => {
+  const repo = await repoWithDrift();
+  try {
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
+    ])));
+    const { code, parsed, unparseable } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+
+    // Everything below is true in both worlds — audit finished, audit cut off
+    // at the budget — which is what makes this half load-proof rather than
+    // load-lucky. Nothing here is conditional on which world we got.
+    assert.equal(code, 0);
+    assert.equal(unparseable, false);
+    assert.equal(parsed.hookSpecificOutput.hookEventName, 'SessionStart');
+    const ctx = parsed.hookSpecificOutput.additionalContext;
+    assert.match(ctx, /Claude working \(0\)/, 'the standup arrives — an audit never eats the opener');
+    assert.match(ctx, /recall\(\{file:/, 'and so does the rest of it, not a truncated version');
+
+    // The certain tier is monotonic: it fills blanks and confirms landed work,
+    // and it never moves a card between columns. That holds whether the audit
+    // ran to completion or was cut off mid-write, so it is safe to assert here
+    // — and promoting started-without-saying out of `proposed` fails it.
+    const c = (await boardOnDisk(tracker)).cards.find((x) => x.id === 'TS-001');
+    assert.equal(c.status, 'backlog', 'nothing applied without an explicit ask changes a column');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('the audit FIXES what git can prove and only reports the rest', async () => {
   // The SW-024 contract. This card trips two rules at once: the branch has a
   // commit the card does not record (certain — a blank git can fill), and the
   // card says backlog while work exists (proposed — git proves backlog is
   // false but cannot say whether it is claude or review).
   const repo = await repoWithDrift();
   try {
+    const head = execFileSync('git', ['rev-parse', '--short', 'feat/mcp-server'],
+      { cwd: repo, encoding: 'utf8' }).trim();
     await writeFile(tracker, JSON.stringify(seed([
       card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
     ])));
-    const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
-    const ctx = parsed.hookSpecificOutput.additionalContext;
 
-    assert.match(ctx, /the board was corrected/, 'it no longer merely reports');
-    assert.match(ctx, /missing-commit/, 'the certain half is applied');
-    assert.match(ctx, /Still unsettled/);
-    assert.match(ctx, /started-without-saying/, 'the SW-005 slip, still surfaced, not written');
-    assert.match(ctx, /Claude working \(0\)/, 'and the standup is still there');
+    const out = await auditDirectly(repo);
+    assert.equal(out.ok, true, out.reason || 'the audit ran');
+    assert.deepEqual(out.applied.map((a) => a.id), ['TS-001']);
+    assert.deepEqual(out.applied[0].rules, ['missing-commit'], 'the certain half, and only that half');
+    assert.equal(out.applied[0].commit, head, 'the sha git already knew');
+    assert.equal(out.applied[0].was, out.applied[0].to, 'a commit-only fix moves no column');
+    assert.deepEqual(out.held.map((f) => f.rule), ['started-without-saying'],
+      'the SW-005 slip, surfaced and not written');
 
-    // The claim has to be true on disk, not just in the prose.
+    // What a session opener interpolates. The sentences AROUND these live in the
+    // hook and can only be read back through a spawn, which is exactly the
+    // reading that cost this test its determinism; these are the facts inside
+    // them, and they are what a reader acts on.
+    assert.match(out.described, new RegExp(`TS-001 commit ${head} \\(missing-commit\\)`));
+    assert.match(out.summary, /1 discrepancy .* 1 it can propose/);
+
+    // The claim has to be true on disk, not just in the return value.
     const onDisk = await boardOnDisk(tracker);
     const c = onDisk.cards.find((x) => x.id === 'TS-001');
-    assert.ok(c.commit, 'the sha git already knew was written to the card');
+    assert.equal(c.commit, head, 'the sha git already knew was written to the card');
     assert.equal(c.status, 'backlog', 'the inference was NOT applied — that needs an explicit ask');
     const entry = Array.isArray(c.note) ? c.note[c.note.length - 1] : null;
     assert.ok(entry, 'the correction is a structured entry');

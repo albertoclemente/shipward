@@ -4,7 +4,21 @@ node_modules/
 .shipward/*.tmp
 .shipward/*.lock*
 # Worktrees live here (EnterWorktree, git worktree add). Each is a full second
-# checkout, and .claude is a directory people add wholesale — 1,525 tracked
-# files live under .claude/skills — so without this one line a stray `git add
-# -A` commits an entire worktree into the repo.
+# checkout, and .claude is a directory people add wholesale, so without this one
+# line a stray `git add -A` commits an entire worktree into the repo.
 .claude/worktrees/
+
+# Third-party scaffolding this repo uses but does not own (SW-049). Untracked
+# rather than deleted: these are live tooling in this working copy, and removing
+# them from disk would break the sessions that depend on them. None ships a
+# LICENSE, so none of it is ours to redistribute.
+#
+# What DOES stay tracked under .claude is the product's own: hooks/shipward.mjs,
+# settings.json and the five commands — setup.mjs installs those into other
+# repos, and CLAUDE.md documents them.
+.claude/skills/
+_bmad/
+
+# Design handoff of uncertain redistribution rights, and working archives.
+design_handoff_shipward/
+*.zip

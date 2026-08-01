@@ -23,9 +23,9 @@
       "type": "bug",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/checks-under-load",
       "commit": null,
       "created": "2026-07-31T14:41:12.470Z",
       "pushed": null,
@@ -66,9 +66,9 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/checks-under-load",
       "commit": null,
       "created": "2026-07-31T11:37:48.210Z",
       "pushed": null,
@@ -193,13 +193,26 @@
       "type": "chore",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "chore/publish-licence-readme",
+      "commit": "048e238",
       "created": "2026-07-31T09:41:22.961Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-01T08:25:35.967Z",
+        "sha": "048e238",
+        "dirty": false,
+        "ms": 25533
+      }
     },
     {
       "id": "SW-048",
@@ -1027,6 +1040,30 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-01T08:25:35.967Z",
+      "p": "shipward",
+      "msg": "SW-049 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T08:12:32.072Z",
+      "p": "shipward",
+      "msg": "SW-049 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T08:09:06.222Z",
+      "p": "shipward",
+      "msg": "SW-054 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T08:09:06.203Z",
+      "p": "shipward",
+      "msg": "SW-056 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-07-31T14:41:42.571Z",
       "p": "shipward",
@@ -2103,7 +2140,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-07-31T14:41:19.349Z",
-    "pid": 86805
+    "lastSeen": "2026-08-01T08:16:46.053Z",
+    "pid": 17516
   }
 }

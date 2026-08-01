@@ -29,6 +29,21 @@ export const DEFAULT_TIMEOUT_MS = 120000;
 // elision stated. SW-041 files the same failure mode for recall.
 export const OUTPUT_BUDGET = 2000;
 
+// SW-056. How long the streams get to finish draining after the process itself
+// has ended. Resolving on 'exit' is what makes the timeout a real bound, and it
+// is also how trailing output gets lost — that output is the whole of what a
+// human reads when a check fails, so a resolve that outran it would trade a hung
+// reply for a silently truncated one.
+//
+// Measured before choosing, because the risk is not where it looks: a lone child
+// that closes its own pipes hands over every byte before 'exit' fires — 100 to
+// 1,000,000, ten runs each, nothing late — so the ordinary path never spends
+// this. What it buys is the case where something the check LEFT BEHIND still
+// holds the pipe with a line yet to write, which a bare exit-resolve lost in
+// every one of 12 runs. Whichever event arrives first wins, so this is a
+// ceiling on the wait and not the wait itself.
+export const OUTPUT_GRACE_MS = 250;
+
 /* ── pure ────────────────────────────────────────────────── */
 
 // Which check applies, as a decision that can be explained. Absence is a first
@@ -112,6 +127,33 @@ export function checkEnv(env = process.env) {
   return out;
 }
 
+// SW-056. child.kill() signals the DIRECT child and nothing it spawned, so a
+// check that leaves anything behind was never bounded by its timeout: the
+// survivor holds the inherited stdout open, 'close' waits on IT rather than on
+// the check, and a check declared with a 120000ms timeout was recorded in the
+// wild as "killed after 1110053ms". Signalling the GROUP is the only reason
+// spawnCheck asks for `detached: true`.
+//
+// Measured, since the card blamed `node --test` workers specifically and that
+// part does not hold on Node 25: the runner forwards SIGTERM to its own workers,
+// so a merely slow suite already died on time. What survives is anything one
+// level further out — a suite that spawns, or a wrapper like npm or sh passing
+// our stdio down — which is a wider class than the report described, not a
+// narrower one.
+const killGroup = (child, signal) => {
+  if (!child.pid) return;
+  try {
+    process.kill(-child.pid, signal);
+  } catch {
+    // A group that is already gone is the outcome we wanted, not a failure to
+    // report — and process.kill throws ESRCH for it, so a timeout that raced the
+    // child's own exit would crash the server instead of bounding a check.
+    // Anything else (EPERM, or a platform that gave us no group) still deserves
+    // the direct child, so fall through rather than give up on the kill.
+    try { child.kill(signal); } catch { /* the child is gone too; nothing left to stop */ }
+  }
+};
+
 // No shell, ever. argv[0] is the program and the rest are arguments, so nothing
 // in a check is parsed as syntax — see the validator in tracker-store.mjs,
 // which refuses a check that is not an argv array at the write.
@@ -120,7 +162,16 @@ export function spawnCheck(argv, { cwd, timeoutMs }) {
     const started = Date.now();
     let child;
     try {
-      child = spawn(argv[0], argv.slice(1), { cwd, env: checkEnv(), shell: false, stdio: ['ignore', 'pipe', 'pipe'] });
+      child = spawn(argv[0], argv.slice(1), {
+        cwd, env: checkEnv(), shell: false, stdio: ['ignore', 'pipe', 'pipe'],
+        // Its own process group, purely so the timeout has something to kill
+        // that includes the grandchildren. Not for backgrounding: nothing here
+        // unrefs the child, and stdin is 'ignore', so the usual detached hazards
+        // (a stray SIGTTIN, a parent that exits early) do not apply. The one
+        // real cost is that a terminal's Ctrl-C no longer reaches the check —
+        // the parent dying breaks its stdout instead.
+        detached: true,
+      });
     } catch (err) {
       resolve({ exit: null, ms: 0, out: String(err.message || err), spawnError: true });
       return;
@@ -133,20 +184,50 @@ export function spawnCheck(argv, { cwd, timeoutMs }) {
     child.stdout?.on('data', take);
     child.stderr?.on('data', take);
 
+    let escalation = null;
     const timer = setTimeout(() => {
       timedOut = true;
-      child.kill('SIGTERM');
+      killGroup(child, 'SIGTERM');
       // A child that ignores SIGTERM would otherwise hold the reply open past
       // the timeout that exists to bound it.
-      setTimeout(() => child.kill('SIGKILL'), 2000).unref?.();
+      escalation = setTimeout(() => killGroup(child, 'SIGKILL'), 2000);
+      escalation.unref?.();
     }, timeoutMs);
 
+    let grace = null;
+    let settled = false;
     const finish = (exit, spawnError = false) => {
+      // 'exit' and 'close' both land on the ordinary path, and a SIGKILL
+      // escalation can arrive after either.
+      if (settled) return;
+      settled = true;
       clearTimeout(timer);
+      clearTimeout(grace);
+      clearTimeout(escalation);
+      // An orphan can hold these pipes open forever. Leaving them readable would
+      // keep this process's event loop alive on a check that has already been
+      // answered — the hang moved rather than fixed.
+      child.stdout?.destroy();
+      child.stderr?.destroy();
       resolve({ exit, ms: Date.now() - started, out: clip(out), timedOut, spawnError });
     };
+
+    // 'close' waits for the stdio streams to reach EOF, which is a fact about
+    // whoever still holds the pipe and not about whether the process we timed is
+    // over. So 'exit' decides the outcome and starts a short bounded wait for
+    // the rest of the output; 'close' inside that window resolves immediately
+    // with everything. The two halves of SW-056 are not alternatives — the group
+    // kill without this still waits on a pipe an unkillable orphan could hold,
+    // and this without the group kill answers promptly while the workers run on.
+    let exited = false;
+    let outcome = null;
+    child.on('exit', (code) => {
+      exited = true;
+      outcome = timedOut ? null : code;
+      grace = setTimeout(() => finish(outcome), OUTPUT_GRACE_MS);
+    });
     child.on('error', (err) => { out += String(err.message || err); finish(null, true); });
-    child.on('close', (code) => finish(timedOut ? null : code));
+    child.on('close', (code) => finish(exited ? outcome : (timedOut ? null : code)));
   });
 }
 

@@ -8,7 +8,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, writeFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -200,6 +200,98 @@ test('a command that will not finish is killed and reported as a timeout', async
   const r = await spawnCheck(['node', '-e', 'setInterval(() => {}, 1000)'], { cwd: process.cwd(), timeoutMs: 300 });
   assert.equal(r.timedOut, true);
   assert.ok(Date.now() - started < 5000, 'the timeout must bound the wait, not merely be recorded');
+});
+
+// SW-056. The test above passes on the broken code, and that is the finding: a
+// lone sleeping process closes its own pipes when it dies, so 'close' arrives
+// promptly and the bound looks held. The check this project recommends to every
+// repo is `node --test`, which runs its files in WORKER processes — and a worker
+// that survives a kill aimed only at the runner keeps the INHERITED stdout open,
+// so 'close' is waiting on the orphan rather than on the check. A check declared
+// with a 120000ms timeout was recorded in the wild as "killed after 1110053ms".
+test('the timeout bounds the run even when the check leaves a grandchild holding its stdout', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-orphan-'));
+  try {
+    const pidFile = join(dir, 'grandchild.pid');
+    const grandchild = `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));`
+      + ` setTimeout(() => {}, 30000);`;
+    // stdio inherit is the whole point: the grandchild holds the very pipe
+    // spawnCheck is reading, exactly as a test worker does.
+    const parent = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}],`
+      + ` { stdio: ['ignore', 'inherit', 'inherit'] }); setTimeout(() => {}, 30000);`;
+
+    const started = Date.now();
+    const r = await spawnCheck([process.execPath, '-e', parent], { cwd: dir, timeoutMs: 1000 });
+    const elapsed = Date.now() - started;
+
+    assert.equal(r.timedOut, true);
+    assert.ok(elapsed < 6000,
+      `the run must be bounded by the 1000ms timeout, not by the grandchild's 30000ms life — took ${elapsed}ms`);
+
+    // Answering promptly while the workers keep running is the half-fix: the
+    // CPU burns invisibly, behind a reply that already said the check was over.
+    const gpid = Number(await readFile(pidFile, 'utf8'));
+    let alive = true;
+    for (let i = 0; i < 100 && alive; i++) {
+      try { process.kill(gpid, 0); await new Promise((done) => setTimeout(done, 20)); } catch { alive = false; }
+    }
+    assert.equal(alive, false, 'the orphaned grandchild must be killed with the group, not left running');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+// The other half of SW-056, and the part with a trap in it. Resolving on 'exit'
+// is what makes the timeout a bound, and it is also how trailing output gets
+// lost — that output IS the note a human reads when a check fails, so trading a
+// hung reply for a silently truncated one would be no trade at all. Two tests,
+// because the risk is not where it looks.
+//
+// Measured first: for a lone child that closes its own pipes, every byte from
+// 100 to 1,000,000 arrived before 'exit' fired, 10 runs at each size. So this
+// one passes with or without the grace window. It stays as the guard on the
+// path every check actually takes.
+test('output written right up to exit is not lost on the ordinary path', async () => {
+  const src = `for (let i = 0; i < 300; i++) console.log('line ' + i);`
+    + ` console.error('LAST-LINE'); process.exitCode = 7;`;
+  const r = await spawnCheck([process.execPath, '-e', src], { cwd: process.cwd(), timeoutMs: 10000 });
+  assert.equal(r.exit, 7);
+  assert.equal(r.timedOut, false);
+  assert.match(r.out, /line 0/, 'the head is where the failure usually is');
+  assert.match(r.out, /LAST-LINE/, 'the tail is where the summary usually is');
+});
+
+// And this is the one the grace window exists for, measured 12/12 lost without
+// it and 12/12 kept with it. The check process ends while something it left
+// behind still holds the inherited pipe and has not written its last line yet —
+// a runner whose worker reports after it. Resolving the instant 'exit' fires
+// keeps "BEFORE" and drops the rest, which is the truncation that would make the
+// bound a bad trade rather than a fix.
+test('a line written after the check process is already gone still reaches the note', async () => {
+  // fd 3 is a leash, not a channel: the worker never reads anything down it, it
+  // only gets EOF at the instant the check process dies, so the write is pinned
+  // to just after 'exit' without a sleep anyone has to tune against machine
+  // load. Polling for the parent to disappear was the obvious fixture and it is
+  // not reliable — under load some workers never noticed at all and leaked.
+  const worker = `const { Socket } = require('node:net');
+    const leash = new Socket({ fd: 3, readable: true, writable: false });
+    leash.on('end', () => setTimeout(() => {
+      process.stdout.write('WROTE-AFTER-EXIT'); process.exit(0);
+    }, 15));
+    leash.resume();`;
+  const src = `const c = require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(worker)}],`
+    + ` { stdio: ['ignore', 'inherit', 'inherit', 'pipe'] });`
+    // Both unrefs, or the check cannot finish ahead of the worker it spawned —
+    // the child handle AND the leash each hold its event loop open.
+    + ` c.unref(); c.stdio[3].unref();`
+    + ` process.stdout.write('BEFORE'); setTimeout(() => {}, 300);`;
+
+  const r = await spawnCheck([process.execPath, '-e', src], { cwd: process.cwd(), timeoutMs: 10000 });
+  assert.equal(r.exit, 0);
+  assert.equal(r.timedOut, false, 'this is the ordinary path — nothing here should be killed');
+  assert.match(r.out, /BEFORE/);
+  assert.match(r.out, /WROTE-AFTER-EXIT/,
+    'resolving the instant the process ends drops whatever the streams had not handed over yet');
 });
 
 test('a program that does not exist is an error, not a throw', async () => {

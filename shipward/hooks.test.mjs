@@ -12,6 +12,11 @@ import { tmpdir } from 'node:os';
 import { join, dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { hydrate, parseNotes } from './tracker-store.mjs';
+// standup.mjs is pure — board in, words out — so rendering IN process is safe
+// where reconciling in process is not (RECONCILE_DIRECTLY below tells that
+// story). The SW-057 direct halves lean on this to read the standup with no
+// spawn and no clock anywhere in the path.
+import { standupText, activeProject } from './standup.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, '..');
@@ -300,6 +305,35 @@ const auditDirectly = (repo) => new Promise((res, rej) => {
   }, (err, stdout, stderr) => (err ? rej(new Error(`${err.message}\n${stderr}`)) : res(JSON.parse(stdout))));
 });
 
+// SW-058. The same child-process rule as RECONCILE_DIRECTLY above — an
+// in-process reconcile() would take the lock on THIS repo's real board — with
+// the caller's AbortController in the picture, because the thing under test IS
+// the cancellation. The abort happens before the call on purpose: aborting
+// DURING a reconcile is a bet on where it happens to be when the signal fires,
+// and a pre-aborted signal pins the strongest form of the contract — every
+// write checkpoint is behind the check, so nothing at all may land.
+const RECONCILE_SIGNALLED = `
+import { readRaw } from ${mod('tracker-store.mjs')};
+import { activeProject } from ${mod('standup.mjs')};
+import { reconcile } from ${mod('reconcile.mjs')};
+const budget = new AbortController();
+if (process.env.SW058_ABORT === '1') budget.abort();
+const { doc } = await readRaw();
+try {
+  const out = await reconcile(doc.cards, activeProject(doc).id, { signal: budget.signal });
+  process.stdout.write(JSON.stringify({ settled: 'resolved', ok: out.ok, reason: out.reason, applied: out.applied }));
+} catch (err) {
+  process.stdout.write(JSON.stringify({ settled: 'rejected', name: err.name }));
+}
+`;
+
+const reconcileSignalled = (repo, { aborted = false } = {}) => new Promise((res, rej) => {
+  execFile(process.execPath, ['--input-type=module', '-e', RECONCILE_SIGNALLED], {
+    cwd: sandbox,
+    env: { ...process.env, SHIPWARD_TRACKER: tracker, SHIPWARD_REPO: repo, SW058_ABORT: aborted ? '1' : '0' },
+  }, (err, stdout, stderr) => (err ? rej(new Error(`${err.message}\n${stderr}`)) : res(JSON.parse(stdout))));
+});
+
 // SW-054 SPLIT THE NEXT TWO TESTS APART, AND THEY MUST STAY APART.
 //
 // One test used to spawn session-start and assert what the audit had fixed. But
@@ -403,28 +437,148 @@ test('the audit FIXES what git can prove and only reports the rest', async () =>
   }
 });
 
-test('the standup describes the board AFTER the reconciler moved it', async () => {
-  // Rendering the board and then correcting it in the same breath would hand
-  // the session two answers and no way to tell which one is now.
+/* -- the audit budget is a cancellation, not a curtain (SW-058) */
+
+test('a cancelled reconcile writes nothing — not a byte, not a feed line, not a lock', async () => {
+  // The SW-058 contract. The hook's expired budget used to stop only the
+  // RENDERING: the raced-and-lost reconcile kept running and could still write
+  // the board after the session had been told nothing happened. The write path
+  // honours the signal at the two points that matter — before the lock is
+  // taken and at the commit point — so an aborted reconcile must leave the
+  // tracker byte-identical, with no sidecar and no lock corpse. This board
+  // WOULD be corrected without the abort; the plumbing test below proves that
+  // with the same seed, so a green here cannot mean "there was nothing to
+  // write anyway".
   const repo = await repoWithDrift();
   try {
-    const head = (await import('node:child_process')).execFileSync(
-      'git', ['rev-parse', '--short', 'feat/mcp-server'], { cwd: repo, encoding: 'utf8' },
-    ).trim();
     await writeFile(tracker, JSON.stringify(seed([
-      card({ id: 'TS-001', status: 'review', branch: 'feat/mcp-server', commit: head }),
+      card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
     ])));
-    // main has not moved, so that commit is NOT an ancestor of it yet.
-    const { execFile: ex } = await import('node:child_process');
-    const sh = (await import('node:util')).promisify(ex);
-    await sh('git', ['merge', '--no-ff', '-m', 'merge', 'feat/mcp-server'], { cwd: repo });
+    const before = await readFile(tracker, 'utf8');
 
-    const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const out = await reconcileSignalled(repo, { aborted: true });
+    assert.equal(out.settled, 'rejected', 'cancelled is not a verdict, and must not resolve as one');
+    assert.equal(out.name, 'CancelledError');
+
+    assert.equal(await readFile(tracker, 'utf8'), before,
+      'byte-identical: an expired budget now means nothing was written, not merely nothing was said');
+    const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    assert.equal(onDisk.feed.length, 0, 'no feed entry announces work that was cancelled');
+    assert.equal(await readFile(join(sandbox, '.shipward', 'notes.jsonl'), 'utf8').catch(() => null), null,
+      'no audit note either — the sidecar is part of the board');
+    assert.equal(await readFile(`${tracker}.lock`, 'utf8').catch(() => null), null,
+      'and no abandoned lock for the next writer to sweep');
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+test('an un-aborted signal changes nothing about a normal reconcile', async () => {
+  // The other half of the contract: threading the budget through must cost the
+  // normal path nothing. Same seed and same expectations as the un-signalled
+  // direct test above, so the two can only drift apart by a real behaviour
+  // change — a reconcile that starts treating "a signal exists" as "the signal
+  // fired" turns this red.
+  const repo = await repoWithDrift();
+  try {
+    const head = execFileSync('git', ['rev-parse', '--short', 'feat/mcp-server'],
+      { cwd: repo, encoding: 'utf8' }).trim();
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
+    ])));
+
+    const out = await reconcileSignalled(repo, { aborted: false });
+    assert.equal(out.settled, 'resolved', 'a signal nobody fires is invisible');
+    assert.equal(out.ok, true, out.reason || 'the audit ran');
+    assert.deepEqual(out.applied.map((a) => a.id), ['TS-001']);
+
+    const onDisk = await boardOnDisk(tracker);
+    const c = onDisk.cards.find((x) => x.id === 'TS-001');
+    assert.equal(c.commit, head, 'the certain fix landed exactly as it does with no signal at all');
+    assert.equal(c.status, 'backlog', 'and moved nothing it would not have moved');
+    assert.equal(onDisk.feed.length, 1);
+    assert.match(onDisk.feed[0].msg, /Reconciled with git/);
+  } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+// SW-057: THE SAME SPLIT AS SW-054 ABOVE, for the two remaining tests that
+// still rode the audit budget — this pair, and the commit-only pair further
+// down. Each spawned session-start and asserted an artifact only a COMPLETED
+// audit produces (the moved card in the standup; the feed line's wording), and
+// measured under load, 5 of 20 session-start spawns do not finish the audit
+// inside AUDIT_BUDGET_MS. A 25% bet is not a test. Same cure, same doctrine,
+// same warning about merging the halves back — and one thing SW-054 could not
+// yet say: since SW-058 an expired budget ABORTS the reconcile and mutate
+// refuses to commit past the abort, so the spawn halves' invariant got
+// STRONGER. There is no longer a world where the audit timed out and its write
+// landed anyway behind the rendered silence — timed out means nothing written,
+// and a board that moved without its feed line (or the reverse) is a torn
+// write in ANY world, which is exactly what the spawn halves pin.
+
+// The promotion scenario both halves of the standup pair need: a review card
+// whose commit main has since absorbed — the one column move the certain tier
+// may make on its own.
+async function repoWithMergedWork() {
+  const repo = await repoWithDrift();
+  const head = execFileSync('git', ['rev-parse', '--short', 'feat/mcp-server'],
+    { cwd: repo, encoding: 'utf8' }).trim();
+  await writeFile(tracker, JSON.stringify(seed([
+    card({ id: 'TS-001', status: 'review', branch: 'feat/mcp-server', commit: head }),
+  ])));
+  const { execFile: ex } = await import('node:child_process');
+  const sh = (await import('node:util')).promisify(ex);
+  await sh('git', ['merge', '--no-ff', '-m', 'merge', 'feat/mcp-server'], { cwd: repo });
+  return { repo, head };
+}
+
+test('session-start hands the board back whole, whether or not the audit finished', async () => {
+  const { repo, head } = await repoWithMergedWork();
+  try {
+    const { code, parsed, unparseable } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+
+    // True in both worlds, like the SW-054 half above: the opener arrives
+    // intact however the race went.
+    assert.equal(code, 0);
+    assert.equal(unparseable, false);
     const ctx = parsed.hookSpecificOutput.additionalContext;
+    assert.match(ctx, /Claude working \(0\)/, 'the standup arrives — an audit never eats the opener');
+    assert.match(ctx, /recall\(\{file:/, 'all of it, not a truncated version');
 
-    assert.match(ctx, /review → pushed/, 'the reconciler moved it');
-    assert.match(ctx, /Waiting on you \(0\)/, 'and the standup counts it where it now is');
-    assert.doesNotMatch(ctx, /Waiting on you \(1\)/);
+    // The board is wherever the race left it, but never anywhere ELSE and
+    // never half-moved. review → pushed is the only move the certain tier may
+    // make here; a third status means the audit invented a column.
+    const onDisk = await boardOnDisk(tracker);
+    const c = onDisk.cards.find((x) => x.id === 'TS-001');
+    assert.ok(c.status === 'review' || c.status === 'pushed',
+      `the audit may only confirm review → pushed, never invent a column (got ${c.status})`);
+    assert.equal(c.commit, head, 'the sha survives either world untouched');
+    // Whole or not at all: the correction and the feed line that announces it
+    // land in ONE mutate, cancelled before the commit point or not at all, so
+    // seeing exactly one of them — in either direction — is a torn write, and
+    // no amount of load may produce one.
+    assert.equal(onDisk.feed.some((f) => /Reconciled with git/.test(f.msg)), c.status === 'pushed',
+      'the move and its announcement are one write');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('the standup describes the board AFTER the reconciler moved it', async () => {
+  // Rendering the board and then correcting it in the same breath would hand
+  // the session two answers and no way to tell which one is now. Driven
+  // directly — no budget anywhere in the path — and then rendered through
+  // standupText, which is what the hook itself interpolates: the same words,
+  // minus the clock that made asserting them a bet on machine load.
+  const { repo } = await repoWithMergedWork();
+  try {
+    const out = await auditDirectly(repo);
+    assert.equal(out.ok, true, out.reason || 'the audit ran');
+    assert.match(out.described, /TS-001 review → pushed/, 'the reconciler moved it, and says so');
+
+    const doc = await boardOnDisk(tracker);
+    assert.equal(doc.cards.find((x) => x.id === 'TS-001').status, 'pushed',
+      'moved on disk, not merely in the return value');
+    const textNow = standupText(doc, activeProject(doc));
+    assert.match(textNow, /Waiting on you \(0\)/, 'and the standup counts it where it now is');
+    assert.doesNotMatch(textNow, /Waiting on you \(1\)/);
   } finally {
     await rm(repo, { recursive: true, force: true });
   }
@@ -478,17 +632,52 @@ test('the audit runs only at session start, never on a per-turn hook', async () 
   }
 });
 
-test('a commit-only correction is not announced as a status change', async () => {
-  // The feed line was first built from the status alone, so filling in a
-  // missing sha was recorded as "TS-001 → backlog" — a move that never
-  // happened, in the log whose whole job is saying what did.
+// SW-057, the second pair — same split, same doctrine as the block above the
+// merged-work pair. The original spawned session-start and then read
+// onDisk.feed[0], an entry only a COMPLETED audit writes: under load feed[0]
+// was simply undefined and the test went red on the machine's schedule, not
+// on a bug.
+
+test('the feed claims no move, whether or not the audit finished', async () => {
   const repo = await repoWithDrift();
   try {
     await writeFile(tracker, JSON.stringify(seed([
       card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
     ])));
-    await run('session-start', {}, { SHIPWARD_REPO: repo });
+    const { code, unparseable } = await run('session-start', {}, { SHIPWARD_REPO: repo });
+    assert.equal(code, 0);
+    assert.equal(unparseable, false);
+
+    // Since SW-058 there are exactly two boards this spawn can leave —
+    // corrected whole, or untouched — and everything below holds on both.
+    const onDisk = await boardOnDisk(tracker);
+    const c = onDisk.cards.find((x) => x.id === 'TS-001');
+    assert.equal(c.status, 'backlog', 'a commit-only fix moves no column, finished or cancelled');
+    for (const f of onDisk.feed) {
+      assert.doesNotMatch(f.msg, /→/, 'no feed line ever claims a move this board did not make');
+    }
+    assert.equal(onDisk.feed.length > 0, c.commit != null,
+      'the filled sha and the feed line announcing it are one write — seeing only one of them is a torn write');
+  } finally {
+    await rm(repo, { recursive: true, force: true });
+  }
+});
+
+test('a commit-only correction is not announced as a status change', async () => {
+  // The feed line was first built from the status alone, so filling in a
+  // missing sha was recorded as "TS-001 → backlog" — a move that never
+  // happened, in the log whose whole job is saying what did. Driven directly
+  // so the entry ALWAYS exists to be read — the spawn half above can only
+  // prove nobody lies on the boards a race happens to leave behind.
+  const repo = await repoWithDrift();
+  try {
+    await writeFile(tracker, JSON.stringify(seed([
+      card({ id: 'TS-001', status: 'backlog', branch: 'feat/mcp-server' }),
+    ])));
+    const out = await auditDirectly(repo);
+    assert.equal(out.ok, true, out.reason || 'the audit ran');
     const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+    assert.equal(onDisk.feed.length, 1, 'the correction was announced');
     assert.match(onDisk.feed[0].msg, /TS-001 commit [0-9a-f]{7}/);
     assert.doesNotMatch(onDisk.feed[0].msg, /→/, 'nothing moved column, so nothing claims to have');
   } finally {

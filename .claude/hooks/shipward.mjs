@@ -111,6 +111,14 @@ async function tracker() {
 // and never on a per-turn hook. Budgeted anyway: a slow or enormous repository
 // must delay a session by a bounded amount, or not at all.
 const AUDIT_BUDGET_MS = 2500;
+// SW-058. When the budget expires the reconcile is ABORTED, not merely
+// out-raced, and this is how long the hook then waits for it to unwind. The
+// wait exists for the tracker lock: an abort can catch the reconcile holding
+// it, and giving the finally-path a moment to release it beats leaving a
+// corpse for the next writer's dead-pid sweep (a 2s stall). Small on purpose —
+// the wait is a courtesy to the next writer, and no courtesy is worth an
+// unbounded session start.
+const ABORT_GRACE_MS = 300;
 const DRIFT_SHOWN = 6;
 const NO_DRIFT = { text: '', changed: false };
 
@@ -172,15 +180,47 @@ async function drift(doc, project) {
     ]);
     // Default the repo rather than passing ROOT: git.mjs honours SHIPWARD_REPO,
     // and overriding it here would silently defeat that.
-    const work = rec.reconcile(doc.cards, project.id);
+    //
+    // SW-058. The budget is a cancellation, not just a render deadline.
+    // Promise.race does not cancel its loser: before the signal, a reconcile
+    // that lost the race kept running, could still take the cross-process
+    // tracker lock and still WRITE the board — after this hook had already
+    // told the session nothing happened — and process.exit() then raced that
+    // in-flight write, which could abandon the lock for the next writer's
+    // dead-pid sweep to break (a 2s stall). mutate() checks the signal before
+    // taking the lock and again at the commit point, so once the budget fires,
+    // "timed out" means nothing was written.
+    const budget = new AbortController();
+    const work = rec.reconcile(doc.cards, project.id, { signal: budget.signal });
     const timeout = new Promise((resolve) => {
       const t = setTimeout(() => resolve(null), AUDIT_BUDGET_MS);
       t.unref?.();
     });
     const out = await Promise.race([work, timeout]);
-    // Timed out, or git could not be read. Silence, not a guess: "we do not
-    // know" must never render as "nothing is wrong".
-    if (!out || !out.ok) return NO_DRIFT;
+    if (!out) {
+      budget.abort();
+      // Wait — bounded — for the aborted reconcile to unwind, so a lock it
+      // holds is released by its own finally-path rather than left behind.
+      // Bounded because an audit wedged inside a git read can only be
+      // outlived, not interrupted, and waiting on it without a clock would
+      // rebuild the unbounded delay the budget exists to prevent: if it has
+      // not settled within ABORT_GRACE_MS the hook proceeds without it. The
+      // .catch is attached first and permanently — the loser settles by
+      // rejecting with CancelledError, and an unhandled rejection would take
+      // the whole hook down with it (rule 1).
+      const settled = work.catch(() => {});
+      let grace;
+      // Deliberately not unref()ed: this timer is what guarantees the await
+      // ends, and it is cleared the moment it has done its job.
+      await Promise.race([settled, new Promise((resolve) => { grace = setTimeout(resolve, ABORT_GRACE_MS); })]);
+      clearTimeout(grace);
+      // Silence, not a guess, exactly as before: "we do not know" must never
+      // render as "nothing is wrong". What changed is that the silence is now
+      // true — nothing was written behind it.
+      return NO_DRIFT;
+    }
+    // Git could not be read. The same silence, for the same reason.
+    if (!out.ok) return NO_DRIFT;
 
     const fixed = out.applied.length
       ? `\n\nThe board disagreed with git, so the board was corrected — git is the witness for what it can prove.\n`

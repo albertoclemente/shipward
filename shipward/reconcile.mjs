@@ -47,6 +47,18 @@ const feedMsg = (applied) => (applied.length === 1
 // follows, and the reason a failure returns a reason instead of an empty
 // result.
 //
+// `signal` — optional — is the one deliberate exception, and it is SW-058's:
+// the SessionStart hook used to Promise.race this function against its audit
+// budget and render silence when the timer won, but race does not cancel the
+// loser, so the reconcile kept running, took the cross-process tracker lock
+// and wrote the board AFTER the session had been told nothing happened.
+// mutate() checks the signal before taking the lock and again at the commit
+// point, so an aborted reconcile rejects with CancelledError having written
+// nothing — a rejection, not an ok:false, because the caller that aborted is
+// not owed a verdict, and dressing the abort up as a reason would let "we
+// stopped asking" read as "the audit failed". Callers with no budget (sync's
+// apply path) simply omit it and are untouched.
+//
 // Takes cards from the caller's own read, so the audit and the write see the
 // same board and a caller holding a doc does not pay for a second read.
 export async function reconcile(cards, projectId, { cwd = REPO, level = 'certain', signal, now = new Date() } = {}) {

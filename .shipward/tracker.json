@@ -17,19 +17,92 @@
   ],
   "cards": [
     {
+      "id": "SW-060",
+      "p": "shipward",
+      "title": "A check that spans a laptop sleep is killed, and its duration is a lie",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-01T09:43:19.926Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-059",
+      "p": "shipward",
+      "title": "A git checkout in the repo silently reverts a concurrent board write",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-01T09:29:17.433Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-058",
+      "p": "shipward",
+      "title": "The audit budget is a rendering budget, not a cancellation",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-01T08:35:18.878Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-057",
+      "p": "shipward",
+      "title": "Two more hook tests ride the audit budget the same way SW-054 did",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-01T08:35:18.683Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-056",
       "p": "shipward",
       "title": "A check's timeout does not bound it — the kill leaves grandchildren holding the pipe",
       "type": "bug",
       "pri": "P2",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/checks-under-load",
-      "commit": null,
+      "commit": "c0f2441",
       "created": "2026-07-31T14:41:12.470Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-01T09:42:42.271Z",
+        "sha": "c0f2441",
+        "dirty": false,
+        "ms": 32520
+      }
     },
     {
       "id": "SW-055",
@@ -66,13 +139,26 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/checks-under-load",
-      "commit": null,
+      "commit": "19f92bb",
       "created": "2026-07-31T11:37:48.210Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-01T08:33:56.114Z",
+        "sha": "c0f2441",
+        "dirty": false,
+        "ms": 34071
+      }
     },
     {
       "id": "SW-053",
@@ -1040,6 +1126,48 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-01T09:43:19.926Z",
+      "p": "shipward",
+      "msg": "You added SW-060 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T09:42:42.271Z",
+      "p": "shipward",
+      "msg": "SW-056 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T09:29:17.433Z",
+      "p": "shipward",
+      "msg": "You added SW-059 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T08:54:55.876Z",
+      "p": "shipward",
+      "msg": "SW-056 check ran out of time — nothing proved either way",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T08:35:18.878Z",
+      "p": "shipward",
+      "msg": "You added SW-058 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T08:35:18.683Z",
+      "p": "shipward",
+      "msg": "You added SW-057 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-01T08:33:56.114Z",
+      "p": "shipward",
+      "msg": "SW-054 moved to Review — give it a look",
+      "by": "claude"
+    },
     {
       "t": "2026-08-01T08:25:35.967Z",
       "p": "shipward",
@@ -2140,7 +2268,7 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-08-01T08:16:46.053Z",
-    "pid": 17516
+    "lastSeen": "2026-08-01T09:43:19.900Z",
+    "pid": 2330
   }
 }

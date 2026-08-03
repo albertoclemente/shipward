@@ -23,13 +23,26 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/sleep-honest-clock",
+      "commit": "0493ec6",
       "created": "2026-08-01T09:43:19.926Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-03T06:13:30.723Z",
+        "sha": "fd05aaf",
+        "dirty": false,
+        "ms": 19528
+      }
     },
     {
       "id": "SW-059",
@@ -38,13 +51,26 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/board-rev-guard",
+      "commit": "0c6b556",
       "created": "2026-08-01T09:29:17.433Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-03T06:13:11.105Z",
+        "sha": "fd05aaf",
+        "dirty": false,
+        "ms": 19270
+      }
     },
     {
       "id": "SW-058",
@@ -53,13 +79,26 @@
       "type": "bug",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/audit-budget",
+      "commit": "e6f199c",
       "created": "2026-08-01T08:35:18.878Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-03T06:12:32.882Z",
+        "sha": "fd05aaf",
+        "dirty": false,
+        "ms": 19042
+      }
     },
     {
       "id": "SW-057",
@@ -68,13 +107,26 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/audit-budget",
+      "commit": "e6f199c",
       "created": "2026-08-01T08:35:18.683Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-03T06:12:51.735Z",
+        "sha": "fd05aaf",
+        "dirty": false,
+        "ms": 18759
+      }
     },
     {
       "id": "SW-056",
@@ -1126,6 +1178,54 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-03T06:13:30.723Z",
+      "p": "shipward",
+      "msg": "SW-060 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-03T06:13:11.105Z",
+      "p": "shipward",
+      "msg": "SW-059 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-03T06:12:51.735Z",
+      "p": "shipward",
+      "msg": "SW-057 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-03T06:12:32.883Z",
+      "p": "shipward",
+      "msg": "SW-058 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-03T05:48:49.091Z",
+      "p": "shipward",
+      "msg": "SW-060 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-03T05:48:49.070Z",
+      "p": "shipward",
+      "msg": "SW-059 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-03T05:48:49.051Z",
+      "p": "shipward",
+      "msg": "SW-057 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-03T05:48:49.029Z",
+      "p": "shipward",
+      "msg": "SW-058 handed to Claude Code — queued",
+      "by": "claude"
+    },
     {
       "t": "2026-08-01T09:43:19.926Z",
       "p": "shipward",
@@ -2268,7 +2368,8 @@
     }
   ],
   "mcp": {
-    "lastSeen": "2026-08-01T09:43:19.900Z",
-    "pid": 2330
-  }
+    "lastSeen": "2026-08-03T06:13:30.762Z",
+    "pid": 33655
+  },
+  "rev": 6
 }

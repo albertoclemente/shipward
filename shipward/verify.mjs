@@ -44,6 +44,47 @@ export const OUTPUT_BUDGET = 2000;
 // ceiling on the wait and not the wait itself.
 export const OUTPUT_GRACE_MS = 250;
 
+// SW-060. Every number in the kill path used to be wall clock, and a closed
+// laptop lid made all of them lies — twice, both diagnosed via pmset:
+//
+//   Jul 31  recorded "killed after 1110053ms" against a 120000ms budget.
+//           Clamshell Sleep at 16:16:25, asleep 1064s, DarkWake 16:34:19;
+//           the check had actually RUN for about 46 seconds.
+//   Aug 1   ms=1057254; asleep 964s; the deadline expired mid-sleep and the
+//           kill landed the instant the machine woke — on a check ~93s into
+//           its 120s budget.
+//
+// Two distinct wrongs, one cause. The recorded duration counted the sleep and
+// went into the card note as memory, where "18.5 minutes against a 120s
+// budget" reads as an accusation against the timeout — it already sent one
+// root-cause hunt in exactly the wrong direction (see the SW-056 comment on
+// killGroup). And setTimeout is a wall-clock appointment, so a sleep that
+// outlives the deadline turns wake into an execution.
+//
+// No clock is trusted to know better. performance.now()/process.hrtime bind
+// to whatever source libuv picked — on macOS, mach_absolute_time does not
+// advance during sleep, mach_continuous_time does, libuv has changed sources
+// across versions and once shipped a wake clock that jumped BACKWARDS
+// (libuv#2891) — and none of that is verifiable here, because no test can put
+// the machine to sleep. What CAN be observed from inside is absence: a
+// heartbeat that stopped beating. A 1s interval records when it actually
+// fired; any gap between beats far above the interval is time this process
+// was not running, and that time is subtracted before anything is reported
+// or killed.
+export const TICK_MS = 1000;
+
+// A gap only counts once it dwarfs the beat. A loaded event loop misses by
+// tens or hundreds of milliseconds; the two real sleeps missed by 1064000 and
+// 964000. Five seconds sits three orders of magnitude from both neighbours,
+// so neither can drift into the other. Starvation that long is treated as
+// sleep on purpose: for the check's budget they are the same fact — the
+// process was not running — and they deserve the same mercy.
+export const SUSPEND_GAP_MS = 5000;
+
+// Floor for the absolute wall-clock ceiling; the whole rationale is on
+// wallCapOf below.
+export const WALL_CAP_FLOOR_MS = 60 * 60 * 1000;
+
 /* ── pure ────────────────────────────────────────────────── */
 
 // Which check applies, as a decision that can be explained. Absence is a first
@@ -89,6 +130,70 @@ export function readOutcome(result) {
   return result.exit === 0 ? { state: 'pass', ok: true } : { state: 'fail', ok: false };
 }
 
+// SW-060, the sleep ledger. `ticks` is the heartbeat record — ticks[0] is
+// when the run began, every later entry is when the 1s interval actually
+// fired — and `now` is the moment being judged, counted as one more beat so
+// a deadline that fires before the first post-wake beat still sees the gap
+// (Jul 31's did: it came due 18 minutes stale, at the instant of DarkWake).
+//
+// Each counted gap forfeits one TICK_MS as presumed running time, so this
+// UNDER-counts suspension by up to a beat per gap rather than ever crediting
+// the check with running time it did not get. A clock that steps backwards
+// (libuv#2891 was a wake bug of exactly that shape; NTP corrections too)
+// makes a negative gap, which counts as nothing.
+export function suspendedMsOf(ticks, now, { tickMs = TICK_MS, gapMs = SUSPEND_GAP_MS } = {}) {
+  if (!Array.isArray(ticks) || ticks.length === 0) return 0;
+  let suspended = 0;
+  let prev = ticks[0];
+  for (const t of [...ticks.slice(1), now]) {
+    const gap = t - prev;
+    if (gap >= gapMs) suspended += gap - tickMs;
+    prev = t;
+  }
+  return suspended;
+}
+
+// The mercy has to have an end, or SW-056 comes back through a new door: a
+// machine that thrashes so hard EVERY beat gap crosses the threshold banks
+// nearly everything as suspension, running time never reaches the budget, and
+// a deadline with no ceiling re-arms forever — the exact unbounded reply the
+// group kill just closed. So the ceiling is absolute wall clock, sleep
+// included, and deliberately consults nothing the gap detector says.
+//
+// The value: max(4 x timeoutMs, one hour). 4x scales for projects that
+// declare long budgets, so a check allowed 30 minutes may also ride out a
+// sleep in proportion. The one-hour floor is set by the incidents: both real
+// sleeps were ~16-18 minutes against the 2-minute default budget, so a bare
+// 4x (8 minutes of wall) would have re-killed at wake the exact two checks
+// this fix exists to spare. An hour clears them threefold — a lid closed
+// across lunch comes back to a live check — while a lid closed overnight
+// still gets a bounded, honestly-worded kill: past that point, proving to
+// whoever is still holding the reply open that it ENDS outranks the verdict.
+export const wallCapOf = (timeoutMs) => Math.max(4 * timeoutMs, WALL_CAP_FLOOR_MS);
+
+// What the deadline decides when it fires, pure so the incidents can replay
+// in tests as synthetic tick histories — no test can close the lid. Three
+// outcomes:
+//  - running budget spent: kill, the honest timeout.
+//  - wall ceiling crossed: kill regardless and say it GAVE UP — see wallCapOf.
+//  - neither: spare it, and re-arm for the unused running budget. The re-arm
+//    is structural containment in itself: each new wall deadline sits at
+//    exactly timeoutMs + suspendedMs as known at that arm (elapsed + the
+//    remainder), so wall time never outruns what the recorded beats justify,
+//    and the arm is clamped to the ceiling so no fire can land past it.
+export function deadlineVerdict({ ticks, now, timeoutMs, wallCapMs, tickMs = TICK_MS, gapMs = SUSPEND_GAP_MS }) {
+  const suspendedMs = suspendedMsOf(ticks, now, { tickMs, gapMs });
+  const startedAt = Array.isArray(ticks) && ticks.length > 0 ? ticks[0] : now;
+  const elapsedMs = Math.max(0, now - startedAt);
+  const runningMs = Math.max(0, elapsedMs - suspendedMs);
+  if (elapsedMs >= wallCapMs) return { kill: true, gaveUp: true, runningMs, suspendedMs, elapsedMs };
+  if (runningMs >= timeoutMs) return { kill: true, gaveUp: false, runningMs, suspendedMs, elapsedMs };
+  return {
+    kill: false, gaveUp: false, runningMs, suspendedMs, elapsedMs,
+    rearmMs: Math.max(1, Math.min(timeoutMs - runningMs, wallCapMs - elapsedMs)),
+  };
+}
+
 /* ── I/O ─────────────────────────────────────────────────── */
 
 // Where a check's store lookups are sent instead of the live board. It does
@@ -129,10 +234,13 @@ export function checkEnv(env = process.env) {
 
 // SW-056. child.kill() signals the DIRECT child and nothing it spawned, so a
 // check that leaves anything behind was never bounded by its timeout: the
-// survivor holds the inherited stdout open, 'close' waits on IT rather than on
-// the check, and a check declared with a 120000ms timeout was recorded in the
-// wild as "killed after 1110053ms". Signalling the GROUP is the only reason
-// spawnCheck asks for `detached: true`.
+// survivor holds the inherited stdout open, and 'close' waits on IT rather
+// than on the check. Signalling the GROUP is the only reason spawnCheck asks
+// for `detached: true`. (The wild "killed after 1110053ms" this card first
+// pinned on an orphan turned out, via pmset, to be the laptop lid — that
+// re-diagnosis is SW-060, and it is what a duration that counts sleep costs.
+// The orphan hazard is real all the same: reproduced and measured in the
+// tests, and the group kill is what bounds it.)
 //
 // Measured, since the card blamed `node --test` workers specifically and that
 // part does not hold on Node 25: the runner forwards SIGTERM to its own workers,
@@ -178,21 +286,45 @@ export function spawnCheck(argv, { cwd, timeoutMs }) {
     }
     let out = '';
     let timedOut = false;
+    let gaveUp = false;
     // Bounded in memory too, not merely in what we keep: a runaway process that
     // prints for two minutes should not be buffered in full first.
     const take = (buf) => { if (out.length < OUTPUT_BUDGET * 8) out += buf; };
     child.stdout?.on('data', take);
     child.stderr?.on('data', take);
 
+    // SW-060: the heartbeat. Its only job is to leave a record of when this
+    // process was actually running; suspendedMsOf reads the gaps in it.
+    // Cleared in finish() with the other timers — an interval left beating
+    // would hold this event loop open on a check that has already been
+    // answered, which is the SW-056 hang wearing a new face.
+    const ticks = [started];
+    const heartbeat = setInterval(() => ticks.push(Date.now()), TICK_MS);
+    const wallCapMs = wallCapOf(timeoutMs);
+
     let escalation = null;
-    const timer = setTimeout(() => {
+    let deadline = null;
+    // SW-060: the deadline no longer trusts its own punctuality. It may fire
+    // minutes late because the machine slept through the appointment — Aug 1's
+    // fired at the instant of DarkWake, 937s stale, onto a check ~93s into a
+    // 120s budget — so before killing anything it asks deadlineVerdict how
+    // much of the elapsed wall was RUNNING time, and re-arms for the unused
+    // budget when the answer is "not enough to die for".
+    const onDeadline = () => {
+      const verdict = deadlineVerdict({ ticks, now: Date.now(), timeoutMs, wallCapMs });
+      if (!verdict.kill) {
+        deadline = setTimeout(onDeadline, verdict.rearmMs);
+        return;
+      }
       timedOut = true;
+      gaveUp = verdict.gaveUp;
       killGroup(child, 'SIGTERM');
       // A child that ignores SIGTERM would otherwise hold the reply open past
       // the timeout that exists to bound it.
       escalation = setTimeout(() => killGroup(child, 'SIGKILL'), 2000);
       escalation.unref?.();
-    }, timeoutMs);
+    };
+    deadline = setTimeout(onDeadline, timeoutMs);
 
     let grace = null;
     let settled = false;
@@ -201,15 +333,27 @@ export function spawnCheck(argv, { cwd, timeoutMs }) {
       // escalation can arrive after either.
       if (settled) return;
       settled = true;
-      clearTimeout(timer);
+      clearTimeout(deadline);
       clearTimeout(grace);
       clearTimeout(escalation);
+      clearInterval(heartbeat);
       // An orphan can hold these pipes open forever. Leaving them readable would
       // keep this process's event loop alive on a check that has already been
       // answered — the hang moved rather than fixed.
       child.stdout?.destroy();
       child.stderr?.destroy();
-      resolve({ exit, ms: Date.now() - started, out: clip(out), timedOut, spawnError });
+      // SW-060: ms is RUNNING time — wall minus every detected suspension. The
+      // wall figure went into a card note once as "killed after 1110053ms" and
+      // was believed; a duration that counts the sleep is not a duration, it
+      // is an alibi for the wrong suspect. suspendedMs appears only when a gap
+      // actually crossed the threshold, so the ordinary result is unchanged.
+      const now = Date.now();
+      const suspendedMs = suspendedMsOf(ticks, now);
+      resolve({
+        exit, ms: Math.max(0, now - started - suspendedMs), out: clip(out), timedOut, spawnError,
+        ...(suspendedMs > 0 ? { suspendedMs } : {}),
+        ...(gaveUp ? { gaveUp: true } : {}),
+      });
     };
 
     // 'close' waits for the stdio streams to reach EOF, which is a fact about
@@ -253,6 +397,10 @@ export async function runCheck(project, card, { cwd = REPO, run = spawnCheck } =
     ...outcome,
     exit: result.exit,
     ms: result.ms,
+    // SW-060: the sleep travels with the result, or verdictText would be back
+    // to guessing why 93s of running took 18 minutes of wall.
+    ...(result.suspendedMs > 0 ? { suspendedMs: result.suspendedMs } : {}),
+    ...(result.gaveUp ? { gaveUp: true } : {}),
     out: result.out,
     sha: head.sha,
     dirty: head.dirty,
@@ -273,6 +421,15 @@ export const verificationOf = (r, at) => ({
   ...(r.state === 'timeout' ? { timedOut: true } : {}),
 });
 
+// SW-060: said in every outcome where a suspension was detected. The two
+// readings this sentence keeps apart send a reader in opposite directions:
+// "the machine slept mid-check" sends them to pmset and the lid, "your check
+// is slow" sends them to the timeout and the suite. The Jul 31 note implied
+// the second when the first was true, and cost a root-cause hunt.
+const sleptClause = (r) => (r.suspendedMs > 0
+  ? ` The machine slept ${Math.round(r.suspendedMs / 1000)}s mid-check (or the process was starved that long — the same fact for this budget); that time is not counted in the ${r.ms}ms.`
+  : '');
+
 // The sentence that goes in the note. Every branch names the tree it is talking
 // about, because evidence without a sha is a claim about a moment nobody can
 // find again — and a pass over a dirty tree says so in the same breath, rather
@@ -282,11 +439,17 @@ export function verdictText(r, { cmd }) {
   const where = r.sha ? `at ${r.sha}${r.dirty ? ' with uncommitted changes in the tree, so this is not reproducible from the sha alone' : ''}` : 'at an unknown commit — git could not be read';
   switch (r.state) {
     case 'pass':
-      return `Check "${r.name}" (${cmd}) passed ${where}, in ${r.ms}ms. That is what it proves: this command exited zero on this tree, not that the work is correct.`;
+      return `Check "${r.name}" (${cmd}) passed ${where}, in ${r.ms}ms.${sleptClause(r)} That is what it proves: this command exited zero on this tree, not that the work is correct.`;
     case 'fail':
-      return `Check "${r.name}" (${cmd}) FAILED ${where} — exit ${r.exit}, ${r.ms}ms. The card stays in progress. Output:\n${r.out || '(no output)'}`;
+      return `Check "${r.name}" (${cmd}) FAILED ${where} — exit ${r.exit}, ${r.ms}ms.${sleptClause(r)} The card stays in progress. Output:\n${r.out || '(no output)'}`;
     case 'timeout':
-      return `Check "${r.name}" (${cmd}) was killed after ${r.ms}ms without finishing ${where}. That is an absence of evidence, not a failure and not a pass. Output so far:\n${r.out || '(no output)'}`;
+      // gaveUp is the wall ceiling, and the check is NOT charged as slow: it
+      // never received its budget of running time — the machine would not stay
+      // awake long enough to grant it (see wallCapOf).
+      if (r.gaveUp) {
+        return `Check "${r.name}" (${cmd}) was killed ${where} after the machine slept ${Math.round((r.suspendedMs || 0) / 1000)}s mid-check: the check itself had run for only ${r.ms}ms, but total wall time crossed the hard ceiling, so the runner gave up waiting for the machine to stay awake. Blame the sleeping machine, not the check's speed. That is an absence of evidence, not a failure and not a pass. Output so far:\n${r.out || '(no output)'}`;
+      }
+      return `Check "${r.name}" (${cmd}) was killed after ${r.ms}ms of running time without finishing ${where}.${sleptClause(r)} That is an absence of evidence, not a failure and not a pass. Output so far:\n${r.out || '(no output)'}`;
     default:
       return `Check "${r.name}" (${cmd}) could not be run ${where}: ${r.out || 'spawn failed'}. Nothing was proved.`;
   }

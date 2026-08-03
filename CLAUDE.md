@@ -46,6 +46,8 @@ The split is SW-039, and the reason is size: note text was 68–73% of every boa
 
 The two files hold disjoint facts — the tracker never carries note text after a write, the sidecar never carries board state — so there is nothing for them to disagree about.
 
+The tracker also carries a `rev` — a write counter **the store owns** (SW-059). Every locked write bumps it and journals it to `.shipward/last-write.json`, which is untracked and must stay that way: never commit it, never delete its `.gitignore` line. When hand-editing the tracker, carry `rev` forward unchanged. What it catches is git: a `git checkout` or `reset` rewrites the board without ever taking the lock, and a file whose rev is below the journal's proves it happened — reads warn on stderr, the next write records `git rewrote the board` in the feed, and nothing is auto-restored. If you see that warning, the overwritten write is recoverable from git history: `git log -- .shipward/tracker.json`.
+
 Statuses:
 
 - `backlog` — planned, not started

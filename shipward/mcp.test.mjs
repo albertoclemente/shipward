@@ -125,8 +125,12 @@ const noteStr = (note) => (Array.isArray(note) ? note.map((e) => e.text).join('\
 
 // Board state without the MCP heartbeat. The server stamps doc.mcp while it
 // runs, so a raw byte comparison would call every read-only tool a writer.
+// `rev` is stripped for exactly the same reason: SW-059 makes every WRITE bump
+// it, the heartbeat is a write, and a heartbeat racing a read-only tool call
+// made these comparisons differ by one integer — the same accusation the mcp
+// strip was invented to stop, arriving through the new field.
 const board = async () => {
-  const { mcp, ...rest } = await doc();
+  const { mcp, rev, ...rest } = await doc();
   return JSON.stringify(rest);
 };
 

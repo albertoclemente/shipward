@@ -20,6 +20,17 @@
 //   * the sweep only collects files whose pid is dead;
 //   * every retry path checks the deadline and sleeps, so no input can spin.
 //
+// And the ninth lost write took none of those paths: `git checkout` rewrote
+// tracker.json from the index in the same second as a committed done() — git
+// never takes the lock, so every guarantee above held and the write vanished
+// anyway (SW-059). The store cannot stop a writer that will not take its lock;
+// it can refuse to be quiet about one. Every write stamps a monotonic `rev`
+// and journals it to an untracked file, and a board whose rev went DOWN is
+// announced on read and recorded in the feed by the next write. Detection
+// only, never auto-restore: rolling the board forward by guesswork could be
+// subtly wrong, and deliberately checking out an old board is legitimate —
+// the truth is in git history either way.
+//
 // SHIPWARD_TRACKER overrides the tracker path. It exists for tests. Two
 // processes pointed at the same logical tracker through different values will
 // derive different lock paths and will NOT serialize with each other.
@@ -306,6 +317,77 @@ async function appendNotes(lines) {
 // different files.
 const stateEtag = (trackerRaw, notesRaw) => etagOf(`${trackerRaw}\u0000${notesRaw}`);
 
+/* ── the write rev + last-write journal (SW-059) ─────────────
+   Two agent sessions share one checkout. One committed a write through the
+   lock at 08:34:30; a `git checkout` in that same second rewrote the file
+   from the index. Both sides were doing their jobs and the write was gone —
+   silently, because git does not take locks and the store had already
+   reported success.
+
+   So the document carries a `rev` only this store increments, and after every
+   commit the store journals { rev, etag, at, pid } beside the tracker.
+   Through the lock, rev can only go up — so a file whose rev is BELOW the
+   journal's was rewritten by something that never held the lock: a git
+   checkout/reset, or a hand-restore. The journal is deliberately UNTRACKED
+   (.gitignore): if git could revert the journal too, the evidence would
+   vanish with the write it records. A missing or unparsable journal makes no
+   claim — every fresh clone starts that way, and a false accusation would
+   teach people to ignore a true one. */
+const JOURNAL = join(DIR, 'last-write.json');
+
+// The file's rev, absent meaning 0: rev postdates every board written before
+// SW-059, and a legacy board must read clean.
+const revOf = (d) => (Number.isInteger(d?.rev) && d.rev >= 0 ? d.rev : 0);
+
+// null on missing or corrupt — no claim either way. A torn journal cannot
+// produce a false accusation, because half-written JSON does not parse.
+async function readJournal() {
+  try {
+    const j = JSON.parse(await readFile(JOURNAL, 'utf8'));
+    return isObj(j) && Number.isInteger(j.rev) && j.rev >= 0 ? j : null;
+  } catch {
+    return null;
+  }
+}
+
+// Best-effort, and only ever called after the board write is durable: a
+// journal failure must never fail the write it records. Not silent, though —
+// every write it misses is one a later git revert can eat undetected.
+async function writeJournal(rev, etag) {
+  try {
+    await writeFile(JOURNAL, JSON.stringify({ rev, etag, at: new Date().toISOString(), pid: process.pid }) + '\n', 'utf8');
+  } catch (err) {
+    process.stderr.write(`shipward: could not journal this write to ${JOURNAL}: ${err.code || err.message} — a git revert of it cannot be detected\n`);
+  }
+}
+
+// One warning per regression per process: the desk polls readRaw every few
+// seconds, and one event must not become a scroll of identical lines — while
+// every CLI/MCP/hook invocation is a fresh process, so nothing short-lived
+// ever swallows it. A NEW regression (a different rev pair) speaks again.
+const warnedRegressions = new Set();
+function warnRevert(fileRev, journal) {
+  const key = `${fileRev}<${journal.rev}`;
+  if (warnedRegressions.has(key)) return;
+  warnedRegressions.add(key);
+  process.stderr.write(
+    `shipward: WARNING — the board went BACKWARDS: ${TRACKER} is at rev ${fileRev} but rev ${journal.rev} was committed here at ${journal.at}. `
+    + 'A locked write can only raise the rev, so something rewrote the file without taking the lock — almost certainly a git checkout or reset in this repo. '
+    + 'The write committed then is gone from the working tree; recover it from git history (git log -- .shipward/tracker.json).\n',
+  );
+}
+
+// The feed record of a detected rewrite. `by` is deliberately ABSENT: that
+// enum names who authored a change, and the honest answer is neither — git
+// rewrote the board and the store is only the witness. Charging "claude" or
+// "user" with a write they did not make would be exactly the kind of quiet
+// misattribution this feature exists to end.
+const rewriteEntry = (doc, fileRev, journal) => ({
+  t: new Date().toISOString(),
+  p: doc.activeProject || doc.projects?.[0]?.id || '',
+  msg: `git rewrote the board: rev fell from ${journal.rev} (committed ${journal.at}) to ${fileRev} — that write is gone from the working tree; recover it from git history`,
+});
+
 /* ── validation ──────────────────────────────────────────────
    The tracker is Claude Code's memory: a write that satisfies the caller but
    not .shipward/schema.json poisons the next session. */
@@ -324,6 +406,11 @@ const isTime = (v) => v == null || (isStr(v) && !Number.isNaN(Date.parse(v)));
 export function validate(d) {
   if (!isObj(d)) return 'not an object';
   if (d.version !== 1) return 'version must be 1';
+  // SW-059. Absent is legal forever — every board written before rev existed
+  // has none, and it reads as 0. The store stamps rev on every write, so
+  // validation only has to keep a hand edit or a raw PUT from storing
+  // something the backwards-detection cannot order.
+  if (d.rev != null && (!Number.isInteger(d.rev) || d.rev < 0)) return 'rev must be a non-negative integer';
   for (const k of ['projects', 'cards', 'feed']) if (!Array.isArray(d[k])) return `${k} must be an array`;
 
   for (const [i, p] of d.projects.entries()) {
@@ -709,6 +796,13 @@ export async function readRaw() {
   const bad = validate(parsed);
   if (bad) throw new ValidationError(`tracker.json is not a valid tracker document: ${bad}`);
 
+  // SW-059: the lock cannot see a writer that never takes it. A file rev
+  // below the last journaled rev means git (or a hand-restore) rewrote the
+  // board. Say so — once — and serve the read anyway: reads never write, and
+  // deliberately checking out an old board is legitimate.
+  const journal = await readJournal();
+  if (journal && revOf(parsed) < journal.rev) warnRevert(revOf(parsed), journal);
+
   const notes = await readNotes();
   const doc = hydrate(parsed, notes.byCard);
   // Validated AGAIN after hydration: the sidecar is a separate file that a
@@ -762,9 +856,14 @@ async function commitDoc(out, held, notes) {
   const { stripped, lines } = extract(out, notes.keys);
   const appended = await appendNotes(lines);
   const fileRaw = await atomicWrite(stripped, held);
+  const etag = stateEtag(fileRaw, notes.raw + appended);
+  // SW-059: journaled AFTER the rename, never before — a journal ahead of a
+  // write that then failed would accuse git of eating a write that never
+  // happened, and a false accusation teaches people to ignore true ones.
+  await writeJournal(revOf(out), etag);
   // The caller is handed the HYDRATED document, byte-identical to what the
   // next readRaw() will serve — the desk PUTs back what it was given.
-  return { body: serialize(out), etag: stateEtag(fileRaw, notes.raw + appended) };
+  return { body: serialize(out), etag };
 }
 
 // Read-modify-write under one lock. `fn` receives the current document and
@@ -772,6 +871,11 @@ async function commitDoc(out, held, notes) {
 export async function mutate(fn, { signal } = {}) {
   return withLock(async (held) => {
     const { doc, notes } = await readRaw();
+    // SW-059, captured before fn runs: the callback owns the document's
+    // CONTENT, never its rev — stamping from what fn returned would let one
+    // stray assignment forge the very signal the journal exists to check.
+    const fileRev = revOf(doc);
+    const journal = await readJournal();
     const before = serialize(doc);
     // Snapshot the feed BEFORE fn runs: fn gets the live document, and a
     // callback that reassigns doc.feed would otherwise destroy the only record
@@ -791,7 +895,19 @@ export async function mutate(fn, { signal } = {}) {
     }
     if (!isObj(next)) throw new ValidationError('mutate callback must return a document object or null');
 
-    const out = normalize(next);
+    let out = normalize(next);
+    // SW-059, the write half of detection. The read already warned on stderr;
+    // a write is where a durable record can land — one feed entry, then a rev
+    // stamped past the journal, which is exactly what retires the warning.
+    // Only onto a real array: papering over a garbage feed here would hide it
+    // from the validation below.
+    if (journal && fileRev < journal.rev && Array.isArray(out.feed)) {
+      out = normalize({ ...out, feed: [rewriteEntry(out, fileRev, journal), ...out.feed] });
+    }
+    // The store owns rev. Past BOTH the file and the journal: past the file so
+    // it always climbs, past the journal so the first write after a git revert
+    // re-establishes "nothing newer was ever recorded here".
+    out = { ...out, rev: Math.max(fileRev, journal ? journal.rev : 0) + 1 };
     const bad = validate(out);
     if (bad) throw new ValidationError(`refusing to write an invalid tracker document: ${bad}`);
     // The commit point. Up to here a cancellation costs nothing: the lock is
@@ -816,7 +932,7 @@ export async function mutate(fn, { signal } = {}) {
 // closes the last loss path: the lock alone could not help, because the desk's
 // base came from an unlocked GET seconds earlier.
 export async function replace(doc, ifMatch) {
-  const out = normalize(doc);
+  let out = normalize(doc);
   const bad = validate(out);
   if (bad) throw new ValidationError(bad);
   return withLock(async (held) => {
@@ -832,6 +948,18 @@ export async function replace(doc, ifMatch) {
         current,
       );
     }
+    // SW-059, same shape as mutate(). No file on disk means nothing to have
+    // gone backwards — but the journal still feeds the stamp below, so a
+    // deleted tracker resumes counting instead of restarting at 1.
+    const journal = await readJournal();
+    const fileRev = current ? revOf(current.doc) : 0;
+    if (current && journal && fileRev < journal.rev && Array.isArray(out.feed)) {
+      out = normalize({ ...out, feed: [rewriteEntry(out, fileRev, journal), ...out.feed] });
+    }
+    // A PUT's rev is whatever the client last read — or nothing at all, from a
+    // desk that predates rev. The store stamps its own, so a stale body can
+    // never lower it; the ifMatch/ConflictError contract above is untouched.
+    out = { ...out, rev: Math.max(fileRev, journal ? journal.rev : 0) + 1 };
     warnCardLoss(current?.doc?.cards, out.cards);
     await archiveDropped(current?.doc?.feed, out.feed);
     // No tracker on disk means nothing to preserve and no sidecar to dedup

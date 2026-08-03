@@ -513,13 +513,16 @@ test('ordinary edits and small boards stay quiet', async () => {
   assert.doesNotMatch(one.stderr, /WARNING/);
 
   // And a tiny board being emptied is below the floor — the desk's own tests
-  // replace 1-2 card seeds constantly.
+  // replace 1-2 card seeds constantly. Listen for the card-loss warning
+  // SPECIFICALLY: the hand reseed two lines up is an unlocked rewrite of a
+  // journaled board, which SW-059 rightly announces — a different warning,
+  // about a different thing.
   const small = { ...seed(), cards: manyCards(2) };
   await writeFile(tracker, JSON.stringify(small, null, 2) + '\n');
   const tiny = await inChild(`
     import { replace } from ${JSON.stringify(STORE)};
     await replace(${JSON.stringify(seed())});`);
-  assert.doesNotMatch(tiny.stderr, /WARNING/);
+  assert.doesNotMatch(tiny.stderr, /drops \d+ of \d+ cards/);
 });
 
 test('mutate is guarded too — a callback that eats the board is announced', async () => {
@@ -686,4 +689,110 @@ test('the sidecar preserves every field an entry carries, not a known list', asy
   assert.deepEqual(await notesLines(), [{ card: 'TS-001', ...entry }], 'written whole');
   const { stdout } = await withStore('const { doc } = await store.readRaw(); process.stdout.write(JSON.stringify(doc.cards[0].note));');
   assert.deepEqual(JSON.parse(stdout), [entry], 'and read back whole');
+});
+
+/* ── the write rev + git-revert detection (SW-059) ────────────
+   Two agent sessions share one checkout. A done() committed the board through
+   the lock; a `git checkout` in the same second rewrote the file from the
+   index — git never takes the lock, so the loss was silent on both sides.
+   The store cannot prevent that; it can notice: every write stamps a rev that
+   only it may raise and journals it to an untracked .shipward/last-write.json,
+   and a board whose rev went DOWN is announced. Detect and say so, never
+   auto-restore. */
+
+const journalPath = () => join(sandbox, '.shipward', 'last-write.json');
+
+test('every write stamps a rev the store owns; a no-op leaves it alone', async () => {
+  await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(1))}); return doc; });`);
+  let onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(onDisk.rev, 1, 'the first write seeds rev on a legacy board');
+
+  await withStore('const { doc } = await store.readRaw(); await store.replace(doc);');
+  onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(onDisk.rev, 2, 'replace() bumps it the same as mutate()');
+
+  await withStore('await store.mutate(() => null);');
+  onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(onDisk.rev, 2, 'a deliberate no-op writes nothing, so it bumps nothing');
+
+  const journal = JSON.parse(await readFile(journalPath(), 'utf8'));
+  assert.equal(journal.rev, 2, 'the journal remembers the last committed rev');
+  const { stdout } = await withStore('const { etag } = await store.readRaw(); process.stdout.write(etag);');
+  assert.equal(journal.etag, stdout, 'and the etag of the state it committed');
+  assert.ok(Number.isInteger(journal.pid), 'with the writer pid for forensics');
+  assert.ok(!Number.isNaN(Date.parse(journal.at)), 'and when, ISO-stamped');
+});
+
+test('a board rewritten to a lower rev warns on read and is recorded by the next write', async () => {
+  // Exactly what `git checkout` does: the store commits rev 2, git puts the
+  // rev-1 bytes back from the index without ever taking the lock.
+  await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(1))}); return doc; });`);
+  const oldBytes = await readFile(tracker, 'utf8');                     // the rev-1 board
+  await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(2))}); return doc; });`);
+  await writeFile(tracker, oldBytes);                                   // ← the checkout
+
+  const read = await withStore('const { doc } = await store.readRaw(); process.stdout.write(String(doc.rev));');
+  assert.equal(read.stdout, '1', 'the read still succeeds — checking out an old board is legitimate');
+  assert.match(read.stderr, /WARNING — the board went BACKWARDS/, 'but it is never silent');
+  assert.match(read.stderr, /at rev 1 but rev 2 was committed/, 'it names both revs');
+  assert.match(read.stderr, /git checkout or reset/, 'and the likely culprit');
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).rev, 1, 'and a read NEVER writes');
+
+  const write = await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(3))}); return doc; });`);
+  assert.match(write.stderr, /went BACKWARDS/, 'the writer names it too');
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.ok(doc.rev > 2, `the new write must land past the journal, got rev ${doc.rev}`);
+  assert.match(doc.feed[0].msg, /git rewrote the board/, 'one durable feed entry records it');
+  assert.match(doc.feed[0].msg, /rev fell from 2/, 'with the rev that vanished');
+  assert.equal(doc.feed[0].by, undefined, 'attributed to neither claude nor user — git did it');
+  assert.equal(JSON.parse(await readFile(journalPath(), 'utf8')).rev, doc.rev, 'journal caught up');
+
+  const after = await withStore('await store.readRaw();');
+  assert.doesNotMatch(after.stderr, /BACKWARDS/, 'so the write retires the warning');
+});
+
+test('a legacy board with no rev and no journal reads clean', async () => {
+  const r = await withStore('const { doc } = await store.readRaw(); process.stdout.write(String(doc.rev));');
+  assert.equal(r.stdout, 'undefined', 'rev is absent on a read, never invented');
+  assert.doesNotMatch(r.stderr, /WARNING|BACKWARDS/, 'absence of history is not an accusation');
+});
+
+test('a fresh clone — rev on disk, no journal — makes no claim', async () => {
+  await writeFile(tracker, JSON.stringify({ ...seed(), rev: 7 }, null, 2) + '\n');
+  const r = await withStore('const { doc } = await store.readRaw(); process.stdout.write(String(doc.rev));');
+  assert.equal(r.stdout, '7');
+  assert.doesNotMatch(r.stderr, /WARNING|BACKWARDS/, 'a missing journal is how every clone starts');
+
+  await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(1))}); return doc; });`);
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).rev, 8, 'and the next write climbs from the file');
+});
+
+test('an unwritable journal never takes the board write with it', async () => {
+  await mkdir(journalPath());                    // a directory where the file should be
+  const { stderr } = await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(1))}); return doc; });`);
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(doc.cards.length, 1, 'the write landed');
+  assert.equal(doc.rev, 1, 'rev stamped from the file alone');
+  assert.match(stderr, /could not journal this write/, 'but the failure is not silent');
+});
+
+test('a PUT carrying a stale rev cannot lower the stored one', async () => {
+  await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(1))}); return doc; });`);
+  await withStore(`await store.mutate((doc) => { doc.cards.push(${JSON.stringify(card(2))}); return doc; });`);
+
+  // The desk PUTs whole documents; this base predates both writes above.
+  await withStore(`await store.replace(${JSON.stringify({ ...seed(), rev: 1, cards: [card(9)] })});`);
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(doc.cards.length, 1, 'the replacement itself is honoured');
+  assert.equal(doc.rev, 3, 'but its stale rev is not — the store stamps past everything seen');
+});
+
+test('validate: rev is absent or a non-negative integer, nothing else', async () => {
+  const { validate } = await import(STORE);
+  assert.equal(validate(seed()), null, 'absent — every board written before SW-059');
+  assert.equal(validate({ ...seed(), rev: 0 }), null);
+  assert.equal(validate({ ...seed(), rev: 41 }), null);
+  assert.match(validate({ ...seed(), rev: -1 }), /rev must be a non-negative integer/);
+  assert.match(validate({ ...seed(), rev: 1.5 }), /rev must be a non-negative integer/);
+  assert.match(validate({ ...seed(), rev: '3' }), /rev must be a non-negative integer/);
 });

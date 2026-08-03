@@ -3,6 +3,7 @@ node_modules/
 *.log
 .shipward/*.tmp
 .shipward/*.lock*
+.shipward/last-write.json
 # Worktrees live here (EnterWorktree, git worktree add). Each is a full second
 # checkout, and .claude is a directory people add wholesale, so without this one
 # line a stray `git add -A` commits an entire worktree into the repo.

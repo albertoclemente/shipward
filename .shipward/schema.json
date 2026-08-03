@@ -12,6 +12,11 @@
     "version": {
       "const": 1
     },
+    "rev": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Server-owned monotonic write counter (SW-059). The store stamps it on every locked write and journals it to the untracked .shipward/last-write.json; a tracker whose rev is below that journal's was rewritten by something that never took the lock — almost always a git checkout/reset. Hand edits carry it forward unchanged. Absent on boards written before it existed (read as 0)."
+    },
     "activeProject": {
       "type": "string",
       "description": "Project id the UI shows by default"

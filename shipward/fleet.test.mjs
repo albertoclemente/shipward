@@ -216,6 +216,23 @@ test('the digest module is served, so the page can import it', async () => {
   assert.match(await res.text(), /export function digest/);
 });
 
+test('the favicon is served, and typed so a browser will actually use it', async () => {
+  // An SVG served as text/javascript is silently ignored: the tab keeps its
+  // blank default and nothing appears in the console to say why.
+  const res = await fetch(`${base}/favicon.svg`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /image\/svg\+xml/);
+  assert.match(await res.text(), /polygon/);
+});
+
+test('the page asks for the favicon and renders the mark inline', async () => {
+  const html = await (await fetch(`${base}/`)).text();
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="\/favicon\.svg">/);
+  assert.match(html, /<svg class="mark"/, 'the mark is inline so it can use the token variables');
+  assert.match(html, /var\(--accent\)/, 'and follows the token sheet rather than a frozen hex');
+});
+
+
 test('killing the fleet takes every desk down with it', async () => {
   const rows = await fleetRows();
   const pids = rows.map((r) => r.pid).filter(Boolean);

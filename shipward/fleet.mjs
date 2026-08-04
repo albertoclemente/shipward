@@ -37,6 +37,7 @@ const SERVED = {
   '/fleet-client.js': 'fleet-client.js',
   '/fleet-view.js': 'fleet-view.js',
   '/fleet-digest.js': 'fleet-digest.js',
+  '/favicon.svg': 'favicon.svg',
 };
 
 const ROOT = resolve(process.argv[2] || process.env.SHIPWARD_FLEET_ROOT || process.cwd());
@@ -224,6 +225,7 @@ const PAGE = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Shipward — the fleet</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <style>
   :root { --bg:#f3f2f2; --surface:#eae9e9; --text:#201e1d; --accent:#ec3013; --muted:#605d5d;
           --divider:color-mix(in srgb,#201e1d 40%,transparent); }
@@ -232,7 +234,7 @@ const PAGE = `<!doctype html>
          font:400 15px/1.55 Archivo,system-ui,sans-serif; }
   header { display:flex; align-items:center; flex-wrap:wrap; gap:10px 24px;
            padding:12px 16px; border-bottom:2px solid var(--divider); }
-  .mark { width:14px; height:14px; background:var(--accent); }
+  .mark { flex:none; display:block; }
   .brand { font-weight:800; font-size:18px; letter-spacing:.03em; }
   .tag { color:var(--muted); font-size:12px; }
   main { padding:24px 16px; max-width:1100px; }
@@ -268,7 +270,7 @@ const PAGE = `<!doctype html>
   .digest-text { color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   :focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 </style></head><body>
-<header><div class="mark"></div><div class="brand">SHIPWARD</div><div class="tag">the fleet</div></header>
+<header><svg class="mark" width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><polygon points="2,20 30,20 23,29 9,29" fill="var(--text)"></polygon><polygon points="16,4 9,18 23,18" fill="var(--accent)"></polygon></svg><div class="brand">SHIPWARD</div><div class="tag">the fleet</div></header>
 <main>
   <h3>Every board under __ROOT__</h3>
   <p class="lede" id="lede">Scanning…</p>
@@ -289,7 +291,13 @@ const server = createServer(async (req, res) => {
     // walks the user's whole projects root, and a path-joining bug here would
     // hand any file on disk to a browser.
     if (SERVED[url.pathname]) {
-      res.writeHead(200, { 'content-type': 'text/javascript; charset=utf-8', 'cache-control': 'no-store' });
+      // Typed by extension since SW-061 added the favicon: an SVG served as
+      // text/javascript is ignored by every browser, and the tab would keep
+      // its blank default icon with nothing in the console to explain why.
+      const type = url.pathname.endsWith('.svg')
+        ? 'image/svg+xml'
+        : 'text/javascript; charset=utf-8';
+      res.writeHead(200, { 'content-type': type, 'cache-control': 'no-store' });
       res.end(await readFile(join(PUBLIC, SERVED[url.pathname]), 'utf8'));
     } else if (url.pathname === '/api/fleet') {
       res.writeHead(200, { 'content-type': 'application/json' });

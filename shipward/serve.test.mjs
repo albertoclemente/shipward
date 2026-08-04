@@ -293,3 +293,14 @@ test('/api/trust is read-only', async () => {
   const res = await fetch(`${base}/api/trust`, { method: 'PUT', body: '{}' });
   assert.equal(res.status, 405);
 });
+
+test('the desk serves its favicon as an image, not as text', async () => {
+  const res = await fetch(`${base}/favicon.svg`);
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-type'), /image\/svg\+xml/);
+});
+
+test('the desk page asks for it', async () => {
+  const html = await (await fetch(`${base}/`)).text();
+  assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="favicon\.svg">/);
+});

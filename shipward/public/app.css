@@ -188,7 +188,10 @@ textarea.input { min-height: 90px; resize: vertical; }
 
 /* ══ Shipward shell ═══════════════════════════════════════ */
 .app { min-height: 100vh; display: flex; flex-direction: column; }
-.brand-mark { width: 14px; height: 14px; background: var(--color-accent); }
+/* Was a bare 14px accent square; now a wrapper around the mark (SW-061).
+   line-height:0 so the inline SVG does not carry a text baseline's descender
+   and push the brand row out of alignment. */
+.brand-mark { display: block; line-height: 0; flex: none; }
 .brand-group { display: flex; align-items: center; gap: 10px; margin-right: auto; }
 .brand-tag { font-size: 12px; }
 .mcp-tag { gap: 8px; padding-block: 5px; }

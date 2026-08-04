@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" aria-label="Shipward">
+  <rect width="32" height="32" fill="#201e1d"></rect>
+  <g transform="translate(6.4,6.4) scale(0.6)">
+    <polygon points="2,20 30,20 23,29 9,29" fill="#f3f2f2"></polygon>
+    <polygon points="16,4 9,18 23,18" fill="#ec3013"></polygon>
+  </g>
+</svg>

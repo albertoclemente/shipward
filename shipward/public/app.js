@@ -54,6 +54,12 @@ const ICON = {
   terminal: '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--color-accent-700)" stroke-width="2.2" style="flex:none"><polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/></svg>',
   branch: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="6" x2="6" y1="3" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>',
   archive: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="5"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>',
+  // SW-061. A hull under a sail. Filled from the CSS variables rather than the
+  // hex the source SVG carries, so the mark follows the token sheet instead of
+  // freezing #201e1d and #ec3013 in a third place — those two values already
+  // live in app.css and in the fleet's own tokens, and a mark that did not
+  // move with them would be the first thing to look wrong after a restyle.
+  mark: '<svg width="16" height="16" viewBox="0 0 32 32" aria-hidden="true"><polygon points="2,20 30,20 23,29 9,29" fill="var(--color-text)"/><polygon points="16,4 9,18 23,18" fill="var(--color-accent)"/></svg>',
 };
 const icon = (name, cls) => el('span', { class: cls, html: ICON[name] });
 
@@ -251,7 +257,7 @@ const FLEET_HOME = fleetLinkFrom(location.search);
 function renderHeader(doc, project) {
   return el('header', { class: 'nav' },
     el('div', { class: 'brand-group' },
-      el('div', { class: 'brand-mark' }),
+      icon('mark', 'brand-mark'),
       el('div', { class: 'nav-brand', text: 'SHIPWARD' }),
       el('div', { class: 'text-muted brand-tag', text: 'the solo shipping desk' }),
       FLEET_HOME ? el('a', { class: 'nav-fleet', href: FLEET_HOME, text: '← fleet' }) : null,

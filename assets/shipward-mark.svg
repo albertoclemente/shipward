@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="16" height="16" role="img" aria-label="Shipward">
+  <!-- The mark as a standalone asset, for the places inlining cannot reach: a
+       README image, a social card, an app icon (SW-062).
+
+       The fills are LITERAL here and variables everywhere else, because a file
+       has no stylesheet to read them from. That makes this the third copy of
+       --color-text and --color-accent, so mark.test.mjs compares these two hex
+       values against public/app.css and fails if a restyle moves them. Re-export
+       from the tokens rather than hand-editing one and not the other. -->
+  <polygon points="2,20 30,20 23,29 9,29" fill="#201e1d"></polygon>
+  <polygon points="16,4 9,18 23,18" fill="#ec3013"></polygon>
+</svg>

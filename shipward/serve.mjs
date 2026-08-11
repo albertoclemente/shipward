@@ -121,6 +121,37 @@ async function writeTracker(req, res) {
   } catch {
     return fail(res, 400, 'body is not valid JSON');
   }
+  // SW-064. The one thing this endpoint may never carry: a project's `checks`
+  // map. Everything else here is data the desk edits; a check is a COMMAND that
+  // done() will execute, so accepting one over an unauthenticated PUT turns
+  // "anyone who can reach this port can corrupt the board" into "…can run code
+  // as you" — a materially different sentence. Reproduced before fixing: PUT a
+  // document whose checks.default was ['/bin/sh','-c','…'], HTTP 200, and the
+  // next done() ran it.
+  //
+  // SW-043 already stopped an AGENT authoring the command that grades it, by
+  // making checks a human-declared, argv-only map that no MCP tool can write.
+  // shell:false is no defence when the argv IS a shell, so this closes the
+  // other door: checks are established by editing the file, never over HTTP.
+  // The desk has no UI for them, so nothing legitimate is lost.
+  //
+  // Compared against what is ON DISK, not merely rejected when present: a
+  // faithful round-trip of the document the client just read has to keep
+  // working, or every ordinary drag would be refused.
+  try {
+    const { doc: current } = await readRaw();
+    const declared = (p) => JSON.stringify(p?.checks ?? null);
+    const before = new Map((current.projects || []).map((p) => [p.id, declared(p)]));
+    for (const p of doc?.projects || []) {
+      const was = before.has(p.id) ? before.get(p.id) : 'null';
+      if (declared(p) !== was) {
+        return fail(res, 403,
+          `refusing to change checks for project "${p.id}" over HTTP — a check is a command this server will run. `
+          + 'Edit .shipward/tracker.json directly to declare one.');
+      }
+    }
+  } catch { /* no readable board yet — nothing to protect, and replace() will judge the body */ }
+
   // Optimistic concurrency. Without a precondition a client would be writing a
   // document built from an unlocked GET, which is how a desk write erased a
   // committed Claude write even with the lock working perfectly.

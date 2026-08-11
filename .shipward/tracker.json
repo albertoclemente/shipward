@@ -17,6 +17,133 @@
   ],
   "cards": [
     {
+      "id": "SW-065",
+      "p": "shipward",
+      "title": "The timing tests measure the machine, not the property",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "S",
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/the-timing-tests",
+      "commit": "e5da699",
+      "created": "2026-08-11T09:50:13.340Z",
+      "pushed": null,
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-11T10:47:01.794Z",
+        "sha": "e5da699",
+        "dirty": true,
+        "ms": 65211
+      }
+    },
+    {
+      "id": "SW-064",
+      "p": "shipward",
+      "title": "The desk's PUT can define a check, and done() then executes it",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "review",
+      "claude": "done",
+      "branch": null,
+      "commit": "e70d82f",
+      "created": "2026-08-11T09:27:12.952Z",
+      "pushed": null,
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-11T10:50:00.946Z",
+        "sha": "e70d82f",
+        "dirty": true,
+        "ms": 19093
+      }
+    },
+    {
+      "id": "SW-063",
+      "p": "shipward",
+      "title": "A README that argues, and a launch strategy",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/a-readme-that",
+      "commit": null,
+      "created": "2026-08-11T08:33:41.937Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-062",
+      "p": "shipward",
+      "title": "Ship the mark as a standalone asset, with its hex pinned to the tokens",
+      "type": "chore",
+      "pri": "P3",
+      "effort": "S",
+      "status": "review",
+      "claude": "done",
+      "branch": "chore/ship-the-mark",
+      "commit": "6b47ce1",
+      "created": "2026-08-05T16:16:05.156Z",
+      "pushed": null,
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-05T16:18:23.984Z",
+        "sha": "6b47ce1",
+        "dirty": false,
+        "ms": 22059
+      }
+    },
+    {
+      "id": "SW-061",
+      "p": "shipward",
+      "title": "Apply the logo — replace the placeholder square on both surfaces",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "S",
+      "status": "review",
+      "claude": "done",
+      "branch": "feat/apply-the-logo",
+      "commit": "8d7e052",
+      "created": "2026-08-04T05:18:55.774Z",
+      "pushed": null,
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-04T05:24:58.131Z",
+        "sha": "8d7e052",
+        "dirty": false,
+        "ms": 18389
+      }
+    },
+    {
       "id": "SW-060",
       "p": "shipward",
       "title": "A check that spans a laptop sleep is killed, and its duration is a lie",
@@ -1179,6 +1306,96 @@
   ],
   "feed": [
     {
+      "t": "2026-08-11T10:50:00.946Z",
+      "p": "shipward",
+      "msg": "SW-064 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T10:47:01.794Z",
+      "p": "shipward",
+      "msg": "SW-065 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T09:50:21.759Z",
+      "p": "shipward",
+      "msg": "SW-065 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T09:50:13.340Z",
+      "p": "shipward",
+      "msg": "You added SW-065 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T09:30:35.510Z",
+      "p": "shipward",
+      "msg": "SW-064 sent back to Backlog — it is not fixed, only annotated",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T09:29:57.632Z",
+      "p": "shipward",
+      "msg": "SW-064 handed back over a failing check — the override is on the card",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T09:27:12.952Z",
+      "p": "shipward",
+      "msg": "You added SW-064 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T08:33:47.113Z",
+      "p": "shipward",
+      "msg": "SW-063 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-11T08:33:41.937Z",
+      "p": "shipward",
+      "msg": "You added SW-063 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-05T16:18:23.985Z",
+      "p": "shipward",
+      "msg": "SW-062 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-05T16:16:12.698Z",
+      "p": "shipward",
+      "msg": "SW-062 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-05T16:16:05.156Z",
+      "p": "shipward",
+      "msg": "You added SW-062 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-04T05:24:58.131Z",
+      "p": "shipward",
+      "msg": "SW-061 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-04T05:19:00.619Z",
+      "p": "shipward",
+      "msg": "SW-061 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-04T05:18:55.774Z",
+      "p": "shipward",
+      "msg": "You added SW-061 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-03T08:53:50.638Z",
       "p": "shipward",
       "msg": "Reconciled with git — 15 cards corrected from the repository",
@@ -2287,95 +2504,11 @@
       "p": "shipward",
       "msg": "You added SW-008 to Backlog — it is on the list",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:25:44.607Z",
-      "p": "shipward",
-      "msg": "You added SW-009 to Backlog — it is on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:15:42.539Z",
-      "p": "shipward",
-      "msg": "SW-006 sent back to Backlog",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:06:49.615Z",
-      "p": "shipward",
-      "msg": "SW-006 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:06:49.615Z",
-      "p": "shipward",
-      "msg": "You added SW-007 to Backlog — it is on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:06:49.615Z",
-      "p": "shipward",
-      "msg": "SW-005 sent back to Backlog",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:02:00Z",
-      "p": "shipward",
-      "msg": "SW-005 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T14:41:00Z",
-      "p": "shipward",
-      "msg": "SW-001 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T13:18:00Z",
-      "p": "shipward",
-      "msg": "You added SW-005 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T13:18:00Z",
-      "p": "shipward",
-      "msg": "You added SW-004 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T13:18:00Z",
-      "p": "shipward",
-      "msg": "You added SW-003 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T13:04:00Z",
-      "p": "shipward",
-      "msg": "SW-001 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T12:52:00Z",
-      "p": "shipward",
-      "msg": "SW-002 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T12:47:00Z",
-      "p": "shipward",
-      "msg": "You added SW-002 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T12:29:17Z",
-      "p": "shipward",
-      "msg": "You added SW-001 to Backlog — it's on the list",
-      "by": "claude"
     }
   ],
   "mcp": {
-    "lastSeen": "2026-08-03T06:13:30.762Z",
-    "pid": 33655
+    "lastSeen": "2026-08-11T09:31:05.186Z",
+    "pid": 71691
   },
-  "rev": 7
+  "rev": 28
 }

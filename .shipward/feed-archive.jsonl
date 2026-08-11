@@ -112,3 +112,17 @@
 {"t":"2026-07-28T14:18:52.470Z","p":"shipward","msg":"SW-033 handed to Claude Code — queued","by":"claude"}
 {"t":"2026-07-01T00:00:00Z","p":"test","msg":"seeded","by":"user"}
 {"t":"2026-07-28T14:23:55.668Z","p":"shipward","msg":"You added SW-034 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T12:29:17Z","p":"shipward","msg":"You added SW-001 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T12:47:00Z","p":"shipward","msg":"You added SW-002 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T12:52:00Z","p":"shipward","msg":"SW-002 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-25T13:04:00Z","p":"shipward","msg":"SW-001 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-25T13:18:00Z","p":"shipward","msg":"You added SW-003 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T13:18:00Z","p":"shipward","msg":"You added SW-004 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T13:18:00Z","p":"shipward","msg":"You added SW-005 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-25T14:41:00Z","p":"shipward","msg":"SW-001 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-25T15:02:00Z","p":"shipward","msg":"SW-005 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-25T15:06:49.615Z","p":"shipward","msg":"SW-005 sent back to Backlog","by":"claude"}
+{"t":"2026-07-25T15:06:49.615Z","p":"shipward","msg":"You added SW-007 to Backlog — it is on the list","by":"claude"}
+{"t":"2026-07-25T15:06:49.615Z","p":"shipward","msg":"SW-006 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-25T15:15:42.539Z","p":"shipward","msg":"SW-006 sent back to Backlog","by":"claude"}
+{"t":"2026-07-25T15:25:44.607Z","p":"shipward","msg":"You added SW-009 to Backlog — it is on the list","by":"claude"}

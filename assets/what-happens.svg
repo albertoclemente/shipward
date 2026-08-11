@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 300" width="880" height="300" role="img" aria-label="The agent claims a task is done. Shipward runs the check you declared. If it passes the card moves and the proof is saved. If it fails the card stays put and the error is saved on it.">
+  <style>
+    .ink   { fill: #201e1d; }
+    .muted { fill: #605d5d; }
+    .paper { fill: #eae9e9; }
+    .h     { font: 800 17px "Archivo", system-ui, sans-serif; letter-spacing: -0.01em; }
+    .b     { font: 400 14px system-ui, sans-serif; }
+    .m     { font: 600 11.5px ui-monospace, Menlo, monospace; letter-spacing: 0.04em; }
+    .lbl   { font: 800 10.5px "Archivo", system-ui, sans-serif; letter-spacing: 0.11em; }
+  </style>
+
+  <!-- 1. the claim -->
+  <rect x="14" y="92" width="212" height="106" class="paper" stroke="#bab6b6"/>
+  <rect x="14" y="92" width="4" height="106" fill="#605d5d"/>
+  <text x="34" y="120" class="lbl muted">YOUR AGENT SAYS</text>
+  <text x="34" y="148" class="h ink">“Fixed it.</text>
+  <text x="34" y="170" class="h ink">Tests pass.”</text>
+  <text x="34" y="190" class="b muted">Confident. Maybe true.</text>
+
+  <path d="M232 145 L280 145" stroke="#201e1d" stroke-width="2"/>
+  <path d="M274 139 L282 145 L274 151 Z" fill="#201e1d"/>
+
+  <!-- 2. the check -->
+  <rect x="288" y="72" width="212" height="146" fill="#ffffff" stroke="#201e1d" stroke-width="2"/>
+  <text x="308" y="100" class="lbl" fill="#ae1800">SHIPWARD RUNS</text>
+  <rect x="308" y="112" width="172" height="30" fill="#201e1d"/>
+  <text x="320" y="132" class="m" fill="#f3f2f2">npm test</text>
+  <text x="308" y="164" class="b muted">the command you</text>
+  <text x="308" y="182" class="b muted">declared once, run</text>
+  <text x="308" y="200" class="b muted">at the moment of the claim</text>
+
+  <!-- fork -->
+  <path d="M506 145 L546 145 L546 77 L586 77" fill="none" stroke="#1a7f43" stroke-width="2"/>
+  <path d="M580 71 L588 77 L580 83 Z" fill="#1a7f43"/>
+  <path d="M506 145 L546 145 L546 218 L586 218" fill="none" stroke="#b3341a" stroke-width="2"/>
+  <path d="M580 212 L588 218 L580 224 Z" fill="#b3341a"/>
+  <text x="512" y="100" class="m" fill="#1a7f43">passes</text>
+  <text x="512" y="196" class="m" fill="#b3341a">fails</text>
+
+  <!-- 3a. passes -->
+  <rect x="594" y="24" width="272" height="106" fill="#dcf3e4" stroke="#1a7f43"/>
+  <rect x="594" y="24" width="4" height="106" fill="#1a7f43"/>
+  <text x="614" y="50" class="lbl" fill="#12602f">THE CARD MOVES</text>
+  <text x="614" y="74" class="h" fill="#0b2e1a">Ready for you</text>
+  <text x="614" y="96" class="b" fill="#12602f">and the proof is saved with it —</text>
+  <text x="614" y="114" class="b" fill="#12602f">including which version it was true of</text>
+
+  <!-- 3b. fails -->
+  <rect x="594" y="174" width="272" height="106" fill="#fde3dd" stroke="#b3341a"/>
+  <rect x="594" y="174" width="4" height="106" fill="#b3341a"/>
+  <text x="614" y="200" class="lbl" fill="#8c2a15">THE CARD DOES NOT MOVE</text>
+  <text x="614" y="224" class="h" fill="#3d0f06">Still in progress</text>
+  <text x="614" y="246" class="b" fill="#8c2a15">and the failure is written onto the card,</text>
+  <text x="614" y="264" class="b" fill="#8c2a15">where the next session will read it</text>
+</svg>

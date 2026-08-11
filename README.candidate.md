@@ -4,6 +4,8 @@
 
 ### A project board for people who work with AI coding agents — that checks the agent's work instead of taking its word for it.
 
+<img src="assets/hero.jpg" alt="Cards flowing left to right across a board. At the last gate two cards pass through marked with a tick; one is stopped at the gate marked with a cross." width="100%">
+
 You use Shipward like any kanban board: cards for what needs doing, columns for
 where each one is. Your AI agent uses the very same board as its memory — it reads it when a
 session starts, and writes to it as it works.
@@ -40,8 +42,6 @@ in flight anywhere, what's been waiting on you longest, and which projects have 
 
 **Nothing to sign up for.** It's two files inside your own repo, committed alongside your
 code. No account, no server, no database, nothing sent anywhere.
-
-<img src="assets/one-file.svg" alt="You, Claude Code and any other agent all read and write the same two files inside your repo, and git checks those files against what actually happened." width="100%">
 
 ---
 

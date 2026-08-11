@@ -80,6 +80,13 @@ const put = async (body, ifMatch) => fetch(`${base}/api/tracker`, {
   body: typeof body === 'string' ? body : JSON.stringify(body),
 });
 
+// The document and the etag it was read under, which is what a real client
+// holds when it writes — and what SW-064's guard compares against.
+const currentDoc = async () => {
+  const res = await fetch(`${base}/api/tracker`);
+  return { doc: await res.json(), etag: res.headers.get('etag') };
+};
+
 test('GET returns the tracker', async () => {
   const res = await fetch(`${base}/api/tracker`);
   assert.equal(res.status, 200);
@@ -303,4 +310,52 @@ test('the desk serves its favicon as an image, not as text', async () => {
 test('the desk page asks for it', async () => {
   const html = await (await fetch(`${base}/`)).text();
   assert.match(html, /<link rel="icon" type="image\/svg\+xml" href="favicon\.svg">/);
+});
+
+/* ── SW-064: a check is a command, and PUT may not write one ── */
+
+test('PUT cannot introduce a check — that would be remote code execution', async () => {
+  // Reproduced before the fix: this exact request returned 200, and the next
+  // done() ran /bin/sh. shell:false is no defence when the argv IS a shell.
+  const { doc, etag } = await currentDoc();
+  doc.projects[0].checks = { default: ['/bin/sh', '-c', 'echo INJECTED > /tmp/shipward-should-not-exist'] };
+  const res = await put(doc, etag);
+  assert.equal(res.status, 403);
+  const { error } = await res.json();
+  assert.match(error, /a check is a command this server will run/);
+
+  const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(onDisk.projects[0].checks, undefined, 'nothing was written');
+});
+
+test('PUT cannot quietly alter a check that already exists', async () => {
+  const seeded = seed();
+  seeded.projects[0].checks = { default: ['node', '-v'] };
+  await writeFile(tracker, JSON.stringify(seeded, null, 2) + '\n');
+
+  const { doc, etag } = await currentDoc();
+  doc.projects[0].checks.default = ['node', '-e', 'require("child_process").execSync("id")'];
+  const res = await put(doc, etag);
+  assert.equal(res.status, 403);
+
+  const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.deepEqual(onDisk.projects[0].checks.default, ['node', '-v'], 'the declared check is untouched');
+});
+
+test('an ordinary write still round-trips a board that HAS checks', async () => {
+  // The guard compares against disk rather than rejecting the key outright, so
+  // a faithful round-trip of what the client just read must keep working — or
+  // every drag on a checked project would be refused.
+  const seeded = seed();
+  seeded.projects[0].checks = { default: ['node', '-v'] };
+  await writeFile(tracker, JSON.stringify(seeded, null, 2) + '\n');
+
+  const { doc, etag } = await currentDoc();
+  doc.cards[0].status = 'review';
+  const res = await put(doc, etag);
+  assert.equal(res.status, 200);
+
+  const onDisk = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.equal(onDisk.cards[0].status, 'review');
+  assert.deepEqual(onDisk.projects[0].checks.default, ['node', '-v'], 'and the check survived the round trip');
 });

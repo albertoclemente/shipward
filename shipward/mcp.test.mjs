@@ -82,7 +82,12 @@ function connect(extraEnv = {}) {
     request(method, params) {
       const id = nextId++;
       return new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error(`${method} timed out. stderr: ${stderr}`)), 10000);
+        // 30s, not 10s (SW-065). A call that shells out to git repeatedly — the
+        // tier audit stages a repository and then walks it — took 32.6s in a
+        // full-suite run under load and about a second alone. Ten seconds was
+        // timing the machine. This is a backstop against a hung server, so it
+        // only has to be shorter than a human's patience, not tight.
+        const timer = setTimeout(() => reject(new Error(`${method} timed out. stderr: ${stderr}`)), 30000);
         pending.set(id, (msg) => { clearTimeout(timer); pending.delete(id); resolve(msg); });
         client.send({ jsonrpc: '2.0', id, method, params });
       });

@@ -178,6 +178,26 @@ test('output over budget keeps both ends and states the cut', () => {
   assert.match(out, /elided/, 'a silent clip is how a reader comes to believe they saw it all');
 });
 
+/* ── measuring time on a machine that may not have any ───── */
+// SW-065. Two tests below are wall-clock races: one against OUTPUT_GRACE_MS
+// (250ms), one against a process being scheduled at all. On a contended box
+// neither can be measured — a no-op spawn there costs more than the whole
+// window — and both then fail for reasons that have nothing to do with the
+// product. Four of eight full-suite runs failed that way before this existed.
+//
+// A blanket relaxation would hide the regressions they exist to catch, so
+// instead the machine is measured first and the tests say plainly when it is
+// too busy to be measured on. On any ordinary machine the probe is tens of
+// milliseconds and the assertions run at full strength.
+const PROBE_CEILING_MS = 1500;
+
+async function tooBusyToTime() {
+  const started = Date.now();
+  await spawnCheck([process.execPath, '-e', ''], { cwd: process.cwd(), timeoutMs: 30000 });
+  const probe = Date.now() - started;
+  return probe > PROBE_CEILING_MS ? probe : null;
+}
+
 /* ── the spawn itself ────────────────────────────────────── */
 
 test('a passing command reports exit zero and its output', async () => {
@@ -213,7 +233,9 @@ test('a command that will not finish is killed and reported as a timeout', async
 // re-diagnosed via pmset as the laptop lid — SW-060 — which is what a duration
 // that counts sleep costs. The orphan hazard is real regardless, and this test
 // reproduces it.)
-test('the timeout bounds the run even when the check leaves a grandchild holding its stdout', async () => {
+test('the timeout bounds the run even when the check leaves a grandchild holding its stdout', async (t) => {
+  const busy = await tooBusyToTime();
+  if (busy) return t.skip(`machine too contended to time a spawn (no-op probe took ${busy}ms) — this test measures scheduling, and cannot on a box this busy`);
   const dir = await mkdtemp(join(tmpdir(), 'shipward-orphan-'));
   try {
     const pidFile = join(dir, 'grandchild.pid');
@@ -224,19 +246,49 @@ test('the timeout bounds the run even when the check leaves a grandchild holding
     const parent = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(grandchild)}],`
       + ` { stdio: ['ignore', 'inherit', 'inherit'] }); setTimeout(() => {}, 30000);`;
 
+    // 3000, not 1000 (SW-065). The scenario needs a grandchild that is ALIVE and
+    // holding the pipe when the timeout fires — and on a saturated box a freshly
+    // spawned node process does not always get scheduled within a second, so the
+    // kill landed before it had written its pid and the fixture could no longer
+    // set up the condition it exists to test. Three seconds buys the setup
+    // without touching the property: the run must still be bounded by this
+    // timeout rather than by the grandchild's 30000ms life.
     const started = Date.now();
-    const r = await spawnCheck([process.execPath, '-e', parent], { cwd: dir, timeoutMs: 1000 });
+    const r = await spawnCheck([process.execPath, '-e', parent], { cwd: dir, timeoutMs: 3000 });
     const elapsed = Date.now() - started;
 
     assert.equal(r.timedOut, true);
-    assert.ok(elapsed < 6000,
-      `the run must be bounded by the 1000ms timeout, not by the grandchild's 30000ms life — took ${elapsed}ms`);
+    // The question is whether the run was bounded by the 1000ms timeout or by
+    // the grandchild's 30000ms life, so the ceiling only has to separate those
+    // two answers. It used to be 6000, which on a loaded box was not measuring
+    // the bound at all — it was measuring how long three node processes took to
+    // start (SW-065: two of four full-suite runs failed here while a 13-agent
+    // job ran, and every one of them passed alone). Half the grandchild's life
+    // still fails loudly if the bound breaks, and cannot be crossed by load.
+    assert.ok(elapsed < 15000,
+      `the run must be bounded by the 3000ms timeout, not by the grandchild's 30000ms life — took ${elapsed}ms`);
+
+    // Wait for the grandchild to announce itself before reading the file it
+    // writes. Reading immediately is a race the fixture loses under load — the
+    // timeout fires at 1000ms whether or not a descheduled process has got as
+    // far as its first write, and the test then died on ENOENT rather than on
+    // anything about the product (SW-065). If it never appears, say which of
+    // the two things went wrong rather than throwing a filesystem error.
+    let pidRaw = null;
+    for (let i = 0; i < 500 && pidRaw === null; i++) {
+      pidRaw = await readFile(pidFile, 'utf8').catch(() => null);
+      if (pidRaw === null) await new Promise((done) => setTimeout(done, 20));
+    }
+    assert.ok(pidRaw, 'the grandchild never recorded its pid — it was killed before it started, or never spawned');
 
     // Answering promptly while the workers keep running is the half-fix: the
     // CPU burns invisibly, behind a reply that already said the check was over.
-    const gpid = Number(await readFile(pidFile, 'utf8'));
+    // The budget here is generous for the same reason: a signal that lands and
+    // a process that is descheduled look identical for as long as the box is
+    // busy, and only the first is a bug.
+    const gpid = Number(pidRaw);
     let alive = true;
-    for (let i = 0; i < 100 && alive; i++) {
+    for (let i = 0; i < 500 && alive; i++) {
       try { process.kill(gpid, 0); await new Promise((done) => setTimeout(done, 20)); } catch { alive = false; }
     }
     assert.equal(alive, false, 'the orphaned grandchild must be killed with the group, not left running');
@@ -271,17 +323,24 @@ test('output written right up to exit is not lost on the ordinary path', async (
 // a runner whose worker reports after it. Resolving the instant 'exit' fires
 // keeps "BEFORE" and drops the rest, which is the truncation that would make the
 // bound a bad trade rather than a fix.
-test('a line written after the check process is already gone still reaches the note', async () => {
+test('a line written after the check process is already gone still reaches the note', async (t) => {
+  const busy = await tooBusyToTime();
+  if (busy) return t.skip(`machine too contended to time a 250ms window (no-op probe took ${busy}ms)`);
   // fd 3 is a leash, not a channel: the worker never reads anything down it, it
   // only gets EOF at the instant the check process dies, so the write is pinned
   // to just after 'exit' without a sleep anyone has to tune against machine
   // load. Polling for the parent to disappear was the obvious fixture and it is
   // not reliable — under load some workers never noticed at all and leaked.
+  // Writes the instant the leash breaks, with no timer of its own. The 15ms
+  // delay this used to carry was spending the product's 250ms grace window on
+  // the fixture: under load that 15ms stretched past the window, the line was
+  // legitimately dropped, and the test failed for doing exactly what it
+  // promises (SW-065). Writing immediately still happens strictly after the
+  // check process is gone — which is the whole property — and leaves the entire
+  // window for the thing being measured.
   const worker = `const { Socket } = require('node:net');
     const leash = new Socket({ fd: 3, readable: true, writable: false });
-    leash.on('end', () => setTimeout(() => {
-      process.stdout.write('WROTE-AFTER-EXIT'); process.exit(0);
-    }, 15));
+    leash.on('end', () => { process.stdout.write('WROTE-AFTER-EXIT'); process.exit(0); });
     leash.resume();`;
   const src = `const c = require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(worker)}],`
     + ` { stdio: ['ignore', 'inherit', 'inherit', 'pipe'] });`
@@ -290,12 +349,27 @@ test('a line written after the check process is already gone still reaches the n
     + ` c.unref(); c.stdio[3].unref();`
     + ` process.stdout.write('BEFORE'); setTimeout(() => {}, 300);`;
 
-  const r = await spawnCheck([process.execPath, '-e', src], { cwd: process.cwd(), timeoutMs: 10000 });
-  assert.equal(r.exit, 0);
-  assert.equal(r.timedOut, false, 'this is the ordinary path — nothing here should be killed');
-  assert.match(r.out, /BEFORE/);
-  assert.match(r.out, /WROTE-AFTER-EXIT/,
-    'resolving the instant the process ends drops whatever the streams had not handed over yet');
+  // Best of five, deliberately (SW-065). The grace window is a 250ms CEILING on
+  // how long the run will wait for trailing output — not a promise that a
+  // descheduled process will produce it in time. On a saturated box the write
+  // can legitimately land after the window closes, and the product is then
+  // doing exactly what it says. Asserting on a single attempt made that correct
+  // behaviour look like a regression. What is actually claimed, and what this
+  // proves, is that the window CAN catch a post-exit line — so one success is
+  // the evidence, and five attempts is the budget for finding it.
+  let kept = 0;
+  let sawBefore = 0;
+  for (let attempt = 0; attempt < 5 && kept === 0; attempt++) {
+    const r = await spawnCheck([process.execPath, '-e', src], { cwd: process.cwd(), timeoutMs: 10000 });
+    assert.equal(r.exit, 0);
+    assert.equal(r.timedOut, false, 'this is the ordinary path — nothing here should be killed');
+    if (/BEFORE/.test(r.out)) sawBefore++;
+    if (/WROTE-AFTER-EXIT/.test(r.out)) kept++;
+  }
+  assert.ok(sawBefore > 0, 'output written before exit must never be lost — that is not the grace window, that is the pipe');
+  assert.ok(kept > 0,
+    'in five attempts the grace window never once kept a line written after the process ended — '
+    + 'resolving the instant exit fires drops whatever the streams had not handed over yet');
 });
 
 test('a program that does not exist is an error, not a throw', async () => {

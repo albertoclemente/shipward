@@ -17,6 +17,34 @@
   ],
   "cards": [
     {
+      "id": "SW-069",
+      "p": "shipward",
+      "title": "No CI, and the hooks would deadlock one",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "M",
+      "status": "review",
+      "claude": "done",
+      "branch": "chore/no-ci-and",
+      "commit": null,
+      "created": "2026-08-12T14:57:55.607Z",
+      "pushed": null,
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-12T15:03:16.120Z",
+        "sha": "53131a3",
+        "dirty": false,
+        "ms": 19079
+      }
+    },
+    {
       "id": "SW-068",
       "p": "shipward",
       "title": "Hand-appending to notes.jsonl can corrupt it, and the checks filter the damage away",
@@ -1377,6 +1405,24 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T15:03:16.120Z",
+      "p": "shipward",
+      "msg": "SW-069 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-12T14:57:55.738Z",
+      "p": "shipward",
+      "msg": "SW-069 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-12T14:57:55.607Z",
+      "p": "shipward",
+      "msg": "You added SW-069 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-12T14:51:49.557Z",
       "p": "shipward",
       "msg": "SW-068 moved to Review — give it a look",
@@ -2557,29 +2603,11 @@
       "p": "shipward",
       "msg": "SW-004 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:09:04.383Z",
-      "p": "shipward",
-      "msg": "SW-004 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:09:00.383Z",
-      "p": "shipward",
-      "msg": "SW-003 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:04:45.788Z",
-      "p": "shipward",
-      "msg": "SW-003 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 37
+  "rev": 40
 }

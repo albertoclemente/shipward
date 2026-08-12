@@ -350,6 +350,28 @@ async function stop(input) {
 /* ── dispatch ────────────────────────────────────────────── */
 const HOOKS = { 'session-start': sessionStart, prompt, 'pre-edit': preEdit, stop };
 
+// RULE 3, added by SW-069: silent under CI.
+//
+// `stop` refuses to end a session while any card is claude/working. On a runner
+// that is a false positive by construction — the working card belongs to
+// somebody's local session, the runner started nothing and has nothing to hand
+// back — and a Claude-in-CI job would be told it may not stop. Verified against
+// this board: the hook returned decision:block naming a card a human was
+// holding.
+//
+// This is not the tool switching off its own guard. The guard exists to stop a
+// HUMAN session drifting away from the board over a long sitting; a runner has
+// no board session to protect, and injecting a standup into a PR review is
+// noise at best. The board is still the authority in CI — `done` still runs the
+// check there, and the git audit still corrects the board. What stops is the
+// nagging.
+//
+// GITHUB_ACTIONS is the specific signal; CI is the conventional one every
+// provider sets. SHIPWARD_HOOKS=off is the manual escape hatch, so a developer
+// can silence them for one command without editing settings.json.
+const inCI = process.env.CI === 'true' || process.env.GITHUB_ACTIONS === 'true';
+if (inCI || process.env.SHIPWARD_HOOKS === 'off') quiet();
+
 try {
   const run = HOOKS[process.argv[2]];
   if (!run) quiet();

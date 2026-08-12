@@ -1,0 +1,75 @@
+# Claude reviews every pull request, and merges none of them.
+#
+# The review is advice. `test.yml` is the gate. Keeping those separate is not
+# bureaucracy here — it is the product's own argument applied to its own repo:
+# a claim needs a check the claimant did not author, so nothing merges because
+# the agent approved.
+#
+# `permissions` is read-only on contents on purpose. This job comments; the
+# job that can push is claude.yml, and only a human asking for it starts that.
+name: claude-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    # A pull request from a fork gets no secrets, so this could not run anyway —
+    # said out loud rather than left to fail obscurely. Fork PRs are reviewed by
+    # a human, which is the correct answer for untrusted code regardless of what
+    # the runner could be made to do.
+    if: github.event.pull_request.head.repo.full_name == github.repository && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0    # the reviewer reads history; a shallow clone hides it
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: true
+          # Static text only. Nothing from the PR title, body or branch name is
+          # interpolated here — the action supplies that context itself, and
+          # pasting attacker-controlled strings into a prompt is how a review
+          # job becomes an instruction channel.
+          prompt: |
+            Review this pull request against the standards in CONTRIBUTING.md.
+
+            The rule that decides this review: NOTHING MAY CLAIM MORE THAN IT CAN
+            PROVE. Concretely, flag any change that
+
+              - makes the tool assert something it has not checked, or lets a
+                card gain a status nothing verified;
+              - collapses "I don't know" into a default — git that cannot be
+                read is not a repo with no branches, a note with no sha is not
+                a fresh note;
+              - truncates, caps or samples without reporting what was dropped;
+              - lets a check be defined anywhere but a human-edited project
+                config, or lets anything reaching the desk port cause code to
+                run;
+              - loses note history, or writes .shipward/notes.jsonl as anything
+                other than one JSON object per line ending in a newline.
+
+            Then the ordinary things: correctness, a test that asserts the
+            property rather than the machine's timing, and whether the comments
+            explain why rather than what.
+
+            Be specific and be brief. Quote the line. If the change is good, say
+            so in one sentence and stop — a review that manufactures findings to
+            look thorough trains the author to skip reviews.
+
+            You are reviewing, not merging and not fixing. Do not push commits,
+            do not approve, and do not touch the board in .shipward/.
+          claude_args: |
+            --allowedTools "Bash(node --test),Bash(git log:*),Bash(git diff:*),Bash(git show:*)"

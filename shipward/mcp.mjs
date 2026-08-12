@@ -6,8 +6,8 @@
 // install or keep current. stdout carries protocol frames ONLY — every log line
 // goes to stderr, because one stray console.log corrupts the stream.
 //
-// The five tools mirror the five slash commands in .claude/commands. Each does
-// the tracker half of its command; git, and the work itself, stay with Claude.
+// The tools mirror the slash commands in .claude/commands. Each does the
+// tracker half of its command; git, and the work itself, stay with Claude.
 // Every rule they apply — id allocation, branch naming, status transitions,
 // feed copy — is imported from public/lib.js, the same module the board runs,
 // so the desk and Claude cannot drift apart.
@@ -187,6 +187,27 @@ const TOOLS = [
       additionalProperties: false,
     },
     run: startCard,
+  },
+  {
+    name: 'note',
+    title: 'Remember something',
+    description:
+      'Write to a card\'s memory WITHOUT moving it. Use it the moment you decide something, reproduce something, or get bitten — a decision taken mid-task, a finding that belongs on a card you are not working, the reason you did NOT do the obvious thing. Every other tool attaches a note to a transition, so anything learned between transitions had nowhere to go; this is where it goes. The entry is appended and dated, never rewritten.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        id: str('Card id the entry belongs to. File a finding under the card that FOUND it, not the code it concerns.'),
+        text: str('What you learned, decided, or hit. Write it for the session that reads it cold in three weeks.'),
+        kind: {
+          type: 'string', enum: ['open', 'finding', 'decision', 'evidence', 'outcome', 'brief'],
+          description: 'What kind of entry this is. State it — a stated kind is a fact; an omitted one is classified from the text and can misfile (a note QUOTING the word GOTCHA reads as a finding).',
+        },
+        resolves: str('Card id whose open items this entry settles, e.g. SW-011. The only way to close an open question raised on ANOTHER card.'),
+      },
+      required: ['id', 'text'],
+      additionalProperties: false,
+    },
+    run: noteCard,
   },
   {
     name: 'done',
@@ -396,6 +417,45 @@ async function logCard({ title, type = 'feature', pri = 'P2', effort = 'M', note
   }, { signal });
   return `${created.id} added to ${created.project.name} backlog — ${text}`;
 }
+
+// Memory without a transition (SW-068).
+//
+// log, start and done each attach a note to a card MOVING. Anything learned
+// between moves — a decision taken mid-task, a finding that belongs on a card
+// you are not working — had nowhere to go, so it went in by hand, straight into
+// notes.jsonl. Two such hand appends broke the one-object-per-line invariant
+// and made 2 entries invisible to every reader until they were repaired. The
+// durable fix is not a better warning about hand-editing; it is removing the
+// reason to hand-edit.
+//
+// Writes through mutate() like everything else, so it takes the cross-process
+// lock, validates, journals the rev and feeds the desk.
+async function noteCard({ id, text, kind, resolves }, signal) {
+  const body = asText(text, 'text').trim();
+  if (!body) throw new ToolError('a note needs text — an empty entry is a write that teaches nothing');
+  let card;
+  await mutate((doc) => {
+    const found = findCard(doc, id);
+    found.note = appendedNote(found.note, found.created, entryOf(body, { kind, resolves }));
+    card = { id: found.id, p: found.p, status: found.status };
+    doc.feed = feedAdd(doc.feed, found.p, `${found.id} note — ${clipFeed(body)}`, nowIso(), 'claude');
+    return doc;
+  }, { signal });
+  // Says what it did NOT do: the whole point of this tool is that the card has
+  // not moved, and a reply that only said "noted" would leave that ambiguous.
+  return `Noted on ${card.id}. Status is unchanged (${card.status}) — this wrote to the memory, not the board.`;
+}
+
+// A feed line is a glance, not the note. Cut on a word so the tail of the feed
+// does not read as a truncated thought.
+const FEED_NOTE_MAX = 60;
+const clipFeed = (s) => {
+  const flat = s.replace(/\s+/g, ' ').trim();
+  if (flat.length <= FEED_NOTE_MAX) return flat;
+  const cut = flat.slice(0, FEED_NOTE_MAX);
+  const space = cut.lastIndexOf(' ');
+  return `${(space > 30 ? cut.slice(0, space) : cut).trimEnd()}…`;
+};
 
 // The other half of a recalled entry, and the half a text budget alone would
 // miss: refs() pulls every path an entry names, and a note that surveys a
@@ -897,7 +957,7 @@ const onWriteQueue = (fn) => {
   return run;
 };
 
-// SW-048. Everything above is the library — the six tools and the rules they
+// SW-048. Everything above is the library — the tools and the rules they
 // apply. Everything below is the SERVER, and it only starts when this file is
 // the process entry point.
 //

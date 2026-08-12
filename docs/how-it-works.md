@@ -17,7 +17,7 @@ that **it does not take the agent's word for anything it can check.**
 ```
 node shipward/serve.mjs     # the desk, http://localhost:4747
 node shipward/mcp.mjs       # the MCP server, for Claude Code
-node shipward/cli.mjs       # the same six tools, for anything else
+node shipward/cli.mjs       # the same tools, for anything else
 node shipward/fleet.mjs ~/projects   # every board you own, on one page
 node --test                 # 446 tests, zero dependencies
 ```
@@ -114,7 +114,7 @@ idempotent command.
 
 ## Not Claude-Code-shaped
 
-The hooks are Claude Code specific; the protocol is not. The same six tools are
+The hooks are Claude Code specific; the protocol is not. The same tools are
 an MCP server, a command line, and a JSON file you may edit by hand:
 
 ```bash
@@ -128,7 +128,7 @@ command one has and the other lacks is impossible by construction.
 
 **On MCP and tokens:** the usual argument against an MCP surface is schema cost.
 Measured 2026-08-01, this server's entire `tools/list` response is **7,363 bytes
-— about 1.8k tokens for all six tools**, which is parity with a CLI rather than
+— about 2.2k tokens for the whole tool surface**, which is parity with a CLI rather than
 the 10–50k that argument assumes. A test pins the ceiling so it stays true as
 the tools grow. (It has already grown: it was 6,843 bytes the day before, and
 `done` gained two arguments in between. Which is rather the point of the next

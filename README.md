@@ -49,6 +49,38 @@ check — not you, not the agent.
 
 ---
 
+## Your agent runs the board itself
+
+You are not the go-between. Shipward hands your agent six commands of its own — **read the
+board, search the memory, file a card, take a card, hand it back, reconcile with git** — and
+it uses them on its own, without being told to.
+
+It opens a session by reading the board. It files a card the moment it notices a bug it
+wasn't looking for. It takes a card, works, and hands it back through the gate. It writes
+down what it decided and what surprised it, then searches those notes weeks later.
+
+You don't maintain this board for your agent. You watch your agent keep it.
+
+---
+
+## And it becomes the project's memory
+
+None of that disappears when the session does.
+
+The board is two files inside your own repo, committed next to your code. So it outlives the
+end of a session, a context window that filled up, a machine you swapped, an agent you
+replaced. Three days later your agent opens the same project and reads its own record back:
+what it decided, what it tried, what bit it — **and which of those notes have stopped being
+true since.**
+
+That is the difference between a to-do list and a memory. A to-do list tells your agent what
+to do next. This tells it everything it already learned about your project, and how much of
+it still holds.
+
+You read the same record it does.
+
+---
+
 ## The same idea, in four places
 
 Once the agent stops being the source of truth about its own work, one question has to be
@@ -92,9 +124,8 @@ board is **arbitration**. That's the difference.
 back to *done* means a command passed — not that the agent believed it had. Not
 unsupervised. **Checked.**
 
-**Your first hour back isn't archaeology.** The agent reads the board when it starts, so you
-don't re-explain the project. It picks up something it left three days ago, including what it
-decided, what it tried, and what bit it.
+**Your first hour back isn't archaeology.** You stop re-explaining the project, and your agent
+stops starting from nothing.
 
 **A memory that ages honestly.** Old notes are marked old. That is rarer than it sounds.
 
@@ -135,9 +166,8 @@ A tool that argues against overconfidence shouldn't be overconfident about itsel
 - **A check is only as good as the command you pick.** A flaky test will block good work.
 - **Until you set a check, it proves nothing** — cards move on the agent's word, like
   everywhere else.
-- **It can't express "this is blocked by that."** No dependency graphs. If you need those at
-  scale, [Beads](https://github.com/gastownhall/beads) is genuinely better and worth your
-  time.
+- **It can't express "this is blocked by that."** No dependency graphs, no ready-work queue.
+  If you're coordinating several agents across hundreds of issues, this isn't that tool.
 - **One person, one machine.** No accounts, no permissions, no team features. The board runs
   unauthenticated on your own computer — right for a laptop, wrong for a shared server. It
   will not let anything reaching that port install a command for it to run, but everything

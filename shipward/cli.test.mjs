@@ -181,11 +181,11 @@ test('errors go to stderr and results to stdout, so `shipward standup > file` is
 /* ── the token claim this card exists to keep honest ─────── */
 
 test('the whole MCP tool surface stays close to a CLI in token cost', async () => {
-  // Beads' MCP README recommends CLI+hooks over MCP for Claude Code on token
-  // grounds — "~1-2k tokens vs 10-50k for MCP schemas". Measured 2026-07-31,
-  // this server's tools/list is 6,843 bytes for all six tools: ~1.7k tokens,
-  // i.e. parity with their CLI. That is a claim worth making in the README and
-  // therefore a claim worth a test, so it cannot quietly stop being true.
+  // The standing argument against MCP for Claude Code is token cost — schemas
+  // said to run 10-50k against ~1-2k for a CLI. Measured 2026-07-31, this
+  // server's tools/list is 6,843 bytes for all six tools: ~1.7k tokens, i.e.
+  // parity with a CLI. That is a claim worth making out loud and therefore a
+  // claim worth a test, so it cannot quietly stop being true.
   const payload = JSON.stringify({ tools: TOOLS.map(({ run: _run, ...t }) => t) });
   assert.ok(payload.length < 12000,
     `the tool surface is ${payload.length} bytes (~${Math.round(payload.length / 4)} tokens) — past 12k it stops being at parity with a CLI`);

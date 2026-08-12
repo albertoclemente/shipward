@@ -4,6 +4,9 @@
 
 ### The project board that doesn't take your coding agent's word for it.
 
+**For one developer working with an AI coding agent.** Runs on your machine, lives in your
+repo, no account.
+
 <img src="assets/hero.jpg" alt="Cards flowing left to right across a board. At the last gate two cards pass through marked with a tick; one is stopped at the gate marked with a cross." width="100%">
 
 ---
@@ -138,9 +141,14 @@ waiting on you longest, which projects have gone quiet.
 
 ```bash
 git clone https://github.com/albertoclemente/shipward
-node shipward/setup.mjs ~/code/your-project    # wires it up, touches nothing else
+node shipward/setup.mjs ~/code/your-project --seed-from-branches
 node shipward/serve.mjs                        # open localhost:4747
 ```
+
+`--seed-from-branches` means **your board isn't empty on day one.** It files one card per
+branch that has unmerged work, using what git already knows — the branch name, its commits.
+Nothing is invented, and merged branches are left alone. Leave the flag off and setup just
+shows you what it *would* file.
 
 Then tell it what "working" means for that project — one line, once:
 
@@ -149,6 +157,9 @@ Then tell it what "working" means for that project — one line, once:
 ```
 
 That's it. Nothing gets marked done without passing it.
+
+Open a session and the first thing your agent sees is a standup — with the board already
+corrected wherever git could prove it wrong.
 
 Your board is two files inside your own repo, committed next to your code. No account, no
 database, nothing sent anywhere. Works with Claude Code out of the box, and with any agent

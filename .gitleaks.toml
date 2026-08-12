@@ -1,0 +1,30 @@
+# Secret scanning config.
+#
+#   gitleaks git --log-opts="--all" --redact
+#
+# Run it before making the repository public, and after any change that adds a
+# fixture or a doc example containing a token-shaped string.
+#
+# A full-history scan on 2026-08-12 returned 54 hits, every one a false positive
+# in third-party scaffolding that is no longer tracked: a truncated JWT header
+# used as a documentation example, and a CSV column of SHA-256 file hashes that
+# the generic-api-key heuristic reads as keys. They are allowlisted BY PATH AND
+# REASON below rather than by blanket-disabling the rule, so a real key landing
+# in one of those paths would still be found.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+description = "Generic API key"
+regex = '''(?i)(?:key|api|token|secret|client|passwd|password|auth|access)(?:[0-9a-z\-_\t .]{0,20})(?:[\s|']|[\s|"]){0,3}(?:=|>|:{1,3}=|\|\|:|<=|=>|:|\?=)(?:'|\"|\s|=|\x60){0,5}([0-9a-z\-_.=]{10,150})(?:['|\"|\n|\r|\s|\x60|;|\\]|$)'''
+entropy = 3.5
+keywords = ["key", "api", "token", "secret", "client", "passwd", "password", "auth", "access"]
+
+  [rules.allowlist]
+  regexTarget = "match"
+  # Documentation examples: the base64 of {"alg":"HS256","typ":"JWT"}, which is
+  # the same in every JWT ever issued and is not a credential.
+  regexes = ['''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9''']
+  # BMAD scaffolding manifests: a `hash` column of SHA-256 file digests.
+  paths = ['''_bmad/_config/files-manifest\.csv''']

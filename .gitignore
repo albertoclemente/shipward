@@ -24,3 +24,8 @@ _bmad/
 design_handoff_shipward/
 *.zip
 LAUNCH-STRATEGY.md
+
+# BMAD run output: specs generated during design, now stale in places (git.mjs
+# records the SPEC holding nine false statements). Kept on disk, not published —
+# shipping documentation known to be wrong is worse than shipping none.
+_bmad-output/

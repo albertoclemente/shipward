@@ -42,7 +42,24 @@ export const OUTPUT_BUDGET = 2000;
 // holds the pipe with a line yet to write, which a bare exit-resolve lost in
 // every one of 12 runs. Whichever event arrives first wins, so this is a
 // ceiling on the wait and not the wait itself.
-export const OUTPUT_GRACE_MS = 250;
+//
+// Raised 250 → 1000 by SW-070, and the reason is worth keeping because it says
+// what "measured" was worth. Every measurement above was taken on an 8-core
+// laptop, where it held even under deliberate saturation — 0/20 lost with 12
+// spinners running. The first GitHub ubuntu runner to see it, 2 cores running
+// four test workers, dropped a trailing stderr line on its very first job.
+//
+// The raise is close to free: on the ordinary path 'close' resolves first and
+// this timer never fires, so the extra 750ms is only ever paid when an orphan
+// really is holding the pipe — the pathological case the bound exists for, on a
+// check that has already run for seconds. What it buys is margin on every slow
+// or contended machine a real user might have, and the tail of a check's output
+// is the summary a human reads when it fails.
+//
+// The bound itself stays. SW-056 chose a bounded truncation over an unbounded
+// hang, and that trade is unchanged: on a starved enough machine a last line can
+// still be lost. Wider margin, same promise.
+export const OUTPUT_GRACE_MS = 1000;
 
 // SW-060. Every number in the kill path used to be wall clock, and a closed
 // laptop lid made all of them lies — twice, both diagnosed via pmset:

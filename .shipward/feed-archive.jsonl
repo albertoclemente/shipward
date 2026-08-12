@@ -130,3 +130,7 @@
 {"t":"2026-07-25T15:25:44.607Z","p":"shipward","msg":"SW-006 moved to Review — give it a look","by":"claude"}
 {"t":"2026-07-25T16:00:25.458Z","p":"shipward","msg":"SW-008 handed to Claude Code — queued","by":"claude"}
 {"t":"2026-07-25T16:04:15.190Z","p":"shipward","msg":"SW-003 handed to Claude Code — queued","by":"user"}
+{"t":"2026-07-25T16:04:33.907Z","p":"shipward","msg":"SW-003 sent back to Backlog","by":"user"}
+{"t":"2026-07-25T16:05:07.948Z","p":"shipward","msg":"SW-008 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T14:33:55.973Z","p":"shipward","msg":"SW-009 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-27T14:50:38.188Z","p":"shipward","msg":"SW-009 moved to Review — give it a look","by":"claude"}

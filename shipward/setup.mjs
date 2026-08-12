@@ -23,9 +23,12 @@
 // wired" and changes nothing, and a hand-edited settings.json keeps every key
 // it had. Exits non-zero on the first thing it will not do (no repo, no git).
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile, copyFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, copyFile, appendFile } from 'node:fs/promises';
 import { join, resolve, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { readGit, branchLog } from './git.mjs';
+import { seedCards, seedable, previewLines } from './seed.mjs';
+import { nextId } from './public/lib.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CENTRAL = resolve(HERE, '..');
@@ -39,10 +42,15 @@ const args = process.argv.slice(2);
 const flags = {};
 const positional = [];
 for (let i = 0; i < args.length; i++) {
-  if (args[i].startsWith('--')) flags[args[i].slice(2)] = args[++i];
-  else positional.push(args[i]);
+  if (!args[i].startsWith('--')) { positional.push(args[i]); continue; }
+  // A flag whose next token is another flag, or nothing, is a boolean. Without
+  // this, --seed-from-branches would swallow the path that follows it.
+  const next = args[i + 1];
+  if (next === undefined || next.startsWith('--')) flags[args[i].slice(2)] = true;
+  else flags[args[i].slice(2)] = args[++i];
 }
-if (!positional[0]) die('usage: node shipward/setup.mjs /path/to/repo [--name N] [--prefix PX] [--id slug] [--tag line]');
+if (!positional[0]) die('usage: node shipward/setup.mjs /path/to/repo [--name N] [--prefix PX] [--id slug] [--tag line] [--seed-from-branches]');
+const seedRequested = flags['seed-from-branches'] === true;
 
 const target = resolve(positional[0]);
 if (!existsSync(target)) die(`${target} does not exist`);
@@ -83,18 +91,72 @@ const writeJson = (path, obj) => writeFile(path, JSON.stringify(obj, null, 2) + 
 /* ── 1. the tracker ──────────────────────────────────────── */
 const shipDir = join(target, '.shipward');
 const trackerPath = join(shipDir, 'tracker.json');
+const notesPath = join(shipDir, 'notes.jsonl');
 await mkdir(shipDir, { recursive: true });
-if (existsSync(trackerPath)) {
+
+// Read git before writing anything: the preview at the end reports it whether
+// or not seeding was asked for, and a repo that cannot be read must say so
+// rather than silently look like a repo with no branches.
+const gitState = await readGit(target);
+const now = new Date().toISOString();
+
+let tracker = await readJson(trackerPath);
+if (tracker) {
   kept.push('.shipward/tracker.json (already exists — the board was not touched)');
 } else {
-  await writeJson(trackerPath, {
+  tracker = {
     version: 1,
     activeProject: id,
     projects: [{ id, name, tag, prefix }],
     cards: [],
-    feed: [{ t: new Date().toISOString(), p: id, msg: `${name} onboarded to Shipward — empty board, the memory starts now`, by: 'user' }],
+    feed: [{ t: now, p: id, msg: `${name} onboarded to Shipward — the memory starts now`, by: 'user' }],
+  };
+  await writeJson(trackerPath, tracker);
+  done.push(`.shipward/tracker.json — project "${name}" (${prefix}-…)`);
+}
+
+/* ── 1b. a first board, from what git already knows ──────── */
+let seeded = null;
+if (seedRequested) {
+  if (!gitState.ok) {
+    die(`--seed-from-branches needs a readable repository: ${gitState.reason}`);
+  }
+  const project = tracker.activeProject ?? id;
+  const cardPrefix = tracker.projects?.find((p) => p.id === project)?.prefix ?? prefix;
+
+  // A branch some card already names is not new work — seeding it again would
+  // put two cards on one branch, which is the board contradicting itself on the
+  // first screen. Re-running setup must be safe, and this is what makes it so.
+  const claimed = new Set((tracker.cards ?? []).map((c) => c.branch).filter(Boolean));
+  const candidates = seedable([...gitState.branches.values()]).filter((b) => !claimed.has(b.name));
+
+  const logs = {};
+  for (const b of candidates) logs[b.name] = await branchLog(b.name, gitState.trunk, target);
+
+  seeded = seedCards(candidates, {
+    project,
+    logs,
+    now,
+    // Ids are allocated against the board as it grows, so seeding into a board
+    // that already has cards continues its numbering instead of colliding.
+    nextIdFor: (taken) => nextId([...(tracker.cards ?? []), ...taken.map((tid) => ({ id: tid, p: project }))], cardPrefix),
   });
-  done.push(`.shipward/tracker.json — project "${name}" (${prefix}-…), empty board`);
+
+  if (seeded.cards.length) {
+    tracker.cards = [...seeded.cards, ...(tracker.cards ?? [])];
+    tracker.feed = [
+      { t: now, p: project, msg: `${seeded.cards.length} card${seeded.cards.length === 1 ? '' : 's'} seeded from unmerged branches — no sha recorded, the git audit fills those in`, by: 'user' },
+      ...(tracker.feed ?? []),
+    ].slice(0, 200);
+    await writeJson(trackerPath, tracker);
+    // One object per line, always ending in a newline: the next writer appends
+    // straight onto whatever this leaves behind (SW-068).
+    await appendFile(notesPath, seeded.notes.map((n) => JSON.stringify(n)).join('\n') + '\n', 'utf8');
+    done.push(`.shipward/tracker.json — ${seeded.cards.length} backlog card${seeded.cards.length === 1 ? '' : 's'} seeded from branches`);
+    done.push(`.shipward/notes.jsonl — ${seeded.notes.length} note${seeded.notes.length === 1 ? '' : 's'} recording what git held`);
+  } else {
+    kept.push('the board (no unmerged branch without a card — nothing to seed)');
+  }
 }
 if (!existsSync(join(shipDir, 'schema.json'))) {
   await copyFile(join(CENTRAL, '.shipward', 'schema.json'), join(shipDir, 'schema.json'));
@@ -186,5 +248,15 @@ console.log(`Shipward → ${name} (${target})\n`);
 for (const d of done) console.log(`  wired   ${d}`);
 for (const k of kept) console.log(`  kept    ${k}`);
 if (!done.length) console.log('  nothing to do — this repo is fully wired already');
+
+// The preview runs on EVERY setup, seeded or not. An opt-in flag nobody sees is
+// the empty board with extra steps, and the last thing printed is the thing that
+// gets read.
+console.log('\nWhat git already knows about this repo:\n');
+for (const line of previewLines(gitState, {
+  seeded,
+  command: `node "${join(CENTRAL, 'shipward', 'setup.mjs')}" ${target} --seed-from-branches`,
+})) console.log(line);
+
 console.log(`\nNext: open a Claude Code session in ${folder} — the standup arrives by itself.`
   + `\nDesk:  cd ${target} && node "${join(CENTRAL, 'shipward', 'serve.mjs')}"`);

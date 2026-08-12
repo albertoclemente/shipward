@@ -1321,6 +1321,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T14:22:55.342Z",
+      "p": "shipward",
+      "by": "claude",
+      "msg": "SW-063 decision — git history stays as-is; a rewrite would invalidate every sha the board cites"
+    },
+    {
       "t": "2026-08-12T14:21:29.063Z",
       "p": "shipward",
       "by": "claude",
@@ -2512,12 +2518,6 @@
       "t": "2026-07-25T16:04:33.907Z",
       "p": "shipward",
       "msg": "SW-003 sent back to Backlog",
-      "by": "user"
-    },
-    {
-      "t": "2026-07-25T16:04:15.190Z",
-      "p": "shipward",
-      "msg": "SW-003 handed to Claude Code — queued",
       "by": "user"
     }
   ],

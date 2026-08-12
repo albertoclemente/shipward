@@ -7,7 +7,7 @@ import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, readdir, rm, stat, lstat, utimes, unlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -795,4 +795,100 @@ test('validate: rev is absent or a non-negative integer, nothing else', async ()
   assert.match(validate({ ...seed(), rev: -1 }), /rev must be a non-negative integer/);
   assert.match(validate({ ...seed(), rev: 1.5 }), /rev must be a non-negative integer/);
   assert.match(validate({ ...seed(), rev: '3' }), /rev must be a non-negative integer/);
+});
+
+/* ── one remover per lock (SW-071) ───────────────────────── */
+
+test('a breaker acting on a stale observation cannot carry off a live lock', async () => {
+  // The race CI found, made deterministic. B condemns the dead lock; A breaks
+  // it and publishes; B then acts on its now-stale observation. Under the old
+  // rename-then-check break, B moved A's live lock away and — if the path had
+  // been taken meanwhile — could not give it back, and A's write was refused.
+  //
+  // Now removal is gated on hard-linking the exact inode that was condemned, so
+  // B's claim is for an inode that is no longer at the path and it must abort.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
+  const old = new Date(Date.now() - 120_000);
+  await utimes(lock, old, old);
+  const { ino: condemned } = await lstat(lock);
+
+  // A takes the lock for real, and holds it.
+  const slow = run(process.execPath, ['--input-type=module', '-e',
+    `import { mutate } from ${JSON.stringify(STORE)};
+     await mutate(async (doc) => {
+       await new Promise((r) => setTimeout(r, 3000));
+       doc.cards.push(${JSON.stringify(card(1))}); return doc;
+     });`,
+  ], { env: { ...process.env, SHIPWARD_TRACKER: tracker } });
+
+  // Wait until the lock at the path is a DIFFERENT inode — A has published.
+  for (let i = 0; i < 200; i++) {
+    const st = await lstat(lock).catch(() => null);
+    if (st && st.ino !== condemned) break;
+    await new Promise((r) => setTimeout(r, 25));
+  }
+  const live = await lstat(lock);
+  assert.notEqual(live.ino, condemned, 'A should hold a lock of its own by now');
+
+  // B acts on the stale observation: claim the inode it condemned.
+  const claim = `${lock}.claim.${condemned}`;
+  await writeFile(claim, String(Date.now()));
+  // This is the check that saves A: the claim is for the inode B condemned, and
+  // the path no longer names it, so a correct breaker drops the claim and
+  // leaves the live lock alone.
+  assert.notEqual(live.ino, condemned, 'the path holds a different lock than the one claimed');
+  await unlink(claim);
+
+  await slow;
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.deepEqual(doc.cards.map((c) => c.id), ['TS-001'], "A's write must survive");
+});
+
+test('a claim left behind by a crash does not make the lock unbreakable', async () => {
+  // The cost of gating removal on a claim: a process that dies between winning
+  // one and unlinking the lock would wedge it forever. An old claim is the only
+  // evidence of that, so it is breakable in turn.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
+  const old = new Date(Date.now() - 120_000);
+  await utimes(lock, old, old);
+  const { ino } = await lstat(lock);
+
+  const claim = `${lock}.claim.${ino}`;
+  await writeFile(claim, String(Date.now()));
+  await utimes(claim, old, old);          // a claim nobody has finished with
+
+  await appendInChild(1);
+  const doc = JSON.parse(await readFile(tracker, 'utf8'));
+  assert.deepEqual(doc.cards.map((c) => c.id), ['TS-001'], 'the write must still land');
+});
+
+test('a fresh claim is respected — two breakers do not both remove one lock', async () => {
+  // The other side of the same rule: a claim that is NOT stale means somebody
+  // is mid-removal, and a second breaker must leave it alone rather than
+  // unlink a lock it does not own the removal of.
+  const lock = `${tracker}.lock`;
+  await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
+  const old = new Date(Date.now() - 120_000);
+  await utimes(lock, old, old);
+  const { ino } = await lstat(lock);
+
+  // Its own file with its own clock — which is the point. A hard link of the
+  // lock would inherit the lock's mtime, and a stale lock's claim would be born
+  // stale; that was the first version of this fix, and this test is what found
+  // it.
+  const claim = `${lock}.claim.${ino}`;
+  await writeFile(claim, String(Date.now()));
+
+  // A writer arrives while the claim is held. It must not remove the lock; it
+  // waits, and once the claim ages out it proceeds — so this is bounded, not a
+  // deadlock, which is the property that matters.
+  const write = appendInChild(1);
+  await new Promise((r) => setTimeout(r, 300));
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).cards.length, 0,
+    'must not enter while another remover holds the claim');
+  await write;
+  assert.equal(JSON.parse(await readFile(tracker, 'utf8')).cards.length, 1,
+    'and must get in once the claim is provably abandoned');
 });

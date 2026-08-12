@@ -9,8 +9,10 @@
 // writes under contention:
 //   * ownership token — a holder only ever releases the lock it took, never
 //     whatever happens to be at the path;
-//   * break by rename — stealing a dead lock is one atomic step, so two
-//     breakers cannot both win and then delete each other's fresh lock;
+//   * one remover per lock — the right to unlink a particular lock is won by
+//     hard-linking that exact inode, which is atomic and exclusive, so a
+//     breaker acting on a stale observation cannot carry off a live holder's
+//     lock and the holder's own release cannot race a breaker (SW-071);
 //   * liveness over age — a holder whose pid is alive is never stale, however
 //     slow it is, and a heartbeat keeps its mtime fresh regardless;
 //   * one observation — staleness is judged from a single open handle, never
@@ -676,37 +678,131 @@ function isStale(snap) {
 // `snap` is what we judged. rename() moves whatever sits at the path NOW, which
 // may already be someone else's fresh lock, so the grave is checked afterwards
 // and an innocent lock is put back.
-async function breakLock(snap) {
-  // Re-read immediately before the rename and abort if the lock is no longer
-  // the one we condemned. rename() moves whatever is at the path NOW, and the
-  // check used to happen only afterwards — by which point a third process could
-  // have published there and the link-back would delete its lock instead.
-  if (snap) {
-    const now = await inspect();
-    if (!now || now.ino !== snap.ino) return false;
+// SW-071. The right to REMOVE a particular lock, held by exactly one process.
+//
+// Every earlier version of the break was "check, then rename", and no amount of
+// narrowing closed the gap between the two. rename() moves whatever sits at the
+// path NOW, so a breaker whose observation had gone stale could carry off a
+// live holder's lock; the code then tried to link it back and, if a third
+// process had published in the meantime, could not — and printed "broke a lock
+// that was not the one judged stale", a path the comment called unreachable.
+// It is reachable: measured 2 writes lost and 2 LockLostErrors in 320, with
+// eight writers racing one dead lock.
+//
+// The fix is to stop trying to make the removal conditional and make the RIGHT
+// to remove exclusive instead. A claim is a second hard link to the very inode
+// we condemned — link() is atomic and fails EEXIST — so for any given inode
+// exactly one process ever wins it, and only the winner unlinks LOCK.
+//
+// Keyed by inode and not by token, because the identity that matters is the one
+// we observed, and a lock written by hand or by an older version has no token
+// while every file has an inode.
+const claimPath = (ino) => `${LOCK}.claim.${ino}`;
+
+// How long a claim may sit before it is assumed to belong to a process that
+// died between winning it and unlinking LOCK. Without this, one crash in that
+// two-syscall window would make the lock permanently unbreakable — trading a
+// rare lost write for a permanent deadlock is not a trade.
+const CLAIM_STALE_MS = 5000;
+
+// The claim is its OWN file, not a hard link of the lock — which is what the
+// first version of this did, and it was wrong in a way only a test found. A
+// hard link shares the inode, so it shares the mtime: a claim taken on a lock
+// that is stale BY DEFINITION (that is why it is being broken) was born older
+// than CLAIM_STALE_MS, every rival breaker judged it abandoned on sight, and
+// two removers for one lock was back. Its own file, its own clock.
+//
+// Exclusivity comes from link() against a fresh scratch, which fails EEXIST for
+// everyone but the first. Identity comes from the check below rather than from
+// the inode of the claim itself.
+async function claimRemoval(snap) {
+  const claim = claimPath(snap.ino);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const scratch = join(DIR, `${BASE}.lock.${process.pid}.${randomUUID()}`);
+    await writeFile(scratch, String(Date.now()), 'utf8');
+    let won = false;
+    try {
+      await link(scratch, claim);
+      won = true;
+    } catch (err) {
+      if (err.code !== 'EEXIST') { await unlink(scratch).catch(() => {}); return null; }
+    } finally {
+      await unlink(scratch).catch(() => {});
+    }
+    if (!won) {
+      // Someone else owns the removal of this inode — unless they died holding
+      // it, which an old claim is the only evidence of. Without this, one crash
+      // in the two syscalls between winning and unlinking would wedge the lock
+      // permanently, which is a worse failure than the one being fixed.
+      const age = await lstat(claim).then((st) => Date.now() - st.mtimeMs).catch(() => 0);
+      if (attempt === 0 && age > CLAIM_STALE_MS) {
+        await unlink(claim).catch(() => {});
+        continue;
+      }
+      return null;
+    }
+    // We hold the exclusive right to remove inode snap.ino. It is only OURS to
+    // exercise if that is still what the path names — a lock that has already
+    // been replaced belongs to whoever replaced it.
+    const now = await lstat(LOCK).catch(() => null);
+    if (!now || now.ino !== snap.ino) {
+      await unlink(claim).catch(() => {});
+      return null;
+    }
+    return claim;
   }
+  return null;
+}
+
+// Remove LOCK, having won the exclusive right to remove this inode.
+//
+// LOCK still names that inode: the only way it could have changed is if someone
+// removed it, and every removal — a breaker's and the holder's own release —
+// goes through claimRemoval() for the inode being removed. For this inode that
+// is us, and we won.
+async function dropClaimed(claim) {
+  await unlink(LOCK).catch(() => {});
+  await unlink(claim).catch(() => {});
+}
+
+// A lock that cannot be opened cannot be claimed: link() resolves symlinks, so
+// against a dangling one it returns ENOENT and the claim can never be won —
+// which would leave that lock unbreakable forever, a worse bug than the one
+// being fixed here (measured: a 60s timeout instead of a broken symlink).
+//
+// So the unopenable case keeps the old rename-then-check dance, with its narrow
+// window intact. That is a deliberately small exception: there is no live
+// holder behind an unreadable lock, the window needs a third process to publish
+// inside it, and every readable lock — which is every lock this store itself
+// writes, and the one the race was measured on — goes the exclusive way.
+async function breakUnreadable(snap) {
   const grave = `${LOCK}.dead.${randomUUID()}`;
   try {
-    await rename(LOCK, grave);
+    await rename(LOCK, grave);           // rename does not follow the symlink
   } catch {
     return false;                        // someone else broke it first
   }
-  const graved = await lstat(grave).catch(() => null);   // lstat: the lock may be a symlink
-  if (graved && snap && graved.ino !== snap.ino) {
-    // Not the corpse we condemned. Put it back if the path is still free; if
-    // someone has already published there, drop ours rather than clobber theirs.
+  const graved = await lstat(grave).catch(() => null);
+  if (graved && graved.ino !== snap.ino) {
     try {
-      await link(grave, LOCK);
+      await link(grave, LOCK);           // not the corpse we condemned — put it back
     } catch {
-      // We took a live holder's only lock and cannot give it back. It will
-      // discover this at commit and refuse to write, but say so loudly: this
-      // path should now be unreachable.
       process.stderr.write('shipward: broke a lock that was not the one judged stale\n');
     }
     await unlink(grave).catch(() => {});
     return false;
   }
   await unlink(grave).catch(() => {});
+  await sweepTmp();
+  return true;
+}
+
+async function breakLock(snap) {
+  if (!snap) return false;
+  if (snap.unreadable) return breakUnreadable(snap);
+  const claim = await claimRemoval(snap);
+  if (!claim) return false;              // someone else is breaking it, or it moved
+  await dropClaimed(claim);
   await sweepTmp();                      // the dead holder may have orphaned one
   return true;
 }
@@ -757,18 +853,31 @@ async function acquire(signal) {
   }
 }
 
+// SW-071: releasing goes through the same claim as breaking, and for the same
+// reason. A bare unlink here was the other half of the race — a breaker could
+// win the right to remove this inode, and the holder would then unlink LOCK
+// too, with the second unlink taking whichever lock had been published in
+// between. One inode, one remover, whether it is the owner letting go or a
+// breaker taking it away.
 async function release(token) {
-  const holder = await readHolder();
-  if (holder?.token !== token) return;   // ours was already broken; do not delete a live holder's
-  // A swallowed error here leaked a lock carrying a LIVE pid, which nothing
-  // would then break — one transient EACCES wedged a long-running server for
-  // the rest of its life. Retry, and if it still will not go, say so.
   for (let attempt = 0; attempt < 3; attempt++) {
-    try { await unlink(LOCK); return; } catch (err) {
-      if (err.code === 'ENOENT') return;
+    const snap = await inspect();
+    if (!snap) return;                              // already gone
+    // Not ours: it was broken while we held it, and deleting it would take a
+    // live holder's lock. withLock's guard reports the loss.
+    if (snap.holder?.token !== token) return;
+    const claim = await claimRemoval(snap);
+    if (!claim) {
+      // A breaker owns the removal of our inode; it will do the unlinking. Only
+      // an unreadable claim state is worth another look.
       await sleep(LOCK_RETRY_MS);
+      continue;
     }
+    await dropClaimed(claim);
+    return;
   }
+  // A leaked lock carrying a LIVE pid is the wedge this warning exists for: one
+  // transient EACCES once held a long-running server for the rest of its life.
   process.stderr.write(`shipward: could not release the tracker lock at ${LOCK} — remove it by hand if writes hang\n`);
 }
 
@@ -838,13 +947,18 @@ const SCRATCH_RE = new RegExp(`^${escapeRe(BASE)}\\.lock\\.(\\d+)\\.[0-9a-f-]+$`
 // is collected on age instead. Nothing matched it before and they accumulated.
 const GRAVE_RE = new RegExp(`^${escapeRe(BASE)}\\.lock\\.dead\\.[0-9a-f-]+$`);
 const GRAVE_MAX_AGE_MS = 60000;
+// SW-071 claims carry no pid either — they name an inode, not a process — and a
+// crash between winning one and unlinking LOCK leaves one behind. claimRemoval
+// already breaks a claim older than CLAIM_STALE_MS so the lock never becomes
+// permanently unbreakable; this only stops them accumulating in the directory.
+const CLAIM_RE = new RegExp(`^${escapeRe(BASE)}\\.lock\\.claim\\.\\d+$`);
 
 function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 
 async function sweepTmp() {
   try {
     for (const f of await readdir(DIR)) {
-      if (GRAVE_RE.test(f)) {
+      if (GRAVE_RE.test(f) || CLAIM_RE.test(f)) {
         const age = await lstat(join(DIR, f)).then((st) => Date.now() - st.mtimeMs).catch(() => 0);
         if (age > GRAVE_MAX_AGE_MS) await unlink(join(DIR, f)).catch(() => {});
         continue;

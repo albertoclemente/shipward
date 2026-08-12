@@ -1321,6 +1321,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T14:21:29.063Z",
+      "p": "shipward",
+      "by": "claude",
+      "msg": "SW-063 note — competitor name redacted from 5 historical entries, on request"
+    },
+    {
       "t": "2026-08-12T09:53:11.258Z",
       "p": "shipward",
       "msg": "SW-066 note amended — a clause was lost to the shell",
@@ -2513,12 +2519,6 @@
       "p": "shipward",
       "msg": "SW-003 handed to Claude Code — queued",
       "by": "user"
-    },
-    {
-      "t": "2026-07-25T16:00:25.458Z",
-      "p": "shipward",
-      "msg": "SW-008 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {

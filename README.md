@@ -50,6 +50,14 @@ in flight anywhere, what's been waiting on you longest, and which projects have 
 **Nothing to sign up for.** It's two files inside your own repo, committed alongside your
 code. No account, no server, no database, nothing sent anywhere.
 
+<img src="assets/where-it-lives.jpg" alt="A browser window, a terminal and a chat bubble all point into a folder holding two documents; a git branch symbol on the right points back at the folder." width="100%">
+
+| | |
+|---|---|
+| **Three ways in** | the board in your browser, your agent over its own connection, or a plain command |
+| **One place it lives** | two files in your repo, versioned with your code |
+| **Git checks them** | and corrects the board where it can prove the board is wrong |
+
 ---
 
 ## Why it's better than the alternatives

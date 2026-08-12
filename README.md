@@ -20,14 +20,8 @@ Every other board takes the agent at its word. When your agent says *"Done — t
 card moves. Shipward runs your project's test command first, and **only moves the card if it
 actually passes.**
 
-<img src="assets/how-it-works.jpg" alt="A task card with an empty speech bubble is linked to a gear on a red gate; beyond it the path splits, one card passing through with a tick and one turned back with a cross and an arrow returning it." width="100%">
+<img src="assets/how-it-works.svg" alt="Step 1: your agent finishes and says the tests pass. Step 2: Shipward runs the command you declared. Step 3: it passed, so the card moves with the proof kept on it; or it failed, so the card does not move and the error is written on it." width="100%">
 
-| | |
-|---|---|
-| **The card, and the claim** | your agent says the task is finished |
-| **The gate** | your test command runs, right then |
-| **It passes** | the card moves, and the proof is kept beside it |
-| **It fails** | the card comes back, with the error written on it |
 
 You set this up once, in one line, per project. After that nobody has to remember to check —
 not you, not the agent.
@@ -50,13 +44,6 @@ in flight anywhere, what's been waiting on you longest, and which projects have 
 **Nothing to sign up for.** It's two files inside your own repo, committed alongside your
 code. No account, no server, no database, nothing sent anywhere.
 
-<img src="assets/where-it-lives.jpg" alt="A browser window, a terminal and a chat bubble all point into a folder holding two documents; a git branch symbol on the right points back at the folder." width="100%">
-
-| | |
-|---|---|
-| **Three ways in** | the board in your browser, your agent over its own connection, or a plain command |
-| **One place it lives** | two files in your repo, versioned with your code |
-| **Git checks them** | and corrects the board where it can prove the board is wrong |
 
 ---
 

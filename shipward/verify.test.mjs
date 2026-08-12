@@ -179,8 +179,8 @@ test('output over budget keeps both ends and states the cut', () => {
 });
 
 /* ── measuring time on a machine that may not have any ───── */
-// SW-065. Two tests below are wall-clock races: one against OUTPUT_GRACE_MS
-// (250ms), one against a process being scheduled at all. On a contended box
+// SW-065. Two tests below are wall-clock races: one against OUTPUT_GRACE_MS,
+// one against a process being scheduled at all. On a contended box
 // neither can be measured — a no-op spawn there costs more than the whole
 // window — and both then fail for reasons that have nothing to do with the
 // product. Four of eight full-suite runs failed that way before this existed.
@@ -307,7 +307,14 @@ test('the timeout bounds the run even when the check leaves a grandchild holding
 // 100 to 1,000,000 arrived before 'exit' fired, 10 runs at each size. So this
 // one passes with or without the grace window. It stays as the guard on the
 // path every check actually takes.
-test('output written right up to exit is not lost on the ordinary path', async () => {
+test('output written right up to exit is not lost on the ordinary path', async (t) => {
+  // Same probe as its sibling below, added by SW-070 after this failed on a
+  // 2-core CI runner and nowhere else — 0/20 lost on an 8-core laptop even with
+  // 12 spinners against it. On a machine that cannot schedule the grace window,
+  // this test cannot tell "the product truncated" from "the OS did not run us",
+  // and a test that cannot tell those apart is measuring the machine (SW-065).
+  const busy = await tooBusyToTime();
+  if (busy) return t.skip(`machine too contended to time the grace window (no-op probe took ${busy}ms)`);
   const src = `for (let i = 0; i < 300; i++) console.log('line ' + i);`
     + ` console.error('LAST-LINE'); process.exitCode = 7;`;
   const r = await spawnCheck([process.execPath, '-e', src], { cwd: process.cwd(), timeoutMs: 10000 });
@@ -325,14 +332,14 @@ test('output written right up to exit is not lost on the ordinary path', async (
 // bound a bad trade rather than a fix.
 test('a line written after the check process is already gone still reaches the note', async (t) => {
   const busy = await tooBusyToTime();
-  if (busy) return t.skip(`machine too contended to time a 250ms window (no-op probe took ${busy}ms)`);
+  if (busy) return t.skip(`machine too contended to time the grace window (no-op probe took ${busy}ms)`);
   // fd 3 is a leash, not a channel: the worker never reads anything down it, it
   // only gets EOF at the instant the check process dies, so the write is pinned
   // to just after 'exit' without a sleep anyone has to tune against machine
   // load. Polling for the parent to disappear was the obvious fixture and it is
   // not reliable — under load some workers never noticed at all and leaked.
   // Writes the instant the leash breaks, with no timer of its own. The 15ms
-  // delay this used to carry was spending the product's 250ms grace window on
+  // delay this used to carry was spending the product's grace window on
   // the fixture: under load that 15ms stretched past the window, the line was
   // legitimately dropped, and the test failed for doing exactly what it
   // promises (SW-065). Writing immediately still happens strictly after the
@@ -349,7 +356,7 @@ test('a line written after the check process is already gone still reaches the n
     + ` c.unref(); c.stdio[3].unref();`
     + ` process.stdout.write('BEFORE'); setTimeout(() => {}, 300);`;
 
-  // Best of five, deliberately (SW-065). The grace window is a 250ms CEILING on
+  // Best of five, deliberately (SW-065). The grace window is a CEILING on
   // how long the run will wait for trailing output — not a promise that a
   // descheduled process will produce it in time. On a saturated box the write
   // can legitimately land after the window closes, and the product is then

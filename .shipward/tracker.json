@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-070",
+      "p": "shipward",
+      "title": "A check can lose its last line on a slow machine, and CI found it",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/a-check-can",
+      "commit": null,
+      "created": "2026-08-12T15:07:35.188Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-069",
       "p": "shipward",
       "title": "No CI, and the hooks would deadlock one",
@@ -1405,6 +1420,18 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T15:07:36.087Z",
+      "p": "shipward",
+      "msg": "SW-070 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-12T15:07:35.188Z",
+      "p": "shipward",
+      "msg": "You added SW-070 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-12T15:03:16.120Z",
       "p": "shipward",
       "msg": "SW-069 moved to Review — give it a look",
@@ -2591,23 +2618,11 @@
       "p": "shipward",
       "msg": "SW-005 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:24:22.275Z",
-      "p": "shipward",
-      "msg": "SW-005 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:11:31.359Z",
-      "p": "shipward",
-      "msg": "SW-004 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 40
+  "rev": 42
 }

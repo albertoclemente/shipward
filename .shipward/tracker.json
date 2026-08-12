@@ -23,13 +23,26 @@
       "type": "chore",
       "pri": "P1",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/no-ci-and",
       "commit": null,
       "created": "2026-08-12T14:57:55.607Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-12T15:03:16.120Z",
+        "sha": "53131a3",
+        "dirty": false,
+        "ms": 19079
+      }
     },
     {
       "id": "SW-068",
@@ -1392,6 +1405,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T15:03:16.120Z",
+      "p": "shipward",
+      "msg": "SW-069 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-12T14:57:55.738Z",
       "p": "shipward",
       "msg": "SW-069 handed to Claude Code — queued",
@@ -2584,17 +2603,11 @@
       "p": "shipward",
       "msg": "SW-004 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:09:04.383Z",
-      "p": "shipward",
-      "msg": "SW-004 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 39
+  "rev": 40
 }

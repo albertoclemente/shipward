@@ -4,7 +4,7 @@
 
 ## Reaching it
 
-An MCP server exposes the tracker as six tools. **Prefer them** — they hold a cross-process lock, validate against the schema, allocate ids, name branches and write the feed for you, so the desk UI and you cannot drift apart.
+An MCP server exposes the tracker as seven tools. **Prefer them** — they hold a cross-process lock, validate against the schema, allocate ids, name branches and write the feed for you, so the desk UI and you cannot drift apart.
 
 | Tool | Use it to |
 |---|---|
@@ -12,6 +12,7 @@ An MCP server exposes the tracker as six tools. **Prefer them** — they hold a 
 | `recall` | search everything previously written down — by file, by kind, or by query |
 | `log` | add a backlog card the moment work is discovered or promised |
 | `start` | take a card — sets `claude`/`working`, names a branch, hands back the note |
+| `note` | write to a card's memory **without moving it** — the decision you just took, the finding that belongs on a card you are not working. Use this the moment you learn something, not at hand-back |
 | `done` | hand a card back — `review` (or `pushed`), sets `commit`, appends to the note, **and runs the card's check** |
 | `sync` | reconcile the board with git — `fromGit:true` reads the repository itself and reports the drift; add `apply:true` to write the fixes it can only infer |
 
@@ -34,9 +35,9 @@ same handlers — a subcommand the server does not have, or a tool the CLI canno
 reach, is impossible by construction. Results go to stdout, mistakes to stderr
 with exit 1, and a crash to stderr with exit 2.
 
-**Fallback — editing `tracker.json` directly is supported and safe** when the MCP server is not connected (the header tag in the desk reads `MCP OFFLINE`, and `tools/list` will not show the six tools). Read → modify → write the whole file, keep it valid against `.shipward/schema.json`, pretty-print with 2 spaces. The desk polls the file, so your edits appear within about 3 seconds either way. The rules below apply whichever route you take.
+**Fallback — editing `tracker.json` directly is supported and safe** when the MCP server is not connected (the header tag in the desk reads `MCP OFFLINE`, and `tools/list` will not show the seven tools). Read → modify → write the whole file, keep it valid against `.shipward/schema.json`, pretty-print with 2 spaces. The desk polls the file, so your edits appear within about 3 seconds either way. The rules below apply whichever route you take.
 
-To add a **note** this way you have two options, and the cheap one is better: append one JSON object to `.shipward/notes.jsonl` — `{"card":"SW-041","t":"…","kind":"finding","text":"…"}`, one per line, oldest first — which costs you no rewrite of anything. Or write the entry into the card's `note` array in `tracker.json` and let the next write move it across; that is supported, just more bytes.
+To add a **note**, use the `note` tool — that is what it is for, and it is available even when the card is not moving. **Hand-appending to `.shipward/notes.jsonl` is the last resort, not the cheap path** (SW-068): it looks like one `appendFileSync` and it is one invariant you have to get right. The file is one JSON object per line **and must end with a newline**. Two hand-appends that each wrote a leading `\n` and no trailing one left a blank line and then glued the next writer's object onto the previous line, and `{…}{…}` parses as nothing — two entries went invisible to every reader while sitting intact on disk. If you must append by hand: `{"card":"SW-041","t":"…","kind":"finding","text":"…"}`, one per line, oldest first, **newline at the end**. The reader now recovers a shared line and says so on stderr rather than dropping it, but a recovery notice means the file needs rewriting. Writing the entry into the card's `note` array in `tracker.json` and letting the next write move it across is also supported, and is safer than touching the sidecar.
 
 ## The files
 

@@ -51,14 +51,19 @@ const cli = async (...args) => {
 
 const board = async () => JSON.parse(await readFile(tracker, 'utf8'));
 
-/* ── the same six, no more and no fewer ──────────────────── */
+/* ── the same tools, no more and no fewer ────────────────── */
 
 test('every MCP tool is reachable as a subcommand, and nothing else is', () => {
   // Drift by construction is the thing this card exists to avoid: the CLI
   // dispatches over the TOOLS table itself, so a tool the server gains is a
   // subcommand the CLI gains.
   const named = TOOLS.map((t) => t.name);
-  assert.deepEqual(named, ['standup', 'recall', 'log', 'start', 'done', 'sync']);
+  // The named verbs the protocol is written around must all be there; the
+  // usage check below is what proves NOTHING is reachable that the table
+  // does not hold, so listing every name here would only be a line to edit.
+  for (const core of ['standup', 'recall', 'log', 'start', 'note', 'done', 'sync']) {
+    assert.ok(named.includes(core), `${core} is not reachable from the CLI`);
+  }
   for (const n of named) assert.match(usage(), new RegExp(`\\b${n}\\b`));
 });
 
@@ -160,7 +165,11 @@ test('a caller mistake exits 1 with a readable message and no stack', async () =
 test('an unknown command lists the real ones', async () => {
   const { err, out, code } = await cli('frobnicate');
   assert.equal(code, 1);
-  assert.match(err || out, /no command "frobnicate".*standup, recall, log, start, done, sync/s);
+  const text = err || out;
+  assert.match(text, /no command "frobnicate"/);
+  // The verbs come from the table, so a tool added later is covered here
+  // rather than failing this line for the wrong reason.
+  for (const t of TOOLS) assert.ok(text.includes(t.name), `${t.name} is missing from the suggestion`);
 });
 
 test('no arguments prints usage and exits nonzero, so a script notices', async () => {
@@ -183,7 +192,7 @@ test('errors go to stderr and results to stdout, so `shipward standup > file` is
 test('the whole MCP tool surface stays close to a CLI in token cost', async () => {
   // The standing argument against MCP for Claude Code is token cost — schemas
   // said to run 10-50k against ~1-2k for a CLI. Measured 2026-07-31, this
-  // server's tools/list is 6,843 bytes for all six tools: ~1.7k tokens, i.e.
+  // server's tools/list was 6,843 bytes for six tools: ~1.7k tokens, i.e.
   // parity with a CLI. That is a claim worth making out loud and therefore a
   // claim worth a test, so it cannot quietly stop being true.
   const payload = JSON.stringify({ tools: TOOLS.map(({ run: _run, ...t }) => t) });

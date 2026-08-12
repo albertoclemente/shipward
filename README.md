@@ -54,9 +54,9 @@ check — not you, not the agent.
 
 ## Your agent runs the board itself
 
-You are not the go-between. Shipward hands your agent six commands of its own — **read the
-board, search the memory, file a card, take a card, hand it back, reconcile with git** — and
-it uses them on its own, without being told to.
+You are not the go-between. Shipward hands your agent seven commands of its own — **read the
+board, search the memory, file a card, take a card, write down what it learned, hand it back,
+reconcile with git** — and it uses them on its own, without being told to.
 
 It opens a session by reading the board. It files a card the moment it notices a bug it
 wasn't looking for. It takes a card, works, and hands it back through the gate. It writes

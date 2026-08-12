@@ -222,29 +222,87 @@ async function readNotes() {
 // The pure half, with no path in it. Exported because the tests need to read a
 // board the way every consumer sees it, and a second implementation of this in
 // the test files would be free to drift from the one that ships.
+// Two JSON objects on one line, split back apart (SW-068).
+//
+// A writer that does not end its append with a newline leaves the next writer
+// appending onto its last line, and `{…}{…}` does not parse — so the line was
+// skipped and BOTH entries vanished from every read while sitting intact on
+// disk. That is memory loss with no backup but git, caused by a missing byte.
+//
+// Brace depth, string- and escape-aware, so a `{` inside note prose cannot
+// split an entry. Returns [] for anything that is not a clean run of balanced
+// objects, which keeps genuinely corrupt lines reported rather than guessed at.
+export function splitObjects(line) {
+  const out = [];
+  let depth = 0, start = -1, inStr = false, esc = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (inStr) {
+      if (esc) esc = false;
+      else if (ch === '\\') esc = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') { inStr = true; continue; }
+    if (ch === '{') { if (depth === 0) start = i; depth++; continue; }
+    if (ch === '}') {
+      depth--;
+      if (depth < 0) return [];
+      if (depth === 0 && start >= 0) { out.push(line.slice(start, i + 1)); start = -1; }
+    }
+  }
+  return depth === 0 && out.length > 1 ? out : [];
+}
+
 export function parseNotes(raw) {
   const byCard = new Map();
   const keys = new Set();
   let skipped = 0;
-  for (const line of raw.split('\n')) {
-    const s = line.trim();
-    if (!s) continue;
-    let e;
-    try { e = JSON.parse(s); } catch { skipped++; continue; }
-    if (!isObj(e) || !isStr(e.card) || !isStr(e.text) || !isStr(e.t)) { skipped++; continue; }
+  let recovered = 0;
+
+  const take = (e) => {
+    if (!isObj(e) || !isStr(e.card) || !isStr(e.text) || !isStr(e.t)) return false;
     const k = noteKey(e.card, e);
-    if (keys.has(k)) continue;             // a re-append after a failed write
+    if (keys.has(k)) return true;          // a re-append after a failed write
     keys.add(k);
     // Everything but `card`, for the same reason noteRecord writes everything
     // but `card`: a field list here would drop whatever an entry grows next.
     const { card, ...entry } = e;
     if (!byCard.has(card)) byCard.set(card, []);
     byCard.get(card).push(entry);
+    return true;
+  };
+
+  for (const line of raw.split('\n')) {
+    const s = line.trim();
+    if (!s) continue;
+    let e;
+    try { e = JSON.parse(s); } catch {
+      // Before giving up on the line, see whether it is several good entries
+      // that lost their newline. Recovering beats skipping: the alternative is
+      // memory that exists on disk and is invisible to every reader.
+      const parts = splitObjects(s);
+      let got = 0;
+      for (const p of parts) {
+        let sub;
+        try { sub = JSON.parse(p); } catch { continue; }
+        if (take(sub)) got++;
+      }
+      if (got) recovered += got; else skipped++;
+      continue;
+    }
+    if (!take(e)) skipped++;
   }
+
   if (skipped) {
     process.stderr.write(`shipward: skipped ${skipped} unreadable line${skipped === 1 ? '' : 's'} in ${NOTES}\n`);
   }
-  return { byCard, keys };
+  // Said out loud, not fixed in silence: the file on disk is still malformed,
+  // and a reader who is told can repair it. `note` writes one object per line.
+  if (recovered) {
+    process.stderr.write(`shipward: recovered ${recovered} entries from ${NOTES} that share a line with another — rewrite it one object per line\n`);
+  }
+  return { byCard, keys, recovered };
 }
 
 // Sidecar entries onto the cards. Any note still inline is legacy or a
@@ -305,10 +363,39 @@ function extract(doc, keys) {
 // something the tracker still holds; this is the only copy there is, so a
 // sidecar that will not take the write must fail the write rather than let the
 // tracker be rewritten without it.
-async function appendNotes(lines) {
+// Always ends the write with a newline, and never ASSUMES the file already did
+// (SW-068). A previous writer that left the last line unterminated — a hand
+// append, an editor without a final newline, a truncated write — would
+// otherwise get this append glued onto its last object, and `{…}{…}` is a line
+// no reader can parse.
+//
+// One extra read of one byte, on a path that already reads and rewrites the
+// whole tracker. Being right here is worth more than that: this is the only
+// copy of the memory.
+async function needsLeadingNewline() {
+  try {
+    const { size } = await stat(NOTES);
+    if (size === 0) return false;
+    const fh = await open(NOTES, 'r');
+    try {
+      const buf = Buffer.alloc(1);
+      await fh.read(buf, 0, 1, size - 1);
+      return buf[0] !== 0x0a;
+    } finally { await fh.close(); }
+  } catch (err) {
+    if (err.code === 'ENOENT') return false;   // a first note needs no separator
+    throw err;
+  }
+}
+
+export async function appendNotes(lines) {
   if (!lines.length) return '';
-  const body = `${lines.join('\n')}\n`;
+  const lead = (await needsLeadingNewline()) ? '\n' : '';
+  const body = `${lead}${lines.join('\n')}\n`;
   await appendFile(NOTES, body, 'utf8');
+  // Returns what actually reached the file, separator included: the caller adds
+  // this to the raw it read and takes the etag over the sum, so anything not
+  // returned here is an etag that disagrees with disk on the very next read.
   return body;
 }
 

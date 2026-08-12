@@ -23,9 +23,13 @@ import { TRACKER } from './tracker-store.mjs';
 
 const TOOL = new Map(TOOLS.map((t) => [t.name, t]));
 
-// Which positional argument each subcommand takes, so `start SW-042` works and
+// Which positional arguments each subcommand takes, so `start SW-042` works and
 // nobody has to type `--id`. Everything else is a flag.
-const POSITIONAL = { log: 'title', start: 'id', done: 'id', recall: 'query' };
+//
+// An array takes one token each until the last, which takes everything left —
+// `note SW-068 the file was unterminated` puts the id in `id` and the rest in
+// `text`, without quoting. A bare string is the same rule with one slot.
+const POSITIONAL = { log: 'title', start: 'id', done: 'id', recall: 'query', note: ['id', 'text'] };
 
 // Flags whose value is a number, and flags that are true by their presence.
 // Derived from the tool's own inputSchema rather than listed here a second
@@ -56,8 +60,19 @@ export function parse(tool, argv) {
   // A positional wins only where the flag was not given, so `--id` and a bare
   // id cannot disagree silently.
   const pos = POSITIONAL[tool.name];
-  if (pos && rest.length && args[pos] == null) args[pos] = rest.join(' ');
-  else if (rest.length && !pos) throw new ToolError(`${tool.name} takes no positional argument (got "${rest.join(' ')}")`);
+  const slots = pos == null ? [] : (Array.isArray(pos) ? pos : [pos]);
+  if (!slots.length && rest.length) {
+    throw new ToolError(`${tool.name} takes no positional argument (got "${rest.join(' ')}")`);
+  }
+  let take = rest;
+  slots.forEach((slot, i) => {
+    if (!take.length) return;
+    // The last slot swallows the remainder, so free text needs no quoting.
+    const last = i === slots.length - 1;
+    const value = last ? take.join(' ') : take[0];
+    take = last ? [] : take.slice(1);
+    if (args[slot] == null) args[slot] = value;
+  });
   return args;
 }
 
@@ -70,11 +85,13 @@ export function usage() {
   ];
   for (const t of TOOLS) {
     const pos = POSITIONAL[t.name];
+    const slots = pos == null ? [] : (Array.isArray(pos) ? pos : [pos]);
     const flags = Object.keys(schemaOf(t))
-      .filter((k) => k !== pos)
+      .filter((k) => !slots.includes(k))
       .map((k) => `--${kebab(k)}`)
       .join(' ');
-    lines.push(`  ${t.name}${pos ? ` <${pos}>` : ''}${flags ? ` [${flags}]` : ''}`);
+    const args = slots.map((s) => ` <${s}>`).join('');
+    lines.push(`  ${t.name}${args}${flags ? ` [${flags}]` : ''}`);
     // The tool's own one-line description, not a second copy written here.
     lines.push(`      ${t.description.split(/(?<=\.)\s/)[0]}`);
   }

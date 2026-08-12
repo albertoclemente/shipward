@@ -12,6 +12,7 @@ import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hydrate, parseNotes } from './tracker-store.mjs';
+import { TOOLS } from './mcp.mjs';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SERVER = join(HERE, 'mcp.mjs');
@@ -172,7 +173,14 @@ test('an older client is answered in its own protocol version', async () => {
 test('tools/list exposes every verb with a usable schema', async () => {
   const { c } = await handshake();
   const { result } = await c.request('tools/list');
-  assert.deepEqual(result.tools.map((t) => t.name).sort(), ['done', 'log', 'recall', 'standup', 'start', 'sync']);
+  // Two assertions, because deriving alone would be the table compared to
+  // itself: the wire must carry the WHOLE table, and the verbs the protocol
+  // is written around must still be in it.
+  const onWire = result.tools.map((t) => t.name).sort();
+  assert.deepEqual(onWire, TOOLS.map((t) => t.name).sort(), 'tools/list must carry every tool');
+  for (const core of ['standup', 'recall', 'log', 'start', 'note', 'done', 'sync']) {
+    assert.ok(onWire.includes(core), `${core} went missing from the tool surface`);
+  }
   for (const t of result.tools) {
     assert.equal(t.inputSchema.type, 'object', `${t.name} needs an object schema`);
     assert.ok(t.description.length > 40, `${t.name} needs a description the model can act on`);
@@ -410,7 +418,9 @@ test('an unknown method gets -32601, an unknown tool gets a readable result', as
 
   const { text, isError } = await c.call('teleport', {});
   assert.equal(isError, true, 'a wrong tool name is the model\'s to fix, not a protocol failure');
-  assert.match(text, /Available: standup, recall, log, start, done, sync/);
+  // Same reason as the banner: derived from the table, so a new tool is
+  // covered rather than a line to edit.
+  assert.match(text, new RegExp(`Available: ${TOOLS.map((t) => t.name).join(', ')}`));
 });
 
 test('nothing but protocol frames reaches stdout', async () => {
@@ -419,7 +429,9 @@ test('nothing but protocol frames reaches stdout', async () => {
   await c.call('standup', {});
   await c.call('log', { title: 'noise check' });
   assert.equal(c.frames().length, 0, 'no unsolicited frames');
-  assert.match(c.stderr(), /ready — 6 tools/, 'the banner went to stderr');
+  // Derived, not written out: a hardcoded count fails the day a tool is added,
+  // which teaches nothing except to edit the number.
+  assert.match(c.stderr(), new RegExp(`ready — ${TOOLS.length} tools`), 'the banner went to stderr');
 });
 
 test('a tool call against a missing tracker says so instead of crashing', async () => {

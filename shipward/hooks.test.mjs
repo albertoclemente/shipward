@@ -48,11 +48,21 @@ const seed = (cards = [card()]) => ({
 });
 
 // Returns { code, out, parsed } — never throws, because the hook must not.
+//
+// The silencing switches (SW-069) are STRIPPED unless a test asks for one. This
+// suite runs on a GitHub runner, where CI=true is already in the environment,
+// and inheriting it would make every hook go quiet and every assertion below
+// fail for a reason that has nothing to do with the hook. A test that only
+// passes on a laptop is not a test.
 function run(which, input = {}, env = {}) {
+  const base = { ...process.env, SHIPWARD_TRACKER: tracker };
+  delete base.CI;
+  delete base.GITHUB_ACTIONS;
+  delete base.SHIPWARD_HOOKS;
   return new Promise((res) => {
     const child = execFile(
       process.execPath, [HOOK, which],
-      { env: { ...process.env, SHIPWARD_TRACKER: tracker, ...env } },
+      { env: { ...base, ...env } },
       (err, stdout) => {
         let parsed = null;
         try { parsed = stdout.trim() ? JSON.parse(stdout) : null; } catch { /* reported below */ }
@@ -741,4 +751,52 @@ test('a repo with no board at all is not nagged about a file it never had', asyn
     const { parsed } = await run('session-start', {}, { SHIPWARD_REPO: repo });
     assert.doesNotMatch(parsed?.hookSpecificOutput?.additionalContext ?? '', /Not in git/);
   } finally { await rm(repo, { recursive: true, force: true }); }
+});
+
+/* ── silent under CI (SW-069) ────────────────────────────── */
+
+// The `stop` hook refuses to end a session while a card is claude/working. On a
+// runner that is a false positive by construction — the working card belongs to
+// somebody's local session, the runner started nothing and has nothing to hand
+// back — so a Claude-in-CI job would be told it may not stop. Verified against
+// the real board before this existed: decision:block, naming a card a human was
+// holding.
+//
+// This is not the guard being switched off. `done` still runs the check in CI
+// and the git audit still corrects the board; what stops is the nagging.
+
+const working = () => [card({ status: 'claude', claude: 'working' })];
+
+for (const [label, env] of [
+  ['CI=true', { CI: 'true' }],
+  ['GITHUB_ACTIONS=true', { GITHUB_ACTIONS: 'true' }],
+  ['SHIPWARD_HOOKS=off', { SHIPWARD_HOOKS: 'off' }],
+]) {
+  test(`every hook is silent under ${label}`, async () => {
+    await writeFile(tracker, JSON.stringify(seed(working()), null, 2) + '\n');
+    for (const which of ['session-start', 'prompt', 'pre-edit', 'stop']) {
+      const r = await run(which, { tool_input: { file_path: join(ROOT, 'shipward', 'lib.js') } }, env);
+      assert.equal(r.code, 0, `${which} must still exit 0`);
+      assert.equal(r.out.trim(), '', `${which} spoke under ${label}: ${r.out.slice(0, 120)}`);
+    }
+  });
+}
+
+test('stop still blocks when none of the switches is set', async () => {
+  // The other half of the pair: a guard that is always silent is not a guard,
+  // and this is what proves the CI cases above are the exception.
+  await writeFile(tracker, JSON.stringify(seed(working()), null, 2) + '\n');
+  const r = await run('stop');
+  assert.equal(r.parsed?.decision, 'block');
+  assert.match(r.parsed.reason, /TS-001/);
+});
+
+test('CI is only honoured as the literal "true", not any truthy string', async () => {
+  // `CI=false` is set by some tooling, and treating it as "in CI" would silence
+  // the hooks on a developer's machine — the exact place they are wanted.
+  await writeFile(tracker, JSON.stringify(seed(working()), null, 2) + '\n');
+  for (const value of ['false', '0', '']) {
+    const r = await run('stop', {}, { CI: value });
+    assert.equal(r.parsed?.decision, 'block', `CI=${JSON.stringify(value)} should not silence the hook`);
+  }
 });

@@ -246,9 +246,16 @@ test('end to end: setup seeds a real repo, and the audit then fills the sha it l
 
   // The claim this whole design rests on: leaving the sha blank is what lets
   // the certain tier correct the board on the FIRST session, not the tenth.
+  // CI is stripped deliberately (SW-069): the hooks go silent on a runner, and
+  // inheriting the runner's CI=true here would assert against an empty string
+  // and fail for a reason that has nothing to do with seeding.
+  const hookEnv = { ...process.env, SHIPWARD_TRACKER: trackerPath, SHIPWARD_REPO: dir };
+  delete hookEnv.CI;
+  delete hookEnv.GITHUB_ACTIONS;
+  delete hookEnv.SHIPWARD_HOOKS;
   const { stdout } = await run(process.execPath, [join(HERE, '..', '.claude', 'hooks', 'shipward.mjs'), 'session-start'], {
     cwd: dir,
-    env: { ...process.env, SHIPWARD_TRACKER: trackerPath, SHIPWARD_REPO: dir },
+    env: hookEnv,
   });
   assert.match(stdout, /the board was corrected/);
   assert.match(stdout, /missing-commit/);

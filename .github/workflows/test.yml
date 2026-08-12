@@ -1,0 +1,56 @@
+# The gate.
+#
+# This is the check that decides whether a pull request may merge — not a
+# review, and specifically not Claude's review. A tool whose whole argument is
+# that a claim needs a check the claimant did not author cannot merge on the
+# strength of the agent's own approval.
+#
+# Make THIS the required status check in branch protection.
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  # A new push supersedes the run it interrupted; nothing here is worth paying
+  # twice for.
+  group: test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # README says Node 20 or newer, macOS or Linux. That claim is now
+        # checked rather than asserted — the oldest supported runtime and the
+        # current one, on both platforms.
+        os: [ubuntu-latest, macos-latest]
+        node: [20, 24]
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node }}
+
+      # No install step, and nothing to cache: zero dependencies is a property
+      # of this repo, so a lockfile appearing here would be a bug worth failing.
+      - name: There are no dependencies
+        run: |
+          test ! -f package-lock.json || { echo "a lockfile appeared — this project has no dependencies"; exit 1; }
+          test ! -d node_modules || { echo "node_modules appeared — this project has no dependencies"; exit 1; }
+
+      # No git identity is configured here on purpose. The suite spawns real
+      # repositories and commits into them, and every one of those tests sets
+      # its own user.name/user.email — checked by running the whole suite with
+      # an empty HOME and no global gitconfig, which passes. A setup step that
+      # is not needed is CI config nobody will ever re-test.
+      - name: node --test
+        run: node --test

@@ -1,0 +1,67 @@
+# Claude on request: mention @claude in an issue or a pull request and it works
+# on it, pushing commits to a branch.
+#
+# This is the one workflow with write access, and it is deliberately the one a
+# human has to start by typing. The action only runs for users with write
+# access to this repository — a drive-by comment from a stranger does nothing —
+# but the write permission is why the trigger stays manual rather than
+# automatic.
+name: claude
+
+on:
+  issue_comment:
+    types: [created]
+  pull_request_review_comment:
+    types: [created]
+  pull_request_review:
+    types: [submitted]
+  issues:
+    types: [opened, assigned]
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  claude:
+    # Cheap gate before spending a runner: only wake up for an actual mention.
+    # These comparisons are expression context, never interpolated into a shell.
+    if: |
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+      (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude')) ||
+      (github.event_name == 'issues' && (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          # Static. The request itself reaches Claude through the action's own
+          # context, so no issue or comment text is pasted into this string.
+          prompt: |
+            Read CLAUDE.md and CONTRIBUTING.md before changing anything.
+
+            Two rules specific to this repository:
+
+            1. NOTHING MAY CLAIM MORE THAN IT CAN PROVE. If a change would let
+               the tool assert something unchecked, say so instead of building
+               it.
+            2. `node --test` must pass, and the test must assert the property
+               rather than the machine's timing. A wall-clock ceiling measures
+               the runner's mood.
+
+            Do NOT write to .shipward/ — the board and its notes are the
+            repository's memory and are maintained from a local session, not
+            from CI. If your change deserves a card or a note, say so in your
+            comment and let a human file it.
+
+            Push your work to a branch and open a pull request. Do not merge it,
+            and do not approve it: what merges here is a passing check, never a
+            review.
+          claude_args: |
+            --allowedTools "Bash(node --test),Bash(git:*),Edit,Write,Read,Grep,Glob"

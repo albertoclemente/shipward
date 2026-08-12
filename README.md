@@ -20,7 +20,7 @@ Every other board takes the agent at its word. When your agent says *"Done — t
 card moves. Shipward runs your project's test command first, and **only moves the card if it
 actually passes.**
 
-<img src="assets/how-it-works.svg" alt="Step 1: your agent finishes and says the tests pass. Step 2: Shipward runs the command you declared. Step 3: it passed, so the card moves with the proof kept on it; or it failed, so the card does not move and the error is written on it." width="100%">
+<img src="assets/how-it-works.jpg" alt="Step 1, your agent finishes: a card reading Fix the login bug, with a speech bubble saying Done - tests pass. Step 2, Shipward checks: it runs npm test, the command you declared, the moment it claims. Step 3, one of two things: it passed and the card moves to review, or it failed and the card stays put." width="100%">
 
 
 You set this up once, in one line, per project. After that nobody has to remember to check —
@@ -44,6 +44,18 @@ in flight anywhere, what's been waiting on you longest, and which projects have 
 **Nothing to sign up for.** It's two files inside your own repo, committed alongside your
 code. No account, no server, no database, nothing sent anywhere.
 
+
+---
+
+## It remembers between sessions
+
+Your agent reads the board when it starts and writes to it as it works, so you do not
+re-explain the project every time. It can pick up something it left three days ago — including
+what it decided, what it tried, and what bit it.
+
+That is what lets it work on its own for longer. **Not unsupervised — checked.** The command
+runs whether or not you are watching, so leaving it to work does not mean finding out later
+that "done" meant "I believe it is done."
 
 ---
 

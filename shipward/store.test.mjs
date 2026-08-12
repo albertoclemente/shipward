@@ -800,49 +800,42 @@ test('validate: rev is absent or a non-negative integer, nothing else', async ()
 /* ── one remover per lock (SW-071) ───────────────────────── */
 
 test('a breaker acting on a stale observation cannot carry off a live lock', async () => {
-  // The race CI found, made deterministic. B condemns the dead lock; A breaks
-  // it and publishes; B then acts on its now-stale observation. Under the old
-  // rename-then-check break, B moved A's live lock away and — if the path had
-  // been taken meanwhile — could not give it back, and A's write was refused.
+  // The race CI found. A holds a lock it published itself; other writers are
+  // still carrying observations of the DEAD lock it broke. Under the old
+  // rename-then-check break, one of them could move A's live lock away and — if
+  // the path had been taken meanwhile — fail to give it back, and A's write was
+  // refused. Removal is now gated on an exclusive claim for the exact inode
+  // that was condemned, so an observation of the corpse grants nothing.
   //
-  // Now removal is gated on hard-linking the exact inode that was condemned, so
-  // B's claim is for an inode that is no longer at the path and it must abort.
+  // Asserts the OUTCOME, not the state mid-flight: an earlier version of this
+  // test polled for A's publish and raced A's own lifecycle, which failed on a
+  // fast runner for reasons that had nothing to do with the property.
   const lock = `${tracker}.lock`;
   await writeFile(lock, JSON.stringify({ pid: 999999, token: 'dead', at: 0 }));
   const old = new Date(Date.now() - 120_000);
   await utimes(lock, old, old);
   const { ino: condemned } = await lstat(lock);
 
-  // A takes the lock for real, and holds it.
+  // A takes the lock for real and holds it long enough to be a target.
   const slow = run(process.execPath, ['--input-type=module', '-e',
     `import { mutate } from ${JSON.stringify(STORE)};
      await mutate(async (doc) => {
-       await new Promise((r) => setTimeout(r, 3000));
+       await new Promise((r) => setTimeout(r, 2000));
        doc.cards.push(${JSON.stringify(card(1))}); return doc;
      });`,
   ], { env: { ...process.env, SHIPWARD_TRACKER: tracker } });
 
-  // Wait until the lock at the path is a DIFFERENT inode — A has published.
-  for (let i = 0; i < 200; i++) {
-    const st = await lstat(lock).catch(() => null);
-    if (st && st.ino !== condemned) break;
-    await new Promise((r) => setTimeout(r, 25));
-  }
-  const live = await lstat(lock);
-  assert.notEqual(live.ino, condemned, 'A should hold a lock of its own by now');
+  // Everyone else arrives condemning the corpse A already broke.
+  await new Promise((r) => setTimeout(r, 250));
+  const others = [2, 3, 4].map((i) => appendInChild(i));
 
-  // B acts on the stale observation: claim the inode it condemned.
-  const claim = `${lock}.claim.${condemned}`;
-  await writeFile(claim, String(Date.now()));
-  // This is the check that saves A: the claim is for the inode B condemned, and
-  // the path no longer names it, so a correct breaker drops the claim and
-  // leaves the live lock alone.
-  assert.notEqual(live.ino, condemned, 'the path holds a different lock than the one claimed');
-  await unlink(claim);
+  // And a claim for the CORPSE, which is what a stale observation would win. It
+  // must not become authority over whatever is at the path now.
+  await writeFile(`${lock}.claim.${condemned}`, String(Date.now())).catch(() => {});
 
-  await slow;
-  const doc = JSON.parse(await readFile(tracker, 'utf8'));
-  assert.deepEqual(doc.cards.map((c) => c.id), ['TS-001'], "A's write must survive");
+  await Promise.all([slow, ...others]);
+  const ids = JSON.parse(await readFile(tracker, 'utf8')).cards.map((c) => c.id).sort();
+  assert.deepEqual(ids, ['TS-001', 'TS-002', 'TS-003', 'TS-004'], 'every write must survive');
 });
 
 test('a claim left behind by a crash does not make the lock unbreakable', async () => {

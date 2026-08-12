@@ -23,13 +23,26 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/handappending-to-notesjsonl",
       "commit": null,
       "created": "2026-08-12T14:31:09.188Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-12T14:51:49.557Z",
+        "sha": "538d5ca",
+        "dirty": false,
+        "ms": 23044
+      }
     },
     {
       "id": "SW-067",
@@ -1364,6 +1377,18 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T14:51:49.557Z",
+      "p": "shipward",
+      "msg": "SW-068 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-12T14:51:05.468Z",
+      "p": "shipward",
+      "msg": "SW-068 note — Dogfood check, and the only one that counts here: this…",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-12T14:43:15.993Z",
       "p": "shipward",
       "msg": "SW-068 handed to Claude Code — queued",
@@ -2550,23 +2575,11 @@
       "p": "shipward",
       "msg": "SW-003 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:04:10.319Z",
-      "p": "shipward",
-      "msg": "SW-010 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T14:50:57.780Z",
-      "p": "shipward",
-      "msg": "SW-010 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 35
+  "rev": 37
 }

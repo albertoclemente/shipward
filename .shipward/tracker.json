@@ -17,6 +17,36 @@
   ],
   "cards": [
     {
+      "id": "SW-068",
+      "p": "shipward",
+      "title": "Hand-appending to notes.jsonl can corrupt it, and the checks filter the damage away",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-12T14:31:09.188Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-067",
+      "p": "shipward",
+      "title": "A new repo's first board is empty, so nothing can prove itself",
+      "type": "feature",
+      "pri": "P1",
+      "effort": "M",
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/a-new-repos",
+      "commit": null,
+      "created": "2026-08-12T14:28:31.345Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-066",
       "p": "shipward",
       "title": "setup.mjs bakes its own install path into repos it onboards",
@@ -1321,6 +1351,24 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T14:31:09.188Z",
+      "p": "shipward",
+      "msg": "You added SW-068 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-12T14:28:37.223Z",
+      "p": "shipward",
+      "msg": "SW-067 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-12T14:28:31.345Z",
+      "p": "shipward",
+      "msg": "You added SW-067 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-12T14:22:55.342Z",
       "p": "shipward",
       "by": "claude",
@@ -2501,29 +2549,11 @@
       "p": "shipward",
       "msg": "SW-009 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T14:33:55.973Z",
-      "p": "shipward",
-      "msg": "SW-009 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T16:05:07.948Z",
-      "p": "shipward",
-      "msg": "SW-008 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T16:04:33.907Z",
-      "p": "shipward",
-      "msg": "SW-003 sent back to Backlog",
-      "by": "user"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 30
+  "rev": 33
 }

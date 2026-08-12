@@ -81,6 +81,22 @@ export async function readGit(cwd = REPO) {
   return { ok: true, trunk, branches };
 }
 
+// What a branch has that the trunk does not, in words (SW-067). Used to seed a
+// first board from branches that already exist, so a new repo's memory starts
+// with something git can vouch for instead of nothing.
+//
+// Subjects only, and capped: this is note text a model will read, and a branch
+// with 400 commits would otherwise write 400 lines into the board on install.
+// `%s` and not `%B` for the same reason — a commit body can be a page.
+const SUBJECT_CAP = 12;
+
+export async function branchLog(name, trunk, cwd = REPO, cap = SUBJECT_CAP) {
+  const out = await git(['log', '--format=%s', '--max-count', String(cap + 1), `${trunk}..${name}`], cwd);
+  if (out === null) return { known: false, subjects: [], more: 0 };
+  const all = lines(out);
+  return { known: true, subjects: all.slice(0, cap), more: Math.max(0, all.length - cap) };
+}
+
 // How far the tree has moved since a commit (SW-044) — the measurement behind
 // "evidence expires".
 //

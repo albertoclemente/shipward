@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-066",
+      "p": "shipward",
+      "title": "setup.mjs bakes its own install path into repos it onboards",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-12T09:52:41.323Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-065",
       "p": "shipward",
       "title": "The timing tests measure the machine, not the property",
@@ -1306,6 +1321,18 @@
   ],
   "feed": [
     {
+      "t": "2026-08-12T09:53:11.258Z",
+      "p": "shipward",
+      "msg": "SW-066 note amended — a clause was lost to the shell",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-12T09:52:41.323Z",
+      "p": "shipward",
+      "msg": "You added SW-066 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-11T10:50:00.946Z",
       "p": "shipward",
       "msg": "SW-064 moved to Review — give it a look",
@@ -2492,23 +2519,11 @@
       "p": "shipward",
       "msg": "SW-008 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:25:44.607Z",
-      "p": "shipward",
-      "msg": "SW-006 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-25T15:25:44.607Z",
-      "p": "shipward",
-      "msg": "You added SW-008 to Backlog — it is on the list",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 28
+  "rev": 30
 }

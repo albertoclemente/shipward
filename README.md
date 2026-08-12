@@ -20,7 +20,14 @@ Every other board takes the agent at its word. When your agent says *"Done — t
 card moves. Shipward runs your project's test command first, and **only moves the card if it
 actually passes.**
 
-<img src="assets/what-happens.svg" alt="The agent says 'Fixed it, tests pass'. Shipward runs the command you declared. If it passes, the card moves and the proof is saved with it. If it fails, the card stays in progress and the failure is written onto the card." width="100%">
+<img src="assets/how-it-works.jpg" alt="A task card with an empty speech bubble is linked to a gear on a red gate; beyond it the path splits, one card passing through with a tick and one turned back with a cross and an arrow returning it." width="100%">
+
+| | |
+|---|---|
+| **The card, and the claim** | your agent says the task is finished |
+| **The gate** | your test command runs, right then |
+| **It passes** | the card moves, and the proof is kept beside it |
+| **It fails** | the card comes back, with the error written on it |
 
 You set this up once, in one line, per project. After that nobody has to remember to check —
 not you, not the agent.

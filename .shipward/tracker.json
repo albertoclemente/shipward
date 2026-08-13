@@ -23,12 +23,12 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/the-link-previews",
       "commit": "9f0bf4f",
       "created": "2026-08-13T09:00:41.452Z",
-      "pushed": null,
+      "pushed": "2026-08-13T09:10:59.592Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -1599,6 +1599,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T09:10:59.592Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-075 review → pushed",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T09:10:57.022Z",
       "p": "shipward",
       "msg": "SW-075 moved to Review — give it a look",
@@ -2791,17 +2797,11 @@
       "p": "shipward",
       "msg": "You added SW-019 to Backlog — it's on the list",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:23:44.926Z",
-      "p": "shipward",
-      "msg": "SW-017 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 76
+  "rev": 77
 }

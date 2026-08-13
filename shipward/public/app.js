@@ -23,6 +23,7 @@ const state = {
   dragging: null,
   drift: null,      // SW-044: git's answer about each anchored sha, from /api/drift
   trust: null,      // SW-045: {known, findings} from /api/trust — null until it answers
+  showAllPushed: false, // SW-073: the Pushed cap is a view, so undoing it is view state
   memoryQuery: '',   // memory view: free-text filter
   memoryFile: null,  // memory view: narrow to one file's accumulated knowledge
   logBy: null,       // log view: null = everyone, 'claude' | 'user'
@@ -648,8 +649,52 @@ function renderMemoryEntry(e) {
   );
 }
 
+// SW-073. What the cap is hiding, said out loud and undoable by looking. The
+// count in the column head is still the true total — a board that quietly
+// showed 10 of 49 and said "10" would be the board lying about itself, which is
+// the one thing this product cannot do.
+function renderPushedTail(col) {
+  const n = col.hidden.length;
+  const oldest = col.cards[col.cards.length - 1];
+  return el('div', { class: 'col-tail' },
+    el('button', {
+      class: 'btn-link col-tail-more',
+      text: `…and ${n} more, landed before ${fmtDate(oldest?.pushed)}`,
+      onclick: () => { state.showAllPushed = true; render(); },
+    }),
+    // The tidying, in one click instead of forty-nine — but still a click. It
+    // takes exactly what is hidden, which is what the reader just saw named.
+    el('button', {
+      class: 'btn btn-secondary btn-block col-tail-archive',
+      text: `Archive these ${n}`,
+      onclick: () => archiveMany(col.hidden.map((c) => c.id)),
+    }),
+  );
+}
+
+// One write, one feed entry, and never a silent partial: cards that cannot make
+// the transition are left alone and reported rather than skipped quietly.
+function archiveMany(ids) {
+  if (!ids.length) return;
+  if (!confirm(`Archive ${ids.length} pushed card${ids.length === 1 ? '' : 's'}? They move to the Archive tab; nothing is deleted.`)) return;
+  commit((doc) => {
+    const want = new Set(ids);
+    let moved = 0;
+    doc.cards = doc.cards.map((c) => {
+      if (!want.has(c.id)) return c;
+      const updated = applyTransition(c, 'shipped', now());
+      if (!updated) return c;
+      moved++;
+      return updated;
+    });
+    if (!moved) return null;
+    doc.feed = feedAdd(doc.feed, doc.activeProject, `Archived ${moved} pushed card${moved === 1 ? '' : 's'}`, now());
+    return doc;
+  });
+}
+
 function renderBoard(doc, project) {
-  const columns = deriveColumns(doc.cards, project.id);
+  const columns = deriveColumns(doc.cards, project.id, { showAllPushed: state.showAllPushed });
   return el('main', { class: 'board-wrap' },
     el('div', { class: 'board' }, columns.map(renderColumn)),
     el('div', { class: 'text-muted board-caption',
@@ -684,6 +729,7 @@ function renderColumn(col) {
     el('div', { class: 'col-body' },
       col.isEmpty ? el('div', { class: 'text-muted col-empty', text: col.empty }) : null,
       col.cards.map(renderCard),
+      col.hidden?.length ? renderPushedTail(col) : null,
       col.key === 'backlog'
         ? el('button', { class: 'btn btn-secondary btn-block col-add', text: '+ Add a card',
             onclick: () => openDialog('new') })

@@ -145,11 +145,46 @@ export function feedAdd(feed, projectId, msg, nowIso, by = 'user') {
 
 export const cardsOf = (cards, projectId) => cards.filter((c) => c.p === projectId);
 
-export function deriveColumns(cards, projectId) {
+// SW-073. Pushed is the only column that grows without bound: every other one
+// empties as work moves through, and Pushed is where work goes to stay. This
+// board reached 49 in sixteen days, which buried the three columns that
+// describe the PRESENT — and telling you what is happening now is the whole job
+// of a board.
+//
+// A VIEW cap, deliberately, not an auto-archive. Nothing moves on disk and no
+// card changes state without a human: hiding a card is a rendering decision and
+// can be undone by looking, where archiving asserts the work is finished with.
+// This product only changes card state on its own where git can PROVE the
+// change; tidiness proves nothing.
+export const PUSHED_SHOWN = 10;
+
+// Newest first by the moment it landed, so the cap keeps what just happened.
+// Falls back to the document's own order when a timestamp is missing or
+// unparseable — Claude Code writes this file directly, so both are possible,
+// and a card with no date must not jump to the top.
+const byLanded = (a, b) => {
+  const t = (c) => {
+    const d = Date.parse(c.pushed || '');
+    return Number.isNaN(d) ? -Infinity : d;
+  };
+  return t(b) - t(a);
+};
+
+export function deriveColumns(cards, projectId, { pushedCap = PUSHED_SHOWN, showAllPushed = false } = {}) {
   const mine = cardsOf(cards, projectId);
   return COLUMNS.map((d) => {
     const list = mine.filter((c) => c.status === d.key);
-    return { ...d, count: list.length, cards: list, isEmpty: list.length === 0 };
+    if (d.key !== 'pushed' || showAllPushed || pushedCap == null || list.length <= pushedCap) {
+      return { ...d, count: list.length, cards: list, isEmpty: list.length === 0, hidden: [] };
+    }
+    const ordered = [...list].sort(byLanded);
+    return {
+      ...d,
+      count: list.length,                  // the COUNT never lies about the total
+      cards: ordered.slice(0, pushedCap),
+      hidden: ordered.slice(pushedCap),    // named, not just counted, so the bulk action knows what it would take
+      isEmpty: false,
+    };
   });
 }
 

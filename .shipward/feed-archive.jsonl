@@ -193,3 +193,4 @@
 {"t":"2026-07-28T10:12:33.014Z","p":"shipward","msg":"23 cards filed to the archive — the board is clear","by":"user"}
 {"t":"2026-07-28T10:20:42.665Z","p":"shipward","msg":"SW-024 logged and taken — git becomes authoritative for what it can prove","by":"claude"}
 {"t":"2026-07-28T10:27:39.143Z","p":"shipward","msg":"Reconciled with git — SW-024 → claude","by":"claude"}
+{"t":"2026-07-28T10:32:47.418Z","p":"shipward","msg":"SW-024 moved to Review — give it a look","by":"claude"}

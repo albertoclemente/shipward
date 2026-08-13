@@ -109,12 +109,12 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": null,
       "commit": "9feb4bd",
       "created": "2026-08-13T15:55:57.399Z",
-      "pushed": null,
+      "pushed": "2026-08-13T16:43:13.030Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -137,12 +137,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": null,
       "commit": "9feb4bd",
       "created": "2026-08-13T15:55:31.227Z",
-      "pushed": null,
+      "pushed": "2026-08-13T16:43:13.030Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -1741,6 +1741,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:43:13.030Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 2 cards corrected from the repository",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:43:10.688Z",
       "p": "shipward",
       "msg": "You added SW-081 to Backlog — it's on the list",
@@ -2933,17 +2939,11 @@
       "p": "shipward",
       "msg": "SW-025 logged and taken — the feed becomes a view",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:32:47.418Z",
-      "p": "shipward",
-      "msg": "SW-024 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 99
+  "rev": 100
 }

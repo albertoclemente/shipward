@@ -186,3 +186,5 @@
 {"t":"2026-07-28T07:42:32.102Z","p":"shipward","msg":"You added SW-022 to Backlog — it's on the list","by":"claude"}
 {"t":"2026-07-28T07:42:32.411Z","p":"shipward","msg":"SW-022 handed to Claude Code — queued","by":"claude"}
 {"t":"2026-07-28T07:46:52.361Z","p":"shipward","msg":"SW-022 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T07:46:52.718Z","p":"shipward","msg":"Synced with git — SW-022 merged to main — sync now reads git","by":"claude"}
+{"t":"2026-07-28T08:41:50.437Z","p":"shipward","msg":"You added SW-023 to Backlog — it's on the list","by":"claude"}

@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-080",
+      "p": "shipward",
+      "title": "Two people outside the project changed the code and the README does not say so",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "chore/two-people-outside",
+      "commit": null,
+      "created": "2026-08-13T16:35:50.525Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-079",
       "p": "shipward",
       "title": "A pass over a dirty tree throws away the only evidence of what ran",
@@ -1672,6 +1687,18 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:35:50.684Z",
+      "p": "shipward",
+      "msg": "SW-080 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T16:35:50.525Z",
+      "p": "shipward",
+      "msg": "You added SW-080 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:29:59.590Z",
       "p": "shipward",
       "msg": "Reconciled with git — 2 cards corrected from the repository",
@@ -2858,23 +2885,11 @@
       "p": "shipward",
       "msg": "SW-023 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T08:41:50.437Z",
-      "p": "shipward",
-      "msg": "You added SW-023 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:46:52.718Z",
-      "p": "shipward",
-      "msg": "Synced with git — SW-022 merged to main — sync now reads git",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 91
+  "rev": 93
 }

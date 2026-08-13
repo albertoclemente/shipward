@@ -137,6 +137,31 @@ waiting on you longest, which projects have gone quiet.
 
 ---
 
+## This is the real thing
+
+Not mockups. This is the board that built Shipward, photographed as it stands.
+
+<img src="assets/board.png" alt="The Shipward board: columns for Backlog, Claude Working, Review and Pushed. One card is in progress, 48 have shipped." width="100%">
+
+**The board.** One card in flight, nothing waiting on you, 48 landed. Each card
+carries its branch and the commit that proves it.
+
+<img src="assets/trust.png" alt="The Trust tab, headed 'What nothing can settle for you', listing two cards closed without a check having run." width="100%">
+
+**The Trust tab, on this repo, right now.** *"2 things nothing can settle for
+you."* Two cards were closed before this project could verify anything, and the
+board says so about itself rather than waiting to be asked. It ends with the
+line that matters: *"Shipward changes nothing here. git can prove some of these
+are wrong; none of them can be settled without you."*
+
+<img src="assets/memory.png" alt="The Memory tab: 257 entries, about 40,030 words, 15 decisions not to reverse, 33 things that bit us, 0 still open." width="100%">
+
+**The memory.** 257 entries, ~40,000 words, **15 decisions not to reverse and 33
+things that bit us** — written by the agent as it worked, and read back by the
+next session instead of starting cold.
+
+---
+
 ## Try it in a minute
 
 ```bash

@@ -17,6 +17,66 @@
   ],
   "cards": [
     {
+      "id": "SW-079",
+      "p": "shipward",
+      "title": "A pass over a dirty tree throws away the only evidence of what ran",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-13T16:20:59.238Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-078",
+      "p": "shipward",
+      "title": "A check is stamped with the tree as it was BEFORE the run",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-13T16:20:59.074Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-077",
+      "p": "shipward",
+      "title": "A pass over a dirty tree keeps no output, and it is the one pass nobody can re-derive",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-13T15:55:57.399Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-076",
+      "p": "shipward",
+      "title": "The tree a check ran against is sampled before the run and never after",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-13T15:55:31.227Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-075",
       "p": "shipward",
       "title": "The link previews as a grey auto-generated card",
@@ -1599,6 +1659,48 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:20:59.238Z",
+      "p": "shipward",
+      "msg": "You added SW-079 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T16:20:59.074Z",
+      "p": "shipward",
+      "msg": "You added SW-078 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T15:58:33.155Z",
+      "p": "shipward",
+      "msg": "SW-076 note — Raised P2 to P1. The window needs a concurrent writer to…",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T15:55:57.519Z",
+      "p": "shipward",
+      "msg": "SW-077 note — From a dev.to comment on the launch post: a green exit code…",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T15:55:57.400Z",
+      "p": "shipward",
+      "msg": "You added SW-077 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T15:55:44.160Z",
+      "p": "shipward",
+      "msg": "SW-076 note — From a dev.to comment on the launch post. The suggestion:…",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T15:55:31.232Z",
+      "p": "shipward",
+      "msg": "You added SW-076 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T10:23:01.781Z",
       "p": "shipward",
       "msg": "SW-063 note — OUTCOME, launch step one — discoverability, submitted…",
@@ -2755,53 +2857,11 @@
       "p": "shipward",
       "msg": "SW-021 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:23:12.152Z",
-      "p": "shipward",
-      "msg": "SW-021 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:21:06.062Z",
-      "p": "shipward",
-      "msg": "Synced with git — the four review-fix cards are on main at fa881cd; SW-021 stays in backlog, it is not done",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:57:43.529Z",
-      "p": "shipward",
-      "msg": "You added SW-021 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:57:43.331Z",
-      "p": "shipward",
-      "msg": "SW-020 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:37:50.902Z",
-      "p": "shipward",
-      "msg": "SW-020 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:37:50.675Z",
-      "p": "shipward",
-      "msg": "You added SW-020 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:35:34.356Z",
-      "p": "shipward",
-      "msg": "SW-019 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 79
+  "rev": 86
 }

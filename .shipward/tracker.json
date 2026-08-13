@@ -23,12 +23,12 @@
       "type": "chore",
       "pri": "P1",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/the-product-is",
       "commit": "a2b366a",
       "created": "2026-08-13T08:10:41.756Z",
-      "pushed": null,
+      "pushed": "2026-08-13T08:12:42.167Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -1571,6 +1571,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T08:12:42.167Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-074 review → pushed",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T08:12:39.787Z",
       "p": "shipward",
       "msg": "SW-074 moved to Review — give it a look",
@@ -2763,17 +2769,11 @@
       "p": "shipward",
       "msg": "You added SW-018 to Backlog — it's on the list",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:00:03.356Z",
-      "p": "shipward",
-      "msg": "SW-017 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 72
+  "rev": 73
 }

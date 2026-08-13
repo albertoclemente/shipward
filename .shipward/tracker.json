@@ -1599,6 +1599,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T10:23:01.781Z",
+      "p": "shipward",
+      "msg": "SW-063 note — OUTCOME, launch step one — discoverability, submitted…",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T10:00:26.888Z",
       "p": "shipward",
       "msg": "SW-063 note — DECISION. Second in-place redaction of this append-only…",
@@ -2791,17 +2797,11 @@
       "p": "shipward",
       "msg": "SW-019 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:31:44.694Z",
-      "p": "shipward",
-      "msg": "SW-019 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 78
+  "rev": 79
 }

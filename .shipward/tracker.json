@@ -23,12 +23,12 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": null,
       "commit": "9feb4bd",
       "created": "2026-08-13T16:20:59.238Z",
-      "pushed": null,
+      "pushed": "2026-08-13T16:29:59.590Z",
       "shipped": null
     },
     {
@@ -38,12 +38,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/a-check-is",
       "commit": "9feb4bd",
       "created": "2026-08-13T16:20:59.074Z",
-      "pushed": null,
+      "pushed": "2026-08-13T16:29:59.590Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -1672,6 +1672,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:29:59.590Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 2 cards corrected from the repository",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:29:56.917Z",
       "p": "shipward",
       "msg": "SW-079 shipped in the same commit as SW-078",
@@ -2864,17 +2870,11 @@
       "p": "shipward",
       "msg": "Synced with git — SW-022 merged to main — sync now reads git",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:46:52.361Z",
-      "p": "shipward",
-      "msg": "SW-022 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 90
+  "rev": 91
 }

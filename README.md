@@ -227,6 +227,19 @@ expired, and the incident behind each rule.
 
 [**CLAUDE.md**](CLAUDE.md) — the protocol your agent actually follows.
 
+## Acknowledgements
+
+Two people read the launch post and found real bugs in this the same day, before
+it had a single star.
+
+- **[Peter](https://dev.to/peterbuildssecure)** — [pointed out](https://dev.to/albertoclemente/every-ai-coding-agent-tracker-is-a-self-report-system-53nm/comments/3d153)
+  that a check proved nothing about the tree being marked complete, because the
+  tree was only read *before* the run. Fixed in
+  [`9feb4bd`](https://github.com/albertoclemente/shipward/commit/9feb4bd).
+- **[Reid Marlow](https://dev.to/reidmarlow)** — [found](https://dev.to/albertoclemente/every-ai-coding-agent-tracker-is-a-self-report-system-53nm/comments/3d17h)
+  that a pass over a dirty tree threw away the only record of what had run. Fixed
+  in the same commit.
+
 ## Requirements
 
 Node 20 or newer, macOS or Linux. No dependencies, no build step, no account.

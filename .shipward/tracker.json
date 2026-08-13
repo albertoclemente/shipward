@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-072",
+      "p": "shipward",
+      "title": "No SECURITY.md, on a tool that runs commands on your machine",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "S",
+      "status": "claude",
+      "claude": "working",
+      "branch": "chore/no-securitymd-on",
+      "commit": null,
+      "created": "2026-08-13T07:07:19.453Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-071",
       "p": "shipward",
       "title": "A contended lock break makes one writer throw instead of retrying",
@@ -1461,6 +1476,18 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T07:07:19.582Z",
+      "p": "shipward",
+      "msg": "SW-072 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T07:07:19.453Z",
+      "p": "shipward",
+      "msg": "You added SW-072 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T07:04:10.829Z",
       "p": "shipward",
       "msg": "Reconciled with git — 9 cards corrected from the repository",
@@ -2647,23 +2674,11 @@
       "p": "shipward",
       "msg": "You added SW-013 to Backlog — it's on the list",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:45:14.620Z",
-      "p": "shipward",
-      "msg": "SW-012 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:42:06.203Z",
-      "p": "shipward",
-      "msg": "SW-012 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 51
+  "rev": 53
 }

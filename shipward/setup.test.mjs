@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { mkdtemp, mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -127,4 +128,113 @@ test('the onboarded repo resolves from inside itself — cwd, no env', async () 
   // /private/var/… in the child's cwd — one directory, two names.
   const { realpath } = await import('node:fs/promises');
   assert.equal(await realpath(out.tracker), await realpath(join(repo, '.shipward', 'tracker.json')));
+});
+
+/* ── a moved install is repaired, not reported as fine (SW-066) ── */
+
+const CENTRAL = join(HERE, '..');
+const GONE = '/nonexistent/old-shipward';
+const WIRED = ['.claude/settings.json', '.mcp.json', 'CLAUDE.md'];
+
+// Rewrite every reference to this install so the repo looks like one onboarded
+// from an install that has since been moved, renamed or reinstalled.
+const moveInstall = async () => {
+  for (const f of WIRED) {
+    const p = join(repo, f);
+    await writeFile(p, (await readFile(p, 'utf8')).split(CENTRAL).join(GONE), 'utf8');
+  }
+};
+const stale = async () => {
+  let n = 0;
+  for (const f of WIRED) n += (await readFile(join(repo, f), 'utf8')).split(GONE).length - 1;
+  return n;
+};
+
+test('re-running setup repairs wiring that points at a vanished install', async () => {
+  // The bug this closes: idempotent by PRESENCE meant a second run saw a
+  // shipward hook, said "already wired" and changed nothing — so the repo kept
+  // four hooks pointing at a path that no longer existed. The hooks exit
+  // silently on any error by design, which is what made it invisible.
+  await setup('--prefix', 'CA');
+  await moveInstall();
+  assert.ok(await stale() > 0, 'the fixture must actually be stale');
+
+  const { stdout } = await setup();
+  assert.equal(await stale(), 0, 'no reference to the old install may survive');
+  assert.match(stdout, /repointed at this install/);
+
+  const settings = await json('.claude/settings.json');
+  for (const ev of ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'Stop']) {
+    const cmds = settings.hooks[ev].flatMap((g) => g.hooks.map((h) => h.command));
+    assert.ok(cmds.every((c) => !c.includes(GONE)), `${ev} still names the old install`);
+    assert.ok(cmds.some((c) => c.includes(CENTRAL)), `${ev} was not repointed here`);
+  }
+  assert.ok(settings.statusLine.command.includes(CENTRAL));
+  assert.equal((await json('.mcp.json')).mcpServers.shipward.args[0], join(CENTRAL, 'shipward', 'mcp.mjs'));
+  assert.ok((await readFile(join(repo, 'CLAUDE.md'), 'utf8')).includes(CENTRAL));
+});
+
+test('a repair does not duplicate the hooks it repairs', async () => {
+  await setup('--prefix', 'CA');
+  await moveInstall();
+  await setup();
+  const settings = await json('.claude/settings.json');
+  for (const ev of ['SessionStart', 'UserPromptSubmit', 'PreToolUse', 'Stop']) {
+    const cmds = settings.hooks[ev].flatMap((g) => g.hooks.map((h) => h.command))
+      .filter((c) => c.includes('shipward'));
+    assert.equal(cmds.length, 1, `${ev} should hold one shipward hook, has ${cmds.length}`);
+  }
+});
+
+test('a clean re-run still changes nothing at all', async () => {
+  // The other half: repairing on a mismatch must not make every run a rewrite.
+  await setup('--prefix', 'CA');
+  const before = await Promise.all(WIRED.map((f) => readFile(join(repo, f), 'utf8')));
+  const { stdout } = await setup();
+  const after = await Promise.all(WIRED.map((f) => readFile(join(repo, f), 'utf8')));
+  assert.deepEqual(after, before, 'a second run must be byte-identical');
+  assert.match(stdout, /already points here/);
+  assert.doesNotMatch(stdout, /repointed/);
+});
+
+test("someone else's statusLine is still never clobbered", async () => {
+  await setup('--prefix', 'CA');
+  const p = join(repo, '.claude', 'settings.json');
+  const s = JSON.parse(await readFile(p, 'utf8'));
+  s.statusLine = { type: 'command', command: 'my-own-prompt --fancy' };
+  await writeFile(p, JSON.stringify(s, null, 2));
+  await moveInstall();
+
+  const { stdout } = await setup();
+  const after = await json('.claude/settings.json');
+  assert.equal(after.statusLine.command, 'my-own-prompt --fancy', 'a foreign statusLine is not ours to repair');
+  assert.match(stdout, /not clobbered/);
+  // …while the hooks around it are still repaired.
+  assert.equal(await stale(), 0);
+});
+
+test('setup refuses to run from a package cache, and writes nothing', async () => {
+  // Onboarding records where Shipward lives in files the target COMMITS. From a
+  // cache npm garbage-collects, that wiring works on day one and breaks
+  // silently later, inside files that may already have been pushed to a team.
+  const cache = await mkdtemp(join(tmpdir(), 'shipward-npx-'));
+  const fake = join(cache, '_npx', 'deadbeef', 'node_modules', 'shipward');
+  await mkdir(join(fake, 'shipward'), { recursive: true });
+  await mkdir(join(fake, '.claude', 'hooks'), { recursive: true });
+  await mkdir(join(fake, '.shipward'), { recursive: true });
+  await run('cp', ['-R', join(CENTRAL, 'shipward') + '/.', join(fake, 'shipward')]);
+  await run('cp', ['-R', join(CENTRAL, '.claude') + '/.', join(fake, '.claude')]);
+  await run('cp', [join(CENTRAL, '.shipward', 'schema.json'), join(fake, '.shipward')]);
+
+  await assert.rejects(
+    () => run(process.execPath, [join(fake, 'shipward', 'setup.mjs'), repo]),
+    (err) => {
+      assert.match(err.stderr, /refusing to onboard/);
+      assert.match(err.stderr, /package cache/);
+      assert.match(err.stderr, /git clone/, 'it must say what to do instead');
+      return true;
+    },
+  );
+  assert.ok(!existsSync(join(repo, '.mcp.json')), 'a refusal must write nothing');
+  await rm(cache, { recursive: true, force: true });
 });

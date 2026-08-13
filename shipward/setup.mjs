@@ -55,6 +55,29 @@ const seedRequested = flags['seed-from-branches'] === true;
 const target = resolve(positional[0]);
 if (!existsSync(target)) die(`${target} does not exist`);
 if (resolve(target) === CENTRAL) die('this repo is already Shipward — onboarding it onto itself would double the wiring');
+
+// SW-066. Wiring records where Shipward lives, in files the target repo COMMITS.
+// That is correct from a clone, whose path is stable and deliberate. It is a
+// trap from a package cache: the wiring works on day one, the cache is
+// collected later, and every session then starts with four broken hooks inside
+// files that may already have been pushed to a team — with nothing pointing
+// back here. Refuse rather than write a path that is designed to disappear.
+const TRANSIENT = [
+  /[/\\]_npx[/\\]/,
+  /[/\\]_cacache[/\\]/,
+  /[/\\]node_modules[/\\]\.cache[/\\]/,
+  /[/\\]\.pnpm-store[/\\]/,
+  /[/\\]\.bun[/\\]install[/\\]cache[/\\]/,
+];
+if (TRANSIENT.some((re) => re.test(`${CENTRAL}/`))) {
+  die(`refusing to onboard from ${CENTRAL}\n`
+    + '  That is a package cache. Onboarding writes this path into the target repo\'s\n'
+    + '  .claude/settings.json, .mcp.json and CLAUDE.md, and those files get committed —\n'
+    + '  so the wiring would work today and break silently when the cache is collected.\n'
+    + '  Clone Shipward to a stable directory and run setup from there:\n'
+    + '      git clone https://github.com/albertoclemente/shipward\n'
+    + '      node shipward/setup.mjs ' + target);
+}
 // The reconciler is half the product, and it reads git. A tracker without a
 // repository behind it would hold a board nothing can ever prove wrong.
 if (!existsSync(join(target, '.git'))) die(`${target} is not a git repository — run git init first`);
@@ -169,8 +192,19 @@ await mkdir(claudeDir, { recursive: true });
 const settingsPath = join(claudeDir, 'settings.json');
 const settings = (await readJson(settingsPath)) ?? {};
 
-const already = (event) => (settings.hooks?.[event] ?? [])
-  .some((g) => (g.hooks ?? []).some((h) => String(h.command ?? '').includes('shipward')));
+// SW-066. Idempotent by PRESENCE was the bug. A second run saw a shipward hook,
+// said "already wired" and changed nothing — so a repo onboarded from an install
+// that has since been moved, renamed or reinstalled kept pointing at a path that
+// no longer exists, and every session started with four hooks that silently did
+// nothing. The hooks exit quietly on any error by design (they must never break
+// a session), which is exactly what made this invisible.
+//
+// Idempotent by CORRECTNESS instead: a wiring that names THIS install is left
+// alone, and one that names anywhere else is repaired and reported. Re-running
+// setup is now the documented repair, which is the answer a user would guess.
+const shipwardHooks = (event) => (settings.hooks?.[event] ?? [])
+  .flatMap((g) => g.hooks ?? [])
+  .filter((h) => String(h.command ?? '').includes('shipward'));
 
 const EVENTS = [
   ['SessionStart', null, 'session-start'],
@@ -179,9 +213,19 @@ const EVENTS = [
   ['Stop', null, 'stop'],
 ];
 let hooksAdded = 0;
+let hooksRepaired = 0;
 settings.hooks ??= {};
 for (const [event, matcher, which] of EVENTS) {
-  if (already(event)) { kept.push(`hook ${event} (a shipward hook is already wired)`); continue; }
+  const existing = shipwardHooks(event);
+  if (existing.length) {
+    // Compared against the hook SCRIPT path, not the whole command, so a
+    // hand-edited env or an extra flag on the line is not mistaken for rot.
+    const stale = existing.filter((h) => !String(h.command).includes(HOOK));
+    for (const h of stale) h.command = hookCmd(which);
+    if (stale.length) { hooksRepaired += stale.length; done.push(`hook ${event} — repointed at this install`); }
+    else kept.push(`hook ${event} (already points here)`);
+    continue;
+  }
   settings.hooks[event] ??= [];
   settings.hooks[event].push({
     ...(matcher ? { matcher } : {}),
@@ -189,13 +233,27 @@ for (const [event, matcher, which] of EVENTS) {
   });
   hooksAdded++;
 }
+
+let statusRepaired = false;
+const statusCmd = `${env} node "${STATUS}"`;
 if (settings.statusLine) {
-  kept.push('statusLine (one is already configured — not clobbered; wire Shipward\'s by hand if wanted)');
+  const cmd = String(settings.statusLine.command ?? '');
+  // Somebody else's status line is still never clobbered — only a Shipward one
+  // that has gone stale is repaired.
+  if (cmd.includes('status.mjs') && cmd.includes('shipward') && !cmd.includes(STATUS)) {
+    settings.statusLine = { type: 'command', command: statusCmd };
+    statusRepaired = true;
+    done.push('statusLine — repointed at this install');
+  } else if (cmd.includes(STATUS)) {
+    kept.push('statusLine (already points here)');
+  } else {
+    kept.push('statusLine (one is already configured — not clobbered; wire Shipward\'s by hand if wanted)');
+  }
 } else {
-  settings.statusLine = { type: 'command', command: `${env} node "${STATUS}"` };
+  settings.statusLine = { type: 'command', command: statusCmd };
   done.push('statusLine — the one-line Shipward status');
 }
-if (hooksAdded || !existsSync(settingsPath)) {
+if (hooksAdded || hooksRepaired || statusRepaired || !existsSync(settingsPath)) {
   await writeJson(settingsPath, settings);
   if (hooksAdded) done.push(`.claude/settings.json — ${hooksAdded} hook event${hooksAdded === 1 ? '' : 's'} added, existing keys preserved`);
 }
@@ -204,14 +262,23 @@ if (hooksAdded || !existsSync(settingsPath)) {
 const mcpPath = join(target, '.mcp.json');
 const mcp = (await readJson(mcpPath)) ?? {};
 mcp.mcpServers ??= {};
+const server = {
+  command: 'node',
+  args: [MCP],
+  env: { SHIPWARD_TRACKER: trackerPath, SHIPWARD_REPO: target },
+};
 if (mcp.mcpServers.shipward) {
-  kept.push('.mcp.json (a shipward server is already registered)');
+  // A registration pointing at a vanished install fails to start, and the desk
+  // simply reads MCP OFFLINE forever — no error anyone would connect to this.
+  if (mcp.mcpServers.shipward.args?.[0] !== MCP) {
+    mcp.mcpServers.shipward = server;
+    await writeJson(mcpPath, mcp);
+    done.push('.mcp.json — repointed at this install');
+  } else {
+    kept.push('.mcp.json (already points here)');
+  }
 } else {
-  mcp.mcpServers.shipward = {
-    command: 'node',
-    args: [MCP],
-    env: { SHIPWARD_TRACKER: trackerPath, SHIPWARD_REPO: target },
-  };
+  mcp.mcpServers.shipward = server;
   await writeJson(mcpPath, mcp);
   done.push('.mcp.json — shipward server, pointed at this repo\'s tracker');
 }
@@ -237,7 +304,22 @@ ${MARK}
 `;
 const existingMd = existsSync(claudeMd) ? await readFile(claudeMd, 'utf8') : null;
 if (existingMd?.includes(MARK)) {
-  kept.push('CLAUDE.md (the protocol section is already there)');
+  // Replace only what lies BETWEEN the markers. Everything the user wrote around
+  // the block is theirs and is not touched — which is also why the block is
+  // marked at both ends rather than merely appended.
+  const first = existingMd.indexOf(MARK);
+  const last = existingMd.lastIndexOf(MARK);
+  const block = existingMd.slice(first, last + MARK.length);
+  if (block.includes(CENTRAL) && last > first) {
+    kept.push('CLAUDE.md (already points here)');
+  } else if (last > first) {
+    await writeFile(claudeMd, existingMd.slice(0, first) + protocol.trimEnd() + existingMd.slice(last + MARK.length), 'utf8');
+    done.push('CLAUDE.md — protocol section repointed at this install');
+  } else {
+    // One marker only: a hand-edited or truncated block. Say so rather than
+    // guess where it ends and eat somebody's prose.
+    kept.push('CLAUDE.md (only one protocol marker found — left alone; remove the block by hand to re-add it)');
+  }
 } else {
   await writeFile(claudeMd, existingMd ? `${existingMd.trimEnd()}\n\n${protocol}` : protocol, 'utf8');
   done.push(existingMd ? 'CLAUDE.md — protocol section appended' : 'CLAUDE.md — created with the protocol');

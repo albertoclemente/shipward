@@ -23,13 +23,26 @@
       "type": "chore",
       "pri": "P1",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/the-product-is",
-      "commit": null,
+      "commit": "a2b366a",
       "created": "2026-08-13T08:10:41.756Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T08:12:39.786Z",
+        "sha": "a2b366a",
+        "dirty": false,
+        "ms": 26829
+      }
     },
     {
       "id": "SW-073",
@@ -1558,6 +1571,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T08:12:39.787Z",
+      "p": "shipward",
+      "msg": "SW-074 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T08:10:41.909Z",
       "p": "shipward",
       "msg": "SW-074 handed to Claude Code — queued",
@@ -2750,17 +2769,11 @@
       "p": "shipward",
       "msg": "SW-017 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T17:59:45.296Z",
-      "p": "shipward",
-      "msg": "You added SW-017 to Backlog — it's on the list",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 71
+  "rev": 72
 }

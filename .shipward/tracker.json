@@ -23,13 +23,26 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/the-link-previews",
-      "commit": null,
+      "commit": "9f0bf4f",
       "created": "2026-08-13T09:00:41.452Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T09:10:57.022Z",
+        "sha": "9f0bf4f",
+        "dirty": false,
+        "ms": 26422
+      }
     },
     {
       "id": "SW-074",
@@ -1586,6 +1599,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T09:10:57.022Z",
+      "p": "shipward",
+      "msg": "SW-075 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T09:00:41.600Z",
       "p": "shipward",
       "msg": "SW-075 handed to Claude Code — queued",
@@ -2778,17 +2797,11 @@
       "p": "shipward",
       "msg": "SW-017 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T18:23:44.544Z",
-      "p": "shipward",
-      "msg": "SW-018 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 75
+  "rev": 76
 }

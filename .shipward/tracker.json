@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-081",
+      "p": "shipward",
+      "title": "Evidence records that a check passed, not what it produced",
+      "type": "feature",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-13T16:43:10.688Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-080",
       "p": "shipward",
       "title": "Two people outside the project changed the code and the README does not say so",
@@ -94,13 +109,26 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
+      "status": "review",
+      "claude": "done",
       "branch": null,
-      "commit": null,
+      "commit": "9feb4bd",
       "created": "2026-08-13T15:55:57.399Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T16:42:46.588Z",
+        "sha": "1e3e5dd",
+        "dirty": false,
+        "ms": 27408
+      }
     },
     {
       "id": "SW-076",
@@ -109,13 +137,26 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
+      "status": "review",
+      "claude": "done",
       "branch": null,
-      "commit": null,
+      "commit": "9feb4bd",
       "created": "2026-08-13T15:55:31.227Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T16:42:18.825Z",
+        "sha": "1e3e5dd",
+        "dirty": false,
+        "ms": 27987
+      }
     },
     {
       "id": "SW-075",
@@ -1700,6 +1741,24 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:43:10.688Z",
+      "p": "shipward",
+      "msg": "You added SW-081 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T16:42:46.588Z",
+      "p": "shipward",
+      "msg": "SW-077 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T16:42:18.825Z",
+      "p": "shipward",
+      "msg": "SW-076 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:37:49.874Z",
       "p": "shipward",
       "msg": "Reconciled with git — SW-080 review → pushed",
@@ -2880,29 +2939,11 @@
       "p": "shipward",
       "msg": "SW-024 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:27:39.143Z",
-      "p": "shipward",
-      "msg": "Reconciled with git — SW-024 → claude",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:20:42.665Z",
-      "p": "shipward",
-      "msg": "SW-024 logged and taken — git becomes authoritative for what it can prove",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:12:33.014Z",
-      "p": "shipward",
-      "msg": "23 cards filed to the archive — the board is clear",
-      "by": "user"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 96
+  "rev": 99
 }

@@ -6,9 +6,9 @@
 // and spawn's behaviour is the thing being relied on for safety here.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, writeFile, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
@@ -764,4 +764,142 @@ test('a check that imports the store cannot reach the live board through it', as
     { cwd: process.cwd(), timeoutMs: 20000 });
   assert.match(r.out, /MissingTrackerError/, 'it finds nothing, and says so');
   assert.doesNotMatch(r.out, /READ-A-BOARD/, 'it must not have found a board at all');
+});
+
+/* ── the tree must not move under the check (SW-078) ─────── */
+
+// Raised by a reader in the dev.to comments on the day this went public, and he
+// stated the invariant better than the project had: the claim worth making is
+// not "this command passed" but "this command passed against the artifact now
+// being marked complete". headState was read once, BEFORE the spawn, so a check
+// running for minutes recorded pre-run state and a pass could be stamped
+// against a tree that no longer existed.
+
+const stagedRepo = async (t) => {
+  const dir = await mkdtemp(join(tmpdir(), 'shipward-moved-'));
+  t.after(() => rm(dir, { recursive: true, force: true }));
+  const g = (...a) => execFileSync('git', a, { cwd: dir, stdio: 'pipe' });
+  g('init', '-q', '-b', 'main', '.');
+  g('config', 'user.email', 't@t');
+  g('config', 'user.name', 'T');
+  await writeFile(join(dir, 'a.txt'), 'one\n');
+  g('add', '-A');
+  g('commit', '-qm', 'first');
+  return { dir, g };
+};
+
+const NOOP = { id: 'p', checks: { default: ['node', '-e', ''] } };
+
+test('a tree that does not move still passes', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => ({ exit: 0, ms: 5, out: '' }),
+  });
+  assert.equal(r.state, 'pass');
+  assert.equal(r.ok, true);
+});
+
+test('a file landing DURING the check refuses the pass', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => {
+      await writeFile(join(dir, 'b.txt'), 'landed mid-check\n');
+      return { exit: 0, ms: 5, out: 'all green' };
+    },
+  });
+  assert.equal(r.state, 'moved', 'a green exit must not carry a tree that shifted');
+  assert.equal(r.ok, false);
+});
+
+test('a file whose CONTENT changes mid-check is caught, not just its name', async (t) => {
+  // The case a path-list comparison misses entirely: same filename on both
+  // sides, different bytes. This is why the fingerprint hashes the patch.
+  const { dir } = await stagedRepo(t);
+  await writeFile(join(dir, 'a.txt'), 'two\n');
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => {
+      await writeFile(join(dir, 'a.txt'), 'three\n');
+      return { exit: 0, ms: 5, out: '' };
+    },
+  });
+  assert.equal(r.state, 'moved');
+});
+
+test('a commit landing mid-check names both shas', async (t) => {
+  const { dir, g } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => {
+      await writeFile(join(dir, 'c.txt'), 'x\n');
+      g('add', '-A');
+      g('commit', '-qm', 'landed during the check');
+      return { exit: 0, ms: 5, out: '' };
+    },
+  });
+  assert.equal(r.state, 'moved');
+  assert.notEqual(r.movedFrom, r.movedTo, 'HEAD really did move, so both shas are worth naming');
+  assert.match(verdictText(r, { cmd: 'x' }), /HEAD moved from/);
+});
+
+test('writes to the BOARD do not count as the tree moving', async (t) => {
+  // The heartbeat rewrites .shipward/tracker.json every 60s. If that counted,
+  // every check on this repo would report moved — the SW-053 failure wearing a
+  // new face.
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => {
+      await mkdir(join(dir, '.shipward'), { recursive: true });
+      await writeFile(join(dir, '.shipward', 'tracker.json'), '{"heartbeat":1}');
+      return { exit: 0, ms: 5, out: '' };
+    },
+  });
+  assert.equal(r.state, 'pass', 'a write to the board is not a change to the code under test');
+});
+
+test('a failing check that also moved reports moved, and neither grants the status', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => {
+      await writeFile(join(dir, 'b.txt'), 'x\n');
+      return { exit: 1, ms: 5, out: 'boom' };
+    },
+  });
+  assert.equal(r.ok, false);
+  assert.equal(kindFor(r), 'finding');
+});
+
+test('the same-sha case does not print two identical shas at a reader', async () => {
+  const text = verdictText(
+    { ran: true, state: 'moved', name: 'default', ms: 5, movedFrom: 'abc1234', movedTo: 'abc1234', out: '' },
+    { cmd: 'node --test' },
+  );
+  assert.match(text, /working tree changed while it ran/);
+  assert.doesNotMatch(text, /abc1234.*abc1234/s, 'reads as a bug in the tool, not a fact about the repo');
+});
+
+/* ── a dirty pass keeps its transcript (SW-079) ──────────── */
+
+test('a pass over a DIRTY tree keeps the output, because the sha cannot re-derive it', async () => {
+  const text = verdictText(
+    { ran: true, state: 'pass', name: 'default', ms: 12, sha: 'abc1234', dirty: true, out: 'ok 5 tests' },
+    { cmd: 'node --test' },
+  );
+  assert.match(text, /only record of what ran/);
+  assert.match(text, /ok 5 tests/);
+});
+
+test('a pass over a CLEAN tree still keeps no transcript', async () => {
+  // The policy that stands: the note is memory every future session re-reads,
+  // and a green run at a clean sha is re-derivable by checking it out.
+  const text = verdictText(
+    { ran: true, state: 'pass', name: 'default', ms: 12, sha: 'abc1234', dirty: false, out: 'ok 5 tests' },
+    { cmd: 'node --test' },
+  );
+  assert.doesNotMatch(text, /ok 5 tests/);
+  assert.match(text, /passed at abc1234/);
 });

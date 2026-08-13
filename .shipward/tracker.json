@@ -38,9 +38,9 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "fix/a-check-is",
       "commit": null,
       "created": "2026-08-13T16:20:59.074Z",
       "pushed": null,
@@ -1659,6 +1659,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:24:39.347Z",
+      "p": "shipward",
+      "msg": "SW-078 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:20:59.238Z",
       "p": "shipward",
       "msg": "You added SW-079 to Backlog — it's on the list",
@@ -2851,17 +2857,11 @@
       "p": "shipward",
       "msg": "Synced with git — SW-021 merged to main — cancellation honoured",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:26:14.188Z",
-      "p": "shipward",
-      "msg": "SW-021 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 86
+  "rev": 87
 }

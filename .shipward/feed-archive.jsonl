@@ -181,3 +181,4 @@
 {"t":"2026-07-27T18:57:43.529Z","p":"shipward","msg":"You added SW-021 to Backlog — it's on the list","by":"claude"}
 {"t":"2026-07-28T07:21:06.062Z","p":"shipward","msg":"Synced with git — the four review-fix cards are on main at fa881cd; SW-021 stays in backlog, it is not done","by":"claude"}
 {"t":"2026-07-28T07:23:12.152Z","p":"shipward","msg":"SW-021 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T07:26:14.188Z","p":"shipward","msg":"SW-021 moved to Review — give it a look","by":"claude"}

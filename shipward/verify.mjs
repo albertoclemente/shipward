@@ -403,15 +403,38 @@ export async function runCheck(project, card, { cwd = REPO, run = spawnCheck } =
   // differently from a project that never promised any.
   if (!resolved.argv) return { ran: false, ok: false, state: resolved.name ? 'unresolved' : 'none', ...resolved };
 
+  // SW-078. The tree is read on BOTH sides of the run, because a single reading
+  // before it only ever proved something about a moment that had already
+  // passed. Raised by a reader on the day this went public, and he put the
+  // invariant better than this project had: the claim worth making is not "this
+  // command passed" but "this command passed against the artifact now being
+  // marked complete".
+  //
+  // A check can run for minutes. Anything that lands in the tree meanwhile —
+  // the agent editing another file, a build artefact, a second session — was
+  // invisible, and the evidence was stamped with pre-run state. So a pass could
+  // be recorded against a tree that no longer existed by the time the card
+  // moved.
   const head = await headState(cwd);
   const result = await run(resolved.argv, { cwd, timeoutMs: timeoutOf(project) });
+  const after = await headState(cwd);
   const outcome = readOutcome(result);
+
+  // Only claimable when both readings succeeded. If git could not be read
+  // either side, "did it move?" is unknown — and unknown must not read as no.
+  const comparable = head.known && after.known && head.digest && after.digest;
+  const moved = comparable && head.digest !== after.digest;
 
   return {
     ran: true,
     name: resolved.name,
     argv: resolved.argv,
     ...outcome,
+    // A tree that moved under the check makes the result unusable as evidence
+    // for THIS card, whatever the exit code was — the same class as a timeout:
+    // absence of evidence, neither pass nor fail. Overrides the outcome so a
+    // green exit cannot carry a card whose ground shifted beneath it.
+    ...(moved ? { state: 'moved', ok: false, movedFrom: head.sha, movedTo: after.sha } : {}),
     exit: result.exit,
     ms: result.ms,
     // SW-060: the sleep travels with the result, or verdictText would be back
@@ -436,6 +459,7 @@ export const verificationOf = (r, at) => ({
   dirty: !!r.dirty,
   ms: Number.isInteger(r.ms) ? r.ms : 0,
   ...(r.state === 'timeout' ? { timedOut: true } : {}),
+  ...(r.state === 'moved' ? { treeMoved: true } : {}),
 });
 
 // SW-060: said in every outcome where a suspension was detected. The two
@@ -455,8 +479,27 @@ export function verdictText(r, { cmd }) {
   if (!r.ran) return `Unverified — ${r.reason}. done() proved nothing about this work.`;
   const where = r.sha ? `at ${r.sha}${r.dirty ? ' with uncommitted changes in the tree, so this is not reproducible from the sha alone' : ''}` : 'at an unknown commit — git could not be read';
   switch (r.state) {
-    case 'pass':
-      return `Check "${r.name}" (${cmd}) passed ${where}, in ${r.ms}ms.${sleptClause(r)} That is what it proves: this command exited zero on this tree, not that the work is correct.`;
+    case 'pass': {
+      const proof = `Check "${r.name}" (${cmd}) passed ${where}, in ${r.ms}ms.${sleptClause(r)} That is what it proves: this command exited zero on this tree, not that the work is correct.`;
+      // SW-079. A pass normally keeps no transcript: the note is memory every
+      // future session re-reads, a full test log is a cost paid forever, and a
+      // green run at a clean sha is re-derivable by checking out that sha and
+      // running the same argv. That argument fails in exactly one case — a
+      // DIRTY tree, where the sha does not describe what was tested and the
+      // transcript is the only record there will ever be. Raised by a reader,
+      // and right.
+      return r.dirty ? `${proof} The tree was dirty, so this is the only record of what ran:\n${r.out || '(no output)'}` : proof;
+    }
+    case 'moved': {
+      // Most of the time the sha is IDENTICAL on both sides — the change was in
+      // the working tree, not a commit. Printing "abc123 before, abc123 after"
+      // reads as a bug in the tool rather than as a fact about the repo, so the
+      // two cases are worded differently.
+      const how = r.movedFrom && r.movedTo && r.movedFrom !== r.movedTo
+        ? `HEAD moved from ${r.movedFrom} to ${r.movedTo} while it ran`
+        : `the working tree changed while it ran${r.movedFrom ? ` (still at ${r.movedFrom})` : ''}`;
+      return `Check "${r.name}" (${cmd}) ran, but ${how}. Whatever it exited with, it did not test the tree this card is being marked complete against, so it proves nothing about this hand-back — that is an absence of evidence, not a failure and not a pass. The card stays in progress. Commit or stash, then run done() again. Output:\n${r.out || '(no output)'}`;
+    }
     case 'fail':
       return `Check "${r.name}" (${cmd}) FAILED ${where} — exit ${r.exit}, ${r.ms}ms.${sleptClause(r)} The card stays in progress. Output:\n${r.out || '(no output)'}`;
     case 'timeout':
@@ -476,6 +519,8 @@ export function verdictText(r, { cmd }) {
 // that could not happen writes a finding too — because "we do not know" is
 // something a future session must be able to see, and evidence is the one kind
 // standup marks PERISHABLE.
+// Only a pass is evidence. Everything else — failed, timed out, could not spawn,
+// or ran against a tree that moved underneath it (SW-078) — is a finding.
 export const kindFor = (r) => (r.ran && r.state === 'pass' ? 'evidence' : 'finding');
 
 export const cmdOf = (argv) => (Array.isArray(argv) ? argv.join(' ') : '');

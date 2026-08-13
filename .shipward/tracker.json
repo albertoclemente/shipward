@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-073",
+      "p": "shipward",
+      "title": "Pushed grows without bound and buries the columns that describe the present",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-13T07:56:34.162Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-072",
       "p": "shipward",
       "title": "No SECURITY.md, on a tool that runs commands on your machine",
@@ -1515,6 +1530,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T07:56:34.162Z",
+      "p": "shipward",
+      "msg": "You added SW-073 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T07:55:44.784Z",
       "p": "shipward",
       "msg": "Reconciled with git — SW-066 review → pushed",
@@ -2707,17 +2728,11 @@
       "p": "shipward",
       "msg": "SW-015 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T16:18:51.337Z",
-      "p": "shipward",
-      "msg": "SW-015 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T07:49:25.948Z",
     "pid": 41180
   },
-  "rev": 63
+  "rev": 64
 }

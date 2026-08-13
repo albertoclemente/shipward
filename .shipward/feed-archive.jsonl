@@ -149,3 +149,4 @@
 {"t":"2026-07-27T15:35:24.769Z","p":"shipward","msg":"SW-011 handed to Claude Code — queued","by":"claude"}
 {"t":"2026-07-27T15:37:52.975Z","p":"shipward","msg":"SW-011 moved to Review — give it a look","by":"claude"}
 {"t":"2026-07-27T15:38:03.950Z","p":"shipward","msg":"SW-004 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-27T15:42:05.896Z","p":"shipward","msg":"You added SW-012 to Backlog — it's on the list","by":"claude"}

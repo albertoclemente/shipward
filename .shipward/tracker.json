@@ -23,12 +23,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/a-contended-lock",
-      "commit": null,
+      "commit": "1b9e2bc",
       "created": "2026-08-12T15:31:42.307Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -51,12 +51,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/a-check-can",
-      "commit": null,
+      "commit": "74dcb97",
       "created": "2026-08-12T15:07:35.188Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -79,12 +79,12 @@
       "type": "chore",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/no-ci-and",
-      "commit": null,
+      "commit": "53131a3",
       "created": "2026-08-12T14:57:55.607Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -107,12 +107,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/handappending-to-notesjsonl",
-      "commit": null,
+      "commit": "538d5ca",
       "created": "2026-08-12T14:31:09.188Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -135,12 +135,12 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/a-new-repos",
-      "commit": null,
+      "commit": "dd04713",
       "created": "2026-08-12T14:28:31.345Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -178,12 +178,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "fix/the-timing-tests",
       "commit": "e5da699",
       "created": "2026-08-11T09:50:13.340Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -206,12 +206,12 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": null,
       "commit": "e70d82f",
       "created": "2026-08-11T09:27:12.952Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -249,12 +249,12 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "chore/ship-the-mark",
       "commit": "6b47ce1",
       "created": "2026-08-05T16:16:05.156Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -277,12 +277,12 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/apply-the-logo",
       "commit": "8d7e052",
       "created": "2026-08-04T05:18:55.774Z",
-      "pushed": null,
+      "pushed": "2026-08-13T07:04:10.829Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -1460,6 +1460,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-13T07:04:10.829Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — 9 cards corrected from the repository",
+      "by": "claude"
+    },
     {
       "t": "2026-08-12T16:17:02.042Z",
       "p": "shipward",
@@ -2653,17 +2659,11 @@
       "p": "shipward",
       "msg": "SW-012 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T15:42:05.896Z",
-      "p": "shipward",
-      "msg": "You added SW-012 to Backlog — it's on the list",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-11T09:31:05.186Z",
     "pid": 71691
   },
-  "rev": 49
+  "rev": 51
 }

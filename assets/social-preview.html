@@ -1,0 +1,110 @@
+<!doctype html>
+<meta charset="utf-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;600;800&display=block">
+<style>
+  /* The product's own tokens, not approximations of them. mark.test.mjs pins
+     these two hex values against app.css, so the card cannot drift from the UI
+     without a test failing somewhere. */
+  :root {
+    --text: #201e1d;
+    --accent: #ec3013;
+    --bg: #f3f2f2;
+    --surface: #eae9e9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1280px; height: 640px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Archivo", system-ui, sans-serif;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    padding: 66px 72px 0;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Wordmark */
+  .brand { display: flex; align-items: center; gap: 14px; }
+  .brand svg { width: 34px; height: 34px; display: block; }
+  .brand span {
+    font-weight: 800; font-size: 30px; letter-spacing: 0.14em;
+  }
+
+  /* The one sentence, at the size it is actually read. */
+  h1 {
+    font-weight: 800;
+    font-size: 70px;
+    line-height: 1.04;
+    letter-spacing: -0.028em;
+    max-width: 15.5ch;
+    align-self: center;
+    margin-top: -18px;
+  }
+  h1 em { font-style: normal; color: var(--accent); }
+
+  .sub {
+    font-size: 26px;
+    line-height: 1.42;
+    font-weight: 400;
+    color: color-mix(in srgb, var(--text) 66%, transparent);
+    max-width: 34ch;
+    padding-bottom: 60px;
+  }
+
+  /* Two through, one stopped. The first version put a red gate line THROUGH
+     all three cards and ran them off the right edge, so the glyphs were clipped
+     and the metaphor read as a rendering bug rather than as a mechanism. A
+     social card is looked at for about a second: the difference between the
+     cards IS the message, and anything else competes with it. */
+  .gate { position: absolute; right: 72px; top: 118px; width: 404px; }
+  .card {
+    background: var(--surface);
+    border: 2px solid color-mix(in srgb, var(--text) 16%, transparent);
+    border-radius: 10px;
+    height: 92px;
+    margin-bottom: 22px;
+    display: flex; align-items: center; gap: 18px;
+    padding: 0 22px;
+  }
+  .card .bars { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 9px; }
+  .bars i { display: block; height: 9px; border-radius: 5px; background: color-mix(in srgb, var(--text) 22%, transparent); }
+  .bars i:last-child { width: 55%; }
+  .glyph { font-size: 34px; font-weight: 800; line-height: 1; flex: none; width: 34px; text-align: center; }
+  /* Ink, not green. Checked against app.css: the product's whole palette is
+     #201e1d, #ec3013, red tints and neutrals — there is no green in it at all.
+     A social card that introduces a colour the app does not own is the first
+     thing that looks off when someone opens the repo, and the red card is
+     already doing the work of marking the odd one out. */
+  .pass .glyph { color: var(--text); }
+  .fail { border-color: var(--accent); border-width: 3px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+  .fail .glyph { color: var(--accent); }
+  .fail .bars i { background: color-mix(in srgb, var(--accent) 40%, transparent); }
+
+  .foot {
+    position: absolute; left: 0; right: 0; bottom: 0; height: 12px;
+    background: var(--accent);
+  }
+</style>
+
+<div class="gate">
+  <div class="card pass"><div class="bars"><i></i><i></i></div><div class="glyph">✓</div></div>
+  <div class="card fail"><div class="bars"><i></i><i></i></div><div class="glyph">✕</div></div>
+  <div class="card pass"><div class="bars"><i></i><i></i></div><div class="glyph">✓</div></div>
+</div>
+
+<div class="brand">
+  <svg viewBox="0 0 32 32" aria-hidden="true">
+    <polygon points="2,20 30,20 23,29 9,29" fill="#201e1d"></polygon>
+    <polygon points="16,4 9,18 23,18" fill="#ec3013"></polygon>
+  </svg>
+  <span>SHIPWARD</span>
+</div>
+
+<h1>It doesn't take your coding agent's <em>word</em> for it.</h1>
+
+<div class="sub">A card only moves to done when a command <strong>you</strong> declared actually passes.</div>
+
+<div class="foot"></div>

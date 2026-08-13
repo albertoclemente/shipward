@@ -418,3 +418,64 @@ test('fleetLinkFrom accepts only a local origin — an href from a query param e
     assert.equal(fleetLinkFrom(evil), null, `${evil} must not become a link`);
   }
 });
+
+/* ── the Pushed cap (SW-073) ─────────────────────────────── */
+
+const pushedCard = (id, at) => card({ id, status: 'pushed', pushed: at });
+const pushedCol = (cards, opts) => deriveColumns(cards, 'shipward', opts).find((c) => c.key === 'pushed');
+
+test('a short Pushed column is not capped and hides nothing', () => {
+  const cards = [pushedCard('SW-001', '2026-08-01T00:00:00Z'), pushedCard('SW-002', '2026-08-02T00:00:00Z')];
+  const col = pushedCol(cards);
+  assert.equal(col.count, 2);
+  assert.equal(col.cards.length, 2);
+  assert.deepEqual(col.hidden, []);
+});
+
+test('a long Pushed column shows the newest and names the rest', () => {
+  const cards = Array.from({ length: 25 }, (_, i) =>
+    pushedCard(`SW-${String(i + 1).padStart(3, '0')}`, `2026-08-${String((i % 28) + 1).padStart(2, '0')}T00:00:00Z`));
+  const col = pushedCol(cards, { pushedCap: 10 });
+  assert.equal(col.cards.length, 10);
+  assert.equal(col.hidden.length, 15);
+  // Newest first: everything shown must have landed no earlier than anything hidden.
+  const oldestShown = Date.parse(col.cards.at(-1).pushed);
+  for (const h of col.hidden) assert.ok(Date.parse(h.pushed) <= oldestShown, `${h.id} is newer than a shown card`);
+});
+
+test('the count is the TRUE total even when the view is capped', () => {
+  // A board that showed 10 of 49 and said "10" would be the board lying about
+  // itself, which is the one thing this product cannot do.
+  const cards = Array.from({ length: 49 }, (_, i) => pushedCard(`SW-${String(i + 1).padStart(3, '0')}`, '2026-08-01T00:00:00Z'));
+  const col = pushedCol(cards, { pushedCap: 10 });
+  assert.equal(col.count, 49);
+  assert.equal(col.cards.length + col.hidden.length, 49, 'nothing may be dropped on the floor');
+});
+
+test('showAllPushed turns the cap off entirely', () => {
+  const cards = Array.from({ length: 30 }, (_, i) => pushedCard(`SW-${String(i + 1).padStart(3, '0')}`, '2026-08-01T00:00:00Z'));
+  const col = pushedCol(cards, { pushedCap: 10, showAllPushed: true });
+  assert.equal(col.cards.length, 30);
+  assert.deepEqual(col.hidden, []);
+});
+
+test('a card with no or unparseable pushed date sinks rather than jumping the queue', () => {
+  // Claude Code writes this file directly, so both are possible, and a missing
+  // date must not be treated as "just landed".
+  const cards = [
+    pushedCard('SW-001', '2026-08-10T00:00:00Z'),
+    pushedCard('SW-002', null),
+    pushedCard('SW-003', 'not a date'),
+    pushedCard('SW-004', '2026-08-11T00:00:00Z'),
+  ];
+  const col = pushedCol(cards, { pushedCap: 2 });
+  assert.deepEqual(col.cards.map((c) => c.id), ['SW-004', 'SW-001']);
+  assert.deepEqual(col.hidden.map((c) => c.id).sort(), ['SW-002', 'SW-003']);
+});
+
+test('no other column is ever capped', () => {
+  const many = Array.from({ length: 40 }, (_, i) => card({ id: `SW-${String(i + 1).padStart(3, '0')}`, status: 'backlog' }));
+  const col = deriveColumns(many, 'shipward', { pushedCap: 10 }).find((c) => c.key === 'backlog');
+  assert.equal(col.cards.length, 40);
+  assert.deepEqual(col.hidden, []);
+});

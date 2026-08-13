@@ -143,8 +143,10 @@ Not mockups. This is the board that built Shipward, photographed as it stands.
 
 <img src="assets/board.png" alt="The Shipward board: columns for Backlog, Claude Working, Review and Pushed. One card is in progress, 48 have shipped." width="100%">
 
-**The board.** One card in flight, nothing waiting on you, 48 landed. Each card
-carries its branch and the commit that proves it.
+**The board.** One card in flight, nothing waiting on you, 49 landed. Each card
+carries its branch and the commit that proves it. Pushed shows the most recent
+and keeps the count honest — *“…and 39 more”* is one click from expanding, or one
+from filing to the Archive.
 
 <img src="assets/trust.png" alt="The Trust tab, headed 'What nothing can settle for you', listing two cards closed without a check having run." width="100%">
 

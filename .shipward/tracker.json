@@ -23,9 +23,9 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
+      "status": "claude",
+      "claude": "working",
+      "branch": "feat/pushed-grows-without",
       "commit": null,
       "created": "2026-08-13T07:56:34.162Z",
       "pushed": null,
@@ -1530,6 +1530,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T07:57:02.188Z",
+      "p": "shipward",
+      "msg": "SW-073 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T07:56:34.162Z",
       "p": "shipward",
       "msg": "You added SW-073 to Backlog — it's on the list",
@@ -2722,17 +2728,11 @@
       "p": "shipward",
       "msg": "Synced with git — all 15 review cards merged to main as bd75f11 — fast-forward, no merge commits, 123 tests green on main",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T16:22:45.656Z",
-      "p": "shipward",
-      "msg": "SW-015 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
-    "lastSeen": "2026-08-13T07:49:25.948Z",
-    "pid": 41180
+    "lastSeen": "2026-08-13T08:00:52.267Z",
+    "pid": 65323
   },
-  "rev": 64
+  "rev": 66
 }

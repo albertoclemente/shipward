@@ -14,6 +14,7 @@
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { existsSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -184,9 +185,33 @@ export async function untrackedMemory(cwd = REPO) {
   return { known: true, files: lines(out) };
 }
 
+// SW-078. A fingerprint of the working tree, so "did anything move while the
+// check ran?" is answerable — raised by a reader on the day this went public,
+// and correct: the useful claim is not "this command passed" but "this command
+// passed against the artifact now being marked complete".
+//
+// The patch itself, not just the file names. A path list catches a file that
+// appeared or vanished and misses the far likelier case: a file that was
+// already modified before the run and modified AGAIN during it, where the names
+// are identical and the content is not.
+//
+// HONEST LIMIT, stated because this is evidence and evidence that overclaims is
+// worse than none: `git diff HEAD` covers tracked content, and the untracked
+// list covers files appearing or disappearing. A change to the CONTENTS of an
+// untracked file is not seen. Hashing every untracked file could mean reading a
+// node_modules-sized tree twice per done(), and this runs on every hand-back.
+async function treeDigest(cwd, sha, paths) {
+  const patch = await git(['diff', 'HEAD'], cwd);
+  if (patch === null) return null;
+  return createHash('sha256')
+    .update(`${sha} ${paths.join(' ')} ${patch}`)
+    .digest('hex')
+    .slice(0, 16);
+}
+
 export async function headState(cwd = REPO) {
   const sha = await git(['rev-parse', '--short', 'HEAD'], cwd);
-  if (sha === null) return { sha: null, dirty: false, known: false, dirtyPaths: [] };
+  if (sha === null) return { sha: null, dirty: false, known: false, dirtyPaths: [], digest: null };
   // Bare paths, deliberately, rather than parsing `status --porcelain`: those
   // lines carry two status columns whose LEADING SPACE git() has already
   // trimmed off the first line, so every column-based parse is off by one for
@@ -194,11 +219,15 @@ export async function headState(cwd = REPO) {
   // misread. Two spawns, paid once per done().
   const tracked = await git(['diff', '--name-only', 'HEAD'], cwd);
   const untracked = await git(['ls-files', '--others', '--exclude-standard'], cwd);
-  if (tracked === null || untracked === null) return { sha, dirty: false, known: false, dirtyPaths: [] };
+  if (tracked === null || untracked === null) return { sha, dirty: false, known: false, dirtyPaths: [], digest: null };
   const paths = [...lines(tracked), ...lines(untracked)].filter((p) => !p.startsWith(BOARD_DIR));
+  const digest = await treeDigest(cwd, sha, paths);
   // The paths come back too: "dirty" with nothing to point at is a claim a
-  // reader cannot check, and the note that quotes them is the memory.
-  return { sha, dirty: paths.length > 0, known: true, dirtyPaths: paths.slice(0, DIRTY_SHOWN) };
+  // reader cannot check, and the note that quotes them is the memory. The
+  // digest is for comparing two observations of the same tree (SW-078); the
+  // capped path list is for a human to read and is NOT safe to compare, since
+  // two different trees can share the same first ten names.
+  return { sha, dirty: paths.length > 0, known: true, dirtyPaths: paths.slice(0, DIRTY_SHOWN), digest };
 }
 
 export async function trunkIndex(trunk, cwd = REPO) {

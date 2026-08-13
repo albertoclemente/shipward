@@ -23,12 +23,12 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "review",
+      "status": "pushed",
       "claude": "done",
       "branch": "feat/pushed-grows-without",
       "commit": "7ca3695",
       "created": "2026-08-13T07:56:34.162Z",
-      "pushed": null,
+      "pushed": "2026-08-13T08:02:44.226Z",
       "shipped": null,
       "verification": {
         "check": "default",
@@ -1543,6 +1543,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T08:02:44.226Z",
+      "p": "shipward",
+      "msg": "Reconciled with git — SW-073 review → pushed",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T08:02:33.489Z",
       "p": "shipward",
       "msg": "SW-073 moved to Review — give it a look",
@@ -2735,17 +2741,11 @@
       "p": "shipward",
       "msg": "SW-016 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T17:26:07.950Z",
-      "p": "shipward",
-      "msg": "You added SW-016 to Backlog — it's on the list",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 67
+  "rev": 68
 }

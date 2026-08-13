@@ -162,3 +162,4 @@
 {"t":"2026-07-27T16:18:51.337Z","p":"shipward","msg":"SW-015 handed to Claude Code — queued","by":"claude"}
 {"t":"2026-07-27T16:22:45.656Z","p":"shipward","msg":"SW-015 moved to Review — give it a look","by":"claude"}
 {"t":"2026-07-27T16:29:20.433Z","p":"shipward","msg":"Synced with git — all 15 review cards merged to main as bd75f11 — fast-forward, no merge commits, 123 tests green on main","by":"claude"}
+{"t":"2026-07-27T17:26:07.950Z","p":"shipward","msg":"You added SW-016 to Backlog — it's on the list","by":"claude"}

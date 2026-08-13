@@ -275,13 +275,13 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": null,
       "commit": "e70d82f",
       "created": "2026-08-11T09:27:12.952Z",
       "pushed": "2026-08-13T07:04:10.829Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -331,13 +331,13 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "chore/ship-the-mark",
       "commit": "6b47ce1",
       "created": "2026-08-05T16:16:05.156Z",
       "pushed": "2026-08-13T07:04:10.829Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -359,13 +359,13 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/apply-the-logo",
       "commit": "8d7e052",
       "created": "2026-08-04T05:18:55.774Z",
       "pushed": "2026-08-13T07:04:10.829Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -387,13 +387,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/sleep-honest-clock",
       "commit": "0493ec6",
       "created": "2026-08-01T09:43:19.926Z",
       "pushed": "2026-08-03T08:53:50.635Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -415,13 +415,13 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/board-rev-guard",
       "commit": "0c6b556",
       "created": "2026-08-01T09:29:17.433Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -443,13 +443,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/audit-budget",
       "commit": "e6f199c",
       "created": "2026-08-01T08:35:18.878Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -471,13 +471,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/audit-budget",
       "commit": "e6f199c",
       "created": "2026-08-01T08:35:18.683Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -499,13 +499,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/checks-under-load",
       "commit": "c0f2441",
       "created": "2026-07-31T14:41:12.470Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -527,13 +527,13 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/commit-the-sidecar",
       "commit": "73d32c3",
       "created": "2026-07-31T11:40:05.088Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -555,13 +555,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/checks-under-load",
       "commit": "19f92bb",
       "created": "2026-07-31T11:37:48.210Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -583,13 +583,13 @@
       "type": "bug",
       "pri": "P1",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/the-tracker-dirties",
       "commit": "784fa32",
       "created": "2026-07-31T10:47:58.772Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -611,13 +611,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": null,
       "commit": "c0d17b3",
       "created": "2026-07-31T10:35:58.883Z",
       "pushed": "2026-07-31T10:38:36.375Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -639,13 +639,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": null,
       "commit": "07f4e7b",
       "created": "2026-07-31T10:23:59.608Z",
       "pushed": "2026-07-31T10:25:01.394Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -667,13 +667,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/check-env-leak",
       "commit": "b24c3c9",
       "created": "2026-07-31T10:01:41.543Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -695,13 +695,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "chore/publish-licence-readme",
       "commit": "048e238",
       "created": "2026-07-31T09:41:22.961Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -723,13 +723,13 @@
       "type": "feature",
       "pri": "P3",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/a-cli-surface",
       "commit": "a6a2b4c",
       "created": "2026-07-31T09:39:59.559Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -751,13 +751,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "chore/render-through-pure",
       "commit": "9cb6734",
       "created": "2026-07-31T09:39:59.539Z",
       "pushed": "2026-07-31T13:33:30.212Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -779,13 +779,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/the-fleet-answers",
       "commit": "71e7e1e",
       "created": "2026-07-31T09:39:59.519Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -807,13 +807,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/trust-panel-surface",
       "commit": "4b70873",
       "created": "2026-07-31T09:39:59.499Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -835,13 +835,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/evidence-expires-recall",
       "commit": "4ecfeaf",
       "created": "2026-07-31T09:39:59.480Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -863,13 +863,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/verification-gating-done",
       "commit": "d859d43",
       "created": "2026-07-31T09:39:59.453Z",
       "pushed": "2026-07-31T10:38:14.037Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -891,13 +891,13 @@
       "type": "chore",
       "pri": "P3",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "chore/cap-shipped-list",
       "commit": "69b54a7",
       "created": "2026-07-31T09:27:53.037Z",
       "pushed": "2026-08-03T08:53:50.638Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -919,13 +919,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "chore/bound-memory-reads",
       "commit": "a116bf2",
       "created": "2026-07-31T09:27:16.750Z",
       "pushed": "2026-07-31T10:38:14.037Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-040",
@@ -934,13 +934,13 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "chore/bound-memory-reads",
       "commit": "a116bf2",
       "created": "2026-07-31T09:27:16.688Z",
       "pushed": "2026-07-31T10:38:14.037Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-039",
@@ -949,13 +949,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "L",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/archive-shipped-cards",
       "commit": "9effed2",
       "created": "2026-07-31T09:27:16.660Z",
       "pushed": "2026-07-31T11:38:47.892Z",
-      "shipped": null,
+      "shipped": "2026-08-13T08:05:51.755Z",
       "verification": {
         "check": "default",
         "argv": [
@@ -977,13 +977,13 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/fleet-link",
       "commit": "5302d84",
       "created": "2026-07-28T15:59:53.736Z",
       "pushed": "2026-07-28T16:04:53.646Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-037",
@@ -992,13 +992,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/fleet-service",
       "commit": "d72c32f",
       "created": "2026-07-28T15:38:50.949Z",
       "pushed": "2026-07-28T15:40:39.771Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-036",
@@ -1007,13 +1007,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/onboard-button",
       "commit": "64c1a7d",
       "created": "2026-07-28T15:10:33.807Z",
       "pushed": "2026-07-28T15:17:09.426Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-034",
@@ -1022,13 +1022,13 @@
       "type": "feature",
       "pri": "P3",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/fleet-view",
       "commit": "3d6809b",
       "created": "2026-07-28T14:26:46.531Z",
       "pushed": "2026-07-28T14:36:27.883Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-035",
@@ -1037,13 +1037,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/replace-guard",
       "commit": "6a81fd4",
       "created": "2026-07-28T14:26:46.531Z",
       "pushed": "2026-07-28T14:36:27.883Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-033",
@@ -1052,13 +1052,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/setup",
       "commit": "09965c3",
       "created": "2026-07-28T14:18:52.470Z",
       "pushed": "2026-07-28T14:27:39.431Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-032",
@@ -1067,13 +1067,13 @@
       "type": "bug",
       "pri": "P3",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/pushed-copy",
       "commit": "a801d1b",
       "created": "2026-07-28T13:19:36.099Z",
       "pushed": "2026-07-28T13:20:23.394Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-031",
@@ -1082,13 +1082,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/product-fit",
       "commit": "6dbc14c",
       "created": "2026-07-28T13:06:33.565Z",
       "pushed": "2026-07-28T13:10:26.494Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-030",
@@ -1097,13 +1097,13 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/a11y-pass",
       "commit": "22e6e33",
       "created": "2026-07-28T13:01:23.159Z",
       "pushed": "2026-07-28T13:04:47.045Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-027",
@@ -1112,13 +1112,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/feed-archive",
       "commit": "6f3c67c",
       "created": "2026-07-28T11:12:54.619Z",
       "pushed": "2026-07-28T11:29:45.647Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-028",
@@ -1127,13 +1127,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "L",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/structured-notes",
       "commit": "679736e",
       "created": "2026-07-28T11:12:54.619Z",
       "pushed": "2026-07-28T11:40:10.856Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-029",
@@ -1142,13 +1142,13 @@
       "type": "feature",
       "pri": "P3",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/note-lint",
       "commit": "fca311b",
       "created": "2026-07-28T11:12:54.619Z",
       "pushed": "2026-07-28T11:40:10.856Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-026",
@@ -1157,13 +1157,13 @@
       "type": "bug",
       "pri": "P3",
       "effort": "S",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "fix/desk-overflow",
       "commit": "91665ed",
       "created": "2026-07-28T10:39:47.595Z",
       "pushed": "2026-07-28T10:48:18.004Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-025",
@@ -1172,13 +1172,13 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/feed-view",
       "commit": "701a0c2",
       "created": "2026-07-28T10:33:13.220Z",
       "pushed": "2026-07-28T10:40:40.282Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-024",
@@ -1187,13 +1187,13 @@
       "type": "feature",
       "pri": "P1",
       "effort": "M",
-      "status": "pushed",
+      "status": "shipped",
       "claude": "done",
       "branch": "feat/git-authoritative",
       "commit": "2205d79",
       "created": "2026-07-28T10:20:42.665Z",
       "pushed": "2026-07-28T10:40:40.282Z",
-      "shipped": null
+      "shipped": "2026-08-13T08:05:51.755Z"
     },
     {
       "id": "SW-023",
@@ -1542,6 +1542,12 @@
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-13T08:05:51.755Z",
+      "p": "shipward",
+      "msg": "Archived 40 pushed cards",
+      "by": "user"
+    },
     {
       "t": "2026-08-13T08:02:44.226Z",
       "p": "shipward",
@@ -2735,17 +2741,11 @@
       "p": "shipward",
       "msg": "SW-016 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T17:26:08.253Z",
-      "p": "shipward",
-      "msg": "SW-016 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 68
+  "rev": 69
 }

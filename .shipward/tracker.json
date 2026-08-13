@@ -17,6 +17,34 @@
   ],
   "cards": [
     {
+      "id": "SW-074",
+      "p": "shipward",
+      "title": "The product is invisible above the fold, and there is no release to point at",
+      "type": "chore",
+      "pri": "P1",
+      "effort": "S",
+      "status": "review",
+      "claude": "done",
+      "branch": "chore/the-product-is",
+      "commit": "a2b366a",
+      "created": "2026-08-13T08:10:41.756Z",
+      "pushed": null,
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T08:12:39.786Z",
+        "sha": "a2b366a",
+        "dirty": false,
+        "ms": 26829
+      }
+    },
+    {
       "id": "SW-073",
       "p": "shipward",
       "title": "Pushed grows without bound and buries the columns that describe the present",
@@ -1543,6 +1571,24 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T08:12:39.787Z",
+      "p": "shipward",
+      "msg": "SW-074 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T08:10:41.909Z",
+      "p": "shipward",
+      "msg": "SW-074 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T08:10:41.757Z",
+      "p": "shipward",
+      "msg": "You added SW-074 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T08:05:51.755Z",
       "p": "shipward",
       "msg": "Archived 40 pushed cards",
@@ -2723,29 +2769,11 @@
       "p": "shipward",
       "msg": "SW-017 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T17:59:45.296Z",
-      "p": "shipward",
-      "msg": "You added SW-017 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T17:30:19.492Z",
-      "p": "shipward",
-      "msg": "Synced with git — SW-016 merged to main — ambient status line",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-27T17:29:57.293Z",
-      "p": "shipward",
-      "msg": "SW-016 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 69
+  "rev": 72
 }

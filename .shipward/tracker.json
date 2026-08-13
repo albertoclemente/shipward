@@ -23,13 +23,26 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "chore/two-people-outside",
       "commit": null,
       "created": "2026-08-13T16:35:50.525Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T16:37:33.877Z",
+        "sha": "0171fd5",
+        "dirty": false,
+        "ms": 28082
+      }
     },
     {
       "id": "SW-079",
@@ -1687,6 +1700,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:37:33.877Z",
+      "p": "shipward",
+      "msg": "SW-080 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:35:50.684Z",
       "p": "shipward",
       "msg": "SW-080 handed to Claude Code — queued",
@@ -2879,17 +2898,11 @@
       "p": "shipward",
       "msg": "Synced with git — SW-023 merged — session opener audits git",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T08:42:01.351Z",
-      "p": "shipward",
-      "msg": "SW-023 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 93
+  "rev": 94
 }

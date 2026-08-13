@@ -23,10 +23,10 @@
       "type": "bug",
       "pri": "P2",
       "effort": "S",
-      "status": "backlog",
-      "claude": null,
+      "status": "review",
+      "claude": "done",
       "branch": null,
-      "commit": null,
+      "commit": "9feb4bd",
       "created": "2026-08-13T16:20:59.238Z",
       "pushed": null,
       "shipped": null
@@ -38,13 +38,26 @@
       "type": "bug",
       "pri": "P1",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/a-check-is",
-      "commit": null,
+      "commit": "9feb4bd",
       "created": "2026-08-13T16:20:59.074Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T16:29:43.313Z",
+        "sha": "9feb4bd",
+        "dirty": false,
+        "ms": 28160
+      }
     },
     {
       "id": "SW-077",
@@ -1659,6 +1672,24 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T16:29:56.917Z",
+      "p": "shipward",
+      "msg": "SW-079 shipped in the same commit as SW-078",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T16:29:43.451Z",
+      "p": "shipward",
+      "msg": "SW-079 note — SHIPPED alongside SW-078, same commit — they are one…",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-13T16:29:43.313Z",
+      "p": "shipward",
+      "msg": "SW-078 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:24:39.347Z",
       "p": "shipward",
       "msg": "SW-078 handed to Claude Code — queued",
@@ -2839,29 +2870,11 @@
       "p": "shipward",
       "msg": "SW-022 moved to Review — give it a look",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:42:32.411Z",
-      "p": "shipward",
-      "msg": "SW-022 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:42:32.102Z",
-      "p": "shipward",
-      "msg": "You added SW-022 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T07:26:14.536Z",
-      "p": "shipward",
-      "msg": "Synced with git — SW-021 merged to main — cancellation honoured",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 87
+  "rev": 90
 }

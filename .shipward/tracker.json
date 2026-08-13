@@ -191,13 +191,26 @@
       "type": "bug",
       "pri": "P2",
       "effort": "M",
-      "status": "claude",
-      "claude": "working",
+      "status": "review",
+      "claude": "done",
       "branch": "fix/setupmjs-bakes-its",
-      "commit": null,
+      "commit": "1f1ea21",
       "created": "2026-08-12T09:52:41.323Z",
       "pushed": null,
-      "shipped": null
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-13T07:55:32.512Z",
+        "sha": "1f1ea21",
+        "dirty": false,
+        "ms": 26597
+      }
     },
     {
       "id": "SW-065",
@@ -1502,6 +1515,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-13T07:55:32.513Z",
+      "p": "shipward",
+      "msg": "SW-066 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T07:33:23.713Z",
       "p": "shipward",
       "msg": "SW-066 handed to Claude Code — queued",
@@ -2694,17 +2713,11 @@
       "p": "shipward",
       "msg": "You added SW-015 to Backlog — it's on the list",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-27T16:09:27.605Z",
-      "p": "shipward",
-      "msg": "SW-014 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T07:49:25.948Z",
     "pid": 41180
   },
-  "rev": 61
+  "rev": 62
 }

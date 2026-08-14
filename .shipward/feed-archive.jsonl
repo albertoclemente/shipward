@@ -198,3 +198,4 @@
 {"t":"2026-07-28T10:39:47.595Z","p":"shipward","msg":"You added SW-026 to Backlog — it's on the list","by":"claude"}
 {"t":"2026-07-28T10:40:12.263Z","p":"shipward","msg":"SW-025 moved to Review — give it a look","by":"claude"}
 {"t":"2026-07-28T10:40:40.282Z","p":"shipward","msg":"Reconciled with git — 2 cards corrected from the repository","by":"claude"}
+{"t":"2026-07-28T10:44:05.807Z","p":"shipward","msg":"SW-026 handed to Claude Code — queued","by":"claude"}

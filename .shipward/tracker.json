@@ -17,6 +17,34 @@
   ],
   "cards": [
     {
+      "id": "SW-082",
+      "p": "shipward",
+      "title": "The promotion is not a compare-and-swap: the tree can move between the verified reading and the write",
+      "type": "bug",
+      "pri": "P1",
+      "effort": "M",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "fix/the-promotion-is",
+      "commit": "13450bb",
+      "created": "2026-08-14T08:52:15.494Z",
+      "pushed": "2026-08-14T09:02:01.950Z",
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-14T09:01:36.780Z",
+        "sha": "ea862f5",
+        "dirty": false,
+        "ms": 27521
+      }
+    },
+    {
       "id": "SW-081",
       "p": "shipward",
       "title": "Evidence records that a check passed, not what it produced",
@@ -1741,6 +1769,30 @@
   ],
   "feed": [
     {
+      "t": "2026-08-14T09:02:01.951Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-082 merged to main; board reconciled",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T09:01:36.780Z",
+      "p": "shipward",
+      "msg": "SW-082 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T08:52:18.689Z",
+      "p": "shipward",
+      "msg": "SW-082 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T08:52:15.494Z",
+      "p": "shipward",
+      "msg": "You added SW-082 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-13T16:43:13.030Z",
       "p": "shipward",
       "msg": "Reconciled with git — 2 cards corrected from the repository",
@@ -2915,35 +2967,11 @@
       "p": "shipward",
       "msg": "SW-026 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:40:40.282Z",
-      "p": "shipward",
-      "msg": "Reconciled with git — 2 cards corrected from the repository",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:40:12.263Z",
-      "p": "shipward",
-      "msg": "SW-025 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:39:47.595Z",
-      "p": "shipward",
-      "msg": "You added SW-026 to Backlog — it's on the list",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:33:13.220Z",
-      "p": "shipward",
-      "msg": "SW-025 logged and taken — the feed becomes a view",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 100
+  "rev": 104
 }

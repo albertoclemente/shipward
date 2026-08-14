@@ -194,3 +194,7 @@
 {"t":"2026-07-28T10:20:42.665Z","p":"shipward","msg":"SW-024 logged and taken — git becomes authoritative for what it can prove","by":"claude"}
 {"t":"2026-07-28T10:27:39.143Z","p":"shipward","msg":"Reconciled with git — SW-024 → claude","by":"claude"}
 {"t":"2026-07-28T10:32:47.418Z","p":"shipward","msg":"SW-024 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T10:33:13.220Z","p":"shipward","msg":"SW-025 logged and taken — the feed becomes a view","by":"claude"}
+{"t":"2026-07-28T10:39:47.595Z","p":"shipward","msg":"You added SW-026 to Backlog — it's on the list","by":"claude"}
+{"t":"2026-07-28T10:40:12.263Z","p":"shipward","msg":"SW-025 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T10:40:40.282Z","p":"shipward","msg":"Reconciled with git — 2 cards corrected from the repository","by":"claude"}

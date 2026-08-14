@@ -17,6 +17,34 @@
   ],
   "cards": [
     {
+      "id": "SW-084",
+      "p": "shipward",
+      "title": "A GIF of the board refusing a false done() — the pitch's only unillustrated beat",
+      "type": "feature",
+      "pri": "P2",
+      "effort": "M",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/a-gif-of",
+      "commit": "47f0a7d",
+      "created": "2026-08-14T15:16:36.508Z",
+      "pushed": "2026-08-14T18:06:39.620Z",
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-14T18:06:39.073Z",
+        "sha": "47f0a7d",
+        "dirty": false,
+        "ms": 28781
+      }
+    },
+    {
       "id": "SW-083",
       "p": "shipward",
       "title": "The launch post converts readers into commenters, not users: no low-friction try-it path",
@@ -1797,6 +1825,48 @@
   ],
   "feed": [
     {
+      "t": "2026-08-14T18:06:39.620Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-084 refusal GIF merged to main",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T18:06:39.073Z",
+      "p": "shipward",
+      "msg": "SW-084 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T17:28:28.330Z",
+      "p": "shipward",
+      "msg": "SW-084 check ran out of time — nothing proved either way",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T16:14:29.647Z",
+      "p": "shipward",
+      "msg": "SW-084 check ran out of time — nothing proved either way",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T15:18:07.828Z",
+      "p": "shipward",
+      "msg": "SW-085 removed by hand: the GIF demo card, filed here by the same central-fallback rung that produced the SW-084 artifact — the demo repo setup had failed, so its cli call fell through to this board. Removed minutes later; demo commands now pin SHIPWARD_TRACKER explicitly.",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T15:16:56.244Z",
+      "p": "shipward",
+      "msg": "SW-084 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T15:16:36.508Z",
+      "p": "shipward",
+      "msg": "You added SW-084 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-14T15:15:05.857Z",
       "p": "shipward",
       "msg": "SW-083 note — PUBLISHED: shipward@0.1.0 is live on npm (2026-08-14,…",
@@ -2953,53 +3023,11 @@
       "p": "shipward",
       "msg": "SW-030 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:40:10.856Z",
-      "p": "shipward",
-      "msg": "Reconciled with git — 2 cards corrected from the repository",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:39:20.641Z",
-      "p": "shipward",
-      "msg": "SW-029 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:35:56.397Z",
-      "p": "shipward",
-      "msg": "SW-029 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:35:43.990Z",
-      "p": "shipward",
-      "msg": "SW-028 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:34:37.514Z",
-      "p": "shipward",
-      "msg": "SW-028 edited — note",
-      "by": "user"
-    },
-    {
-      "t": "2026-07-28T11:29:45.647Z",
-      "p": "shipward",
-      "msg": "Reconciled with git — SW-027 review → pushed",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:28:28.251Z",
-      "p": "shipward",
-      "msg": "Notes migrated to structured entries — 29 cards, kinds stated, one severed note repaired (SW-028)",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 111
+  "rev": 118
 }

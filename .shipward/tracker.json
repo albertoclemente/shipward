@@ -23,13 +23,26 @@
       "type": "feature",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "pushed",
+      "claude": "done",
+      "branch": "feat/the-launch-post",
+      "commit": "93758a7",
       "created": "2026-08-14T09:06:18.693Z",
-      "pushed": null,
-      "shipped": null
+      "pushed": "2026-08-14T12:10:33.038Z",
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-14T12:10:28.490Z",
+        "sha": "e5e25b9",
+        "dirty": false,
+        "ms": 28473
+      }
     },
     {
       "id": "SW-082",
@@ -1784,6 +1797,30 @@
   ],
   "feed": [
     {
+      "t": "2026-08-14T12:10:33.039Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-083 npx path merged to main",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T12:10:28.490Z",
+      "p": "shipward",
+      "msg": "SW-083 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T12:07:41.885Z",
+      "p": "shipward",
+      "msg": "SW-084 removed by hand: a test artifact filed onto this board by accident while e2e-testing the npx entry (the harness shell was standing in this repo). Removed minutes after creation, uncommitted, noted here so the id gap is not a mystery.",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-14T11:56:51.966Z",
+      "p": "shipward",
+      "msg": "SW-083 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-14T11:55:48.399Z",
       "p": "shipward",
       "msg": "SW-083 note — First candidate fix APPLIED 2026-08-14, Alberto approved:…",
@@ -2958,35 +2995,11 @@
       "p": "shipward",
       "msg": "SW-028 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:17:03.240Z",
-      "p": "shipward",
-      "msg": "SW-027 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:13:04.451Z",
-      "p": "shipward",
-      "msg": "SW-027 handed to Claude Code — queued",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:12:54.619Z",
-      "p": "shipward",
-      "msg": "You added SW-027, SW-028 and SW-029 to Backlog — the assessment becomes work",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:48:18.004Z",
-      "p": "shipward",
-      "msg": "Reconciled with git — SW-026 review → pushed",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 106
+  "rev": 110
 }

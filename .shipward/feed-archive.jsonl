@@ -200,3 +200,7 @@
 {"t":"2026-07-28T10:40:40.282Z","p":"shipward","msg":"Reconciled with git — 2 cards corrected from the repository","by":"claude"}
 {"t":"2026-07-28T10:44:05.807Z","p":"shipward","msg":"SW-026 handed to Claude Code — queued","by":"claude"}
 {"t":"2026-07-28T10:47:56.921Z","p":"shipward","msg":"SW-026 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T10:48:18.004Z","p":"shipward","msg":"Reconciled with git — SW-026 review → pushed","by":"claude"}
+{"t":"2026-07-28T11:12:54.619Z","p":"shipward","msg":"You added SW-027, SW-028 and SW-029 to Backlog — the assessment becomes work","by":"claude"}
+{"t":"2026-07-28T11:13:04.451Z","p":"shipward","msg":"SW-027 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T11:17:03.240Z","p":"shipward","msg":"SW-027 moved to Review — give it a look","by":"claude"}

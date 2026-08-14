@@ -1797,6 +1797,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-14T15:15:05.857Z",
+      "p": "shipward",
+      "msg": "SW-083 note — PUBLISHED: shipward@0.1.0 is live on npm (2026-08-14,…",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-14T12:10:33.039Z",
       "p": "shipward",
       "msg": "Synced with git — SW-083 npx path merged to main",
@@ -2989,17 +2995,11 @@
       "p": "shipward",
       "msg": "Notes migrated to structured entries — 29 cards, kinds stated, one severed note repaired (SW-028)",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T11:17:36.031Z",
-      "p": "shipward",
-      "msg": "SW-028 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 110
+  "rev": 111
 }

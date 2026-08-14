@@ -1784,6 +1784,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-14T11:55:48.399Z",
+      "p": "shipward",
+      "msg": "SW-083 note — First candidate fix APPLIED 2026-08-14, Alberto approved:…",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-14T09:06:18.693Z",
       "p": "shipward",
       "msg": "You added SW-083 to Backlog — it's on the list",
@@ -2976,17 +2982,11 @@
       "p": "shipward",
       "msg": "Reconciled with git — SW-026 review → pushed",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T10:47:56.921Z",
-      "p": "shipward",
-      "msg": "SW-026 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 105
+  "rev": 106
 }

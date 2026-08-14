@@ -7,7 +7,7 @@
 import { test, beforeEach, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -1259,4 +1259,84 @@ test('Claude working is NOT capped — it is the one list you cannot summarise',
   const { c } = await handshake();
   const { text } = await c.call('standup', {});
   assert.equal((text.match(/in flight \d/g) || []).length, 8, 'every card in flight is named');
+});
+
+/* ── the promotion is a compare-and-swap (SW-082) ────────── */
+
+// Peter's scenario from the dev.to thread, staged deterministically: the
+// verdict is earned outside the lock (SW-043), another process holds the lock
+// and moves the tree, and the write must then refuse the promotion — the tree
+// being marked complete is not the tree the check verified. The lock-holder is
+// what widens the microsecond window into one a test can stand inside.
+test('a tree that moves between the verdict and the write is not marked complete', async () => {
+  const { execFile } = await import('node:child_process');
+  const sh = (await import('node:util')).promisify(execFile);
+  const repo = await mkdtemp(join(tmpdir(), 'shipward-cas-'));
+  sandboxes.push(repo);
+  const g = (...a) => sh('git', a, { cwd: repo });
+  await g('init', '-q', '-b', 'main');
+  await g('config', 'user.email', 't@e.com');
+  await g('config', 'user.name', 'T');
+  await writeFile(join(repo, 'a'), '1'); await g('add', '-A'); await g('commit', '-qm', 'first');
+
+  // The check signals OUTSIDE the repo — a marker inside it would itself be
+  // the tree moving during the run, which is SW-078's case, not this one.
+  const marker = join(sandbox, 'check-ran');
+  const release = join(sandbox, 'release-the-lock');
+  const d = seed();
+  d.projects[0].checks = { default: ['node', '-e', `require('node:fs').writeFileSync(${JSON.stringify(marker)}, '')`] };
+  await writeFile(tracker, JSON.stringify(d, null, 2) + '\n');
+
+  const c = await handshakeIn(repo);
+
+  // Take the write lock from a second process and hold it until told.
+  const holder = spawn(process.execPath, ['--input-type=module', '-e', `
+    import { mutate } from ${JSON.stringify(join(HERE, 'tracker-store.mjs'))};
+    import { stat } from 'node:fs/promises';
+    await mutate(async () => {
+      process.stdout.write('HOLDING\\n');
+      for (;;) {
+        try { await stat(${JSON.stringify(release)}); break; }
+        catch { await new Promise((r) => setTimeout(r, 25)); }
+      }
+      return null;
+    });
+  `], { env: { ...process.env, SHIPWARD_TRACKER: tracker, SHIPWARD_REPO: repo }, stdio: ['ignore', 'pipe', 'pipe'] });
+  await new Promise((resolve, reject) => {
+    holder.stdout.on('data', (x) => String(x).includes('HOLDING') && resolve());
+    holder.on('exit', () => reject(new Error('the lock holder died before holding')));
+    setTimeout(() => reject(new Error('the lock holder never took the lock')), 10000);
+  });
+
+  try {
+    // done() earns its verdict against a clean tree, then queues on the lock.
+    const pending = c.call('done', { id: 'TS-001', note: 'looks complete to me' });
+    await new Promise((resolve, reject) => {
+      const t0 = Date.now();
+      const poll = setInterval(async () => {
+        try { await stat(marker); clearInterval(poll); resolve(); }
+        catch { if (Date.now() - t0 > 15000) { clearInterval(poll); reject(new Error('the check never ran')); } }
+      }, 25);
+    });
+    // Past the output grace and the after-reading, with margin: the change
+    // below must land AFTER the verdict's own tree reading, or this test
+    // quietly becomes another SW-078 test.
+    await new Promise((r) => setTimeout(r, 3000));
+    await writeFile(join(repo, 'landed-late'), 'moved while the write waited on the lock\n');
+    await writeFile(release, '');
+
+    const { text } = await pending;
+    assert.match(text.split('\n')[0], /NOT handed back/, 'the verdict leads, and the swap failed');
+    assert.match(text, /between the check finishing and the card moving/);
+
+    const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+    assert.equal(card.status, 'claude', 'the card did not move');
+    assert.equal(card.claude, 'working');
+    assert.equal(card.verification.treeMoved, true);
+    assert.equal(card.verification.atWrite, true, 'recorded as the write-side hole, not the run-side one');
+    assert.match((await doc()).feed[0].msg, /tree changed under it/);
+  } finally {
+    await writeFile(release, '').catch(() => {});
+    holder.kill();
+  }
 });

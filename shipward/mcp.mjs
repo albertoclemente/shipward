@@ -26,9 +26,9 @@ import {
   memoryEntries, recall as recallEntries, ALL_KINDS, noteDigest, appendedNote, anchors,
 } from './public/memory-lib.js';
 import { standupText, line, entryMax } from './standup.mjs';
-import { auditBoard, summarise, reconcilePlan, driftSince, CERTAIN, REPO } from './git.mjs';
+import { auditBoard, summarise, reconcilePlan, driftSince, headState, CERTAIN, REPO } from './git.mjs';
 import { today } from './reconcile.mjs';
-import { runCheck, verificationOf, verdictText, kindFor, cmdOf } from './verify.mjs';
+import { runCheck, verificationOf, verdictText, kindFor, cmdOf, movedAtWrite } from './verify.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -586,7 +586,7 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
   const { doc: pre } = await readRaw();
   const preCard = findCard(pre, id);
   const project = pre.projects.find((p) => p.id === preCard.p) || null;
-  const verdict = await runCheck(project, chosen ? { ...preCard, check: chosen } : preCard);
+  let verdict = await runCheck(project, chosen ? { ...preCard, check: chosen } : preCard);
   // One rule, so there is no gap to fall through: a check that was PROMISED and
   // did not pass does not earn the promotion — failed, timed out, could not
   // spawn, or named something this project does not declare. Treating a
@@ -594,11 +594,13 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
   // silently-unlinked feature is exactly the SW-038 failure mode.
   const promised = verdict.ran || !!verdict.name;
   const passed = verdict.ran && verdict.ok;
-  const refuted = promised && !passed;
+  // let, not const: both can flip inside the write lock below (SW-082) if the
+  // tree moved after the verdict was earned.
+  let refuted = promised && !passed;
   // A refuted claim does not earn the promotion. It does not block the write
   // either: the note, the commit and the evidence all land — what the check
   // governs is the status granted, not whether done() may speak.
-  const held = refuted && !force;
+  let held = refuted && !force;
   const cmd = cmdOf(verdict.argv);
   // Silence in the note when nothing was ever promised. Writing "unverified"
   // onto every card of every repo that declares no checks would be noise the
@@ -607,12 +609,24 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
 
   let card;
   let resolvesUnknown = false;
-  await mutate((doc) => {
+  await mutate(async (doc) => {
     const found = findCard(doc, id);
     // A resolves pointing at a card nobody has heard of settles nothing —
     // written anyway (the card may live in another project's history), but the
     // reply says so rather than letting a typo silently resolve nothing.
     if (resolves) resolvesUnknown = !doc.cards.some((c) => c.id === resolves);
+    // SW-082. The verdict was earned OUTSIDE this lock (SW-043 — a suite run
+    // inside it would starve every other session), so between its second tree
+    // reading and this write the tree can move again: the SW-078 hole, one
+    // layer out, found by the same reader. The promotion is therefore a
+    // compare-and-swap — a third reading held under the lock the write holds,
+    // and the card moves only if the tree still equals the one the check was
+    // verified against. A mismatch is SW-078's outcome exactly: absence of
+    // evidence, neither pass nor fail, the card stays in progress, force
+    // still available. One headState under the lock is milliseconds; the
+    // suite stays outside where SW-043 put it.
+    const guard = passed && !held ? movedAtWrite(verdict, await headState(REPO)) : null;
+    if (guard) { verdict = guard; refuted = true; held = !force; }
     let moved;
     if (held) {
       // Kept where the work actually is. A card done() was called on is being

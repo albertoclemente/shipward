@@ -57,6 +57,11 @@ and only moves the card if it actually passes.
 You set that command once, per project, in one line. After that nobody has to remember to
 check — not you, not the agent.
 
+Here it is happening, unedited — a confident "done, tests pass" refused by the check, and the
+same command earning the hand-back once the fix is real:
+
+<img src="https://raw.githubusercontent.com/albertoclemente/shipward/main/assets/refused-done.gif" alt="A terminal recording: shipward done is called with the note 'Fixed the discount. Done, tests pass.' The check runs node --test, one test fails, and the reply says the card was NOT handed back — its check refuted the claim, the card stays in progress. After the real one-line fix and a commit, the same done command passes and the card moves to Review, with the caveat that a passing command does not prove the work is correct." width="100%">
+
 ---
 
 ## Your agent runs the board itself

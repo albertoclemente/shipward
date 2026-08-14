@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   resolveCheck, timeoutOf, clip, readOutcome, kindFor, verdictText,
-  spawnCheck, runCheck, verificationOf, cmdOf,
+  spawnCheck, runCheck, verificationOf, cmdOf, movedAtWrite,
   DEFAULT_TIMEOUT_MS, OUTPUT_BUDGET, checkEnv, CHECK_TRACKER,
   suspendedMsOf, deadlineVerdict, wallCapOf, WALL_CAP_FLOOR_MS,
 } from './verify.mjs';
@@ -902,4 +902,97 @@ test('a pass over a CLEAN tree still keeps no transcript', async () => {
   );
   assert.doesNotMatch(text, /ok 5 tests/);
   assert.match(text, /passed at abc1234/);
+});
+
+/* ── the tree must not move under the WRITE either (SW-082) ── */
+
+// Same reader as SW-078, one day later, one layer out: the check is verified
+// outside the lock (SW-043), so between runCheck's second reading and the
+// mutate() that promotes the card the tree can move again. The promotion is a
+// compare-and-swap now — movedAtWrite is the compare, run by done() under the
+// write lock against a third reading.
+
+test('runCheck exposes the digest of the tree the verdict is claimable against', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => ({ exit: 0, ms: 5, out: '' }),
+  });
+  assert.equal(r.state, 'pass');
+  const now = await headState(dir);
+  assert.equal(r.digest, now.digest, 'the digest is the AFTER reading, so an unchanged tree compares equal at the write');
+});
+
+test('an unchanged tree promotes: movedAtWrite is null', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => ({ exit: 0, ms: 5, out: '' }),
+  });
+  assert.equal(movedAtWrite(r, await headState(dir)), null);
+});
+
+test('a file landing between the verdict and the write refuses the swap', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => ({ exit: 0, ms: 5, out: 'all green' }),
+  });
+  assert.equal(r.state, 'pass', 'the check itself was clean — the move comes later');
+  await writeFile(join(dir, 'late.txt'), 'landed after the verdict\n');
+  const refused = movedAtWrite(r, await headState(dir));
+  assert.ok(refused, 'a green verdict must not carry a card whose tree moved before the write');
+  assert.equal(refused.state, 'moved');
+  assert.equal(refused.ok, false);
+  assert.equal(refused.atWrite, true, 'kept apart from SW-078: moved during the run and moved before the write are different holes');
+  assert.equal(refused.movedFrom, refused.movedTo, 'the change was in the working tree, not a commit');
+});
+
+test('a commit landing between the verdict and the write names both shas', async (t) => {
+  const { dir, g } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => ({ exit: 0, ms: 5, out: '' }),
+  });
+  await writeFile(join(dir, 'late.txt'), 'x\n');
+  g('add', '-A');
+  g('commit', '-qm', 'landed after the verdict');
+  const refused = movedAtWrite(r, await headState(dir));
+  assert.equal(refused.state, 'moved');
+  assert.notEqual(refused.movedFrom, refused.movedTo);
+  const text = verdictText(refused, { cmd: 'x' });
+  assert.match(text, /between the check finishing and the card moving/, 'not "while it ran" — the check DID test the verified tree');
+  assert.match(text, /absence of evidence/);
+});
+
+test('the guard is disarmed, never armed, by anything it cannot compare', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const pass = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir, run: async () => ({ exit: 0, ms: 5, out: '' }),
+  });
+  const fail = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir, run: async () => ({ exit: 1, ms: 5, out: 'red' }),
+  });
+  await writeFile(join(dir, 'late.txt'), 'moved\n');
+  const now = await headState(dir);
+  assert.equal(movedAtWrite(fail, now), null, 'a fail promotes nothing, so there is nothing to guard');
+  const { digest, ...noDigest } = pass;
+  assert.equal(movedAtWrite(noDigest, now), null, 'no digest means no comparison — same rule as runCheck comparable');
+  assert.equal(movedAtWrite(pass, { known: false }), null, 'an unreadable third reading refuses nothing');
+  assert.equal(movedAtWrite(null, now), null);
+});
+
+test('the at-write refusal is kept apart from SW-078 in the record', async (t) => {
+  const { dir } = await stagedRepo(t);
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir, run: async () => ({ exit: 0, ms: 5, out: '' }),
+  });
+  await writeFile(join(dir, 'late.txt'), 'moved\n');
+  const refused = movedAtWrite(r, await headState(dir));
+  const rec = verificationOf(refused, '2026-08-14T00:00:00Z');
+  assert.equal(rec.treeMoved, true);
+  assert.equal(rec.atWrite, true);
+  const during = verificationOf({ ...refused, atWrite: undefined }, '2026-08-14T00:00:00Z');
+  assert.equal(during.treeMoved, true);
+  assert.equal(during.atWrite, undefined, 'SW-078 records stay exactly as they were');
 });

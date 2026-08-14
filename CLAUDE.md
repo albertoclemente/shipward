@@ -148,6 +148,7 @@ What happens then:
 |---|---|---|
 | exits 0 | `review` / `pushed` as asked | `evidence`, stamped with the sha it ran against — and the output too when the tree was dirty, since the sha cannot re-derive it |
 | the tree CHANGED while it ran | **stays `claude`/`working`** | `finding` — it did not test the tree being marked complete, so it proves nothing about this hand-back |
+| the tree changed AFTER the check, before the write | **stays `claude`/`working`** | `finding` — the promotion is a compare-and-swap: a third tree reading under the write lock, and the card moves only if it still equals the one the check verified |
 | exits non-zero | **stays `claude`/`working`** | `finding`, with the exit code and the output |
 | timed out, could not spawn, or names a check nobody declares | **stays `claude`/`working`** | `finding` — absence of evidence, neither pass nor fail |
 | no check declared anywhere | `review` / `pushed` as asked | nothing; the reply alone says it proved nothing |

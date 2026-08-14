@@ -444,7 +444,30 @@ export async function runCheck(project, card, { cwd = REPO, run = spawnCheck } =
     out: result.out,
     sha: head.sha,
     dirty: head.dirty,
+    // SW-082: what the write-side guard compares against — the tree as it was
+    // when this verdict became claimable, not as it was when the check began.
+    // Absent when the after-reading failed, and an absent digest disarms the
+    // guard rather than refusing the write: same rule as `comparable` above.
+    ...(after.known && after.digest ? { digest: after.digest } : {}),
   };
+}
+
+// SW-082, the write half of SW-078 and raised by the same reader. runCheck
+// runs OUTSIDE the lock (SW-043), so between its second tree reading and the
+// write that promotes the card, the tree can move again — a strictly smaller
+// window than SW-078's, and the same hole. The promotion is therefore a
+// compare-and-swap: the caller takes a THIRD reading while holding the write
+// lock and promotes only if the tree still equals the one the check was
+// verified against. This is the compare. Null means promote; a verdict means
+// the swap fails — reworded as `moved`, the SW-078 outcome exactly.
+//
+// Only a claimable pass is guarded. A fail or timeout promotes nothing, so
+// there is nothing for a moving tree to corrupt; and a verdict with no digest
+// could not be compared, which must not read as moved (see `comparable`).
+export function movedAtWrite(verdict, now) {
+  if (!verdict?.ran || !verdict.ok || !verdict.digest) return null;
+  if (!now?.known || !now.digest || now.digest === verdict.digest) return null;
+  return { ...verdict, state: 'moved', atWrite: true, ok: false, movedFrom: verdict.sha, movedTo: now.sha };
 }
 
 /* ── what it becomes on the card ─────────────────────────── */
@@ -459,7 +482,11 @@ export const verificationOf = (r, at) => ({
   dirty: !!r.dirty,
   ms: Number.isInteger(r.ms) ? r.ms : 0,
   ...(r.state === 'timeout' ? { timedOut: true } : {}),
-  ...(r.state === 'moved' ? { treeMoved: true } : {}),
+  // atWrite keeps the two windows apart in the record: moved DURING the run
+  // (SW-078) and moved between the verdict and the write (SW-082) are the same
+  // refusal for a different reason, and a future session debugging one should
+  // not be sent hunting for the other.
+  ...(r.state === 'moved' ? { treeMoved: true, ...(r.atWrite ? { atWrite: true } : {}) } : {}),
 });
 
 // SW-060: said in every outcome where a suspension was detected. The two
@@ -495,9 +522,13 @@ export function verdictText(r, { cmd }) {
       // the working tree, not a commit. Printing "abc123 before, abc123 after"
       // reads as a bug in the tool rather than as a fact about the repo, so the
       // two cases are worded differently.
+      // SW-082: "while it ran" would be a lie for the at-write case — the
+      // check DID test the verified tree; it is the write that no longer
+      // matches it. The shared sentence below survives both readings.
+      const when = r.atWrite ? 'between the check finishing and the card moving' : 'while it ran';
       const how = r.movedFrom && r.movedTo && r.movedFrom !== r.movedTo
-        ? `HEAD moved from ${r.movedFrom} to ${r.movedTo} while it ran`
-        : `the working tree changed while it ran${r.movedFrom ? ` (still at ${r.movedFrom})` : ''}`;
+        ? `HEAD moved from ${r.movedFrom} to ${r.movedTo} ${when}`
+        : `the working tree changed ${when}${r.movedFrom ? ` (still at ${r.movedFrom})` : ''}`;
       return `Check "${r.name}" (${cmd}) ran, but ${how}. Whatever it exited with, it did not test the tree this card is being marked complete against, so it proves nothing about this hand-back — that is an absence of evidence, not a failure and not a pass. The card stays in progress. Commit or stash, then run done() again. Output:\n${r.out || '(no output)'}`;
     }
     case 'fail':

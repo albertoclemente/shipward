@@ -1,0 +1,42 @@
+{
+  "name": "shipward",
+  "version": "0.1.0",
+  "description": "The project board that doesn't take your coding agent's word for it. Runs your check before a card moves; lets git overrule the board.",
+  "bin": {
+    "shipward": "shipward/npx.mjs"
+  },
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "shipward",
+    "!shipward/*.test.mjs",
+    ".claude/hooks/shipward.mjs",
+    ".shipward/schema.json",
+    "docs",
+    "CLAUDE.md"
+  ],
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/albertoclemente/shipward.git"
+  },
+  "homepage": "https://github.com/albertoclemente/shipward#readme",
+  "bugs": {
+    "url": "https://github.com/albertoclemente/shipward/issues"
+  },
+  "keywords": [
+    "claude-code",
+    "coding-agent",
+    "task-tracker",
+    "kanban",
+    "mcp",
+    "verification",
+    "git"
+  ],
+  "author": "Alberto Clemente",
+  "license": "MIT"
+}

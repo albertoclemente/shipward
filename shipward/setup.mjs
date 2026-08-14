@@ -74,7 +74,10 @@ if (TRANSIENT.some((re) => re.test(`${CENTRAL}/`))) {
     + '  That is a package cache. Onboarding writes this path into the target repo\'s\n'
     + '  .claude/settings.json, .mcp.json and CLAUDE.md, and those files get committed —\n'
     + '  so the wiring would work today and break silently when the cache is collected.\n'
-    + '  Clone Shipward to a stable directory and run setup from there:\n'
+    + '  Run it through the npx entry, which installs a durable copy at ~/.shipward/app\n'
+    + '  first and wires to that:\n'
+    + '      npx shipward setup ' + target + '\n'
+    + '  or clone Shipward to a stable directory and run setup from there:\n'
     + '      git clone https://github.com/albertoclemente/shipward\n'
     + '      node shipward/setup.mjs ' + target);
 }

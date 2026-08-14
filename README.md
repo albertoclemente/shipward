@@ -1,4 +1,4 @@
-<img src="assets/shipward-mark.svg" width="64" alt="">
+<img src="https://raw.githubusercontent.com/albertoclemente/shipward/main/assets/shipward-mark.svg" width="64" alt="">
 
 # Shipward
 
@@ -7,9 +7,9 @@
 **For one developer working with an AI coding agent.** Runs on your machine, lives in your
 repo, no account.
 
-<img src="assets/board.png" alt="The Shipward board: columns for Backlog, Claude Working, Review and Pushed. One card is in progress, 49 have landed on main." width="100%">
+<img src="https://raw.githubusercontent.com/albertoclemente/shipward/main/assets/board.png" alt="The Shipward board: columns for Backlog, Claude Working, Review and Pushed. One card is in progress, 49 have landed on main." width="100%">
 
-<img src="assets/trust.png" alt="The Trust tab, headed 'What nothing can settle for you', listing two cards that were closed without a check having run." width="100%">
+<img src="https://raw.githubusercontent.com/albertoclemente/shipward/main/assets/trust.png" alt="The Trust tab, headed 'What nothing can settle for you', listing two cards that were closed without a check having run." width="100%">
 
 **That second screen is the whole idea.** The board is telling you, unprompted,
 about two cards it closed without ever verifying them — and that *"none of them
@@ -52,7 +52,7 @@ That's the real reason you can't walk away while it works.
 When your agent says a task is finished, Shipward runs your project's test command **first**,
 and only moves the card if it actually passes.
 
-<img src="assets/how-it-works.jpg" alt="Step 1, your agent finishes: a card reading Fix the login bug, with a speech bubble saying Done - tests pass. Step 2, Shipward checks: it runs npm test, the command you declared, the moment it claims. Step 3, one of two things: it passed and the card moves to review, or it failed and the card stays put." width="100%">
+<img src="https://raw.githubusercontent.com/albertoclemente/shipward/main/assets/how-it-works.jpg" alt="Step 1, your agent finishes: a card reading Fix the login bug, with a speech bubble saying Done - tests pass. Step 2, Shipward checks: it runs npm test, the command you declared, the moment it claims. Step 3, one of two things: it passed and the card moves to review, or it failed and the card stays put." width="100%">
 
 You set that command once, per project, in one line. After that nobody has to remember to
 check — not you, not the agent.
@@ -146,7 +146,7 @@ waiting on you longest, which projects have gone quiet.
 
 ## And the memory behind it
 
-<img src="assets/memory.png" alt="The Memory tab: 257 entries, about 40,030 words, 15 decisions not to reverse, 33 things that bit us, 0 still open." width="100%">
+<img src="https://raw.githubusercontent.com/albertoclemente/shipward/main/assets/memory.png" alt="The Memory tab: 257 entries, about 40,030 words, 15 decisions not to reverse, 33 things that bit us, 0 still open." width="100%">
 
 257 entries, ~40,000 words, **15 decisions not to reverse and 33 things that bit
 us** — written by the agent as it worked, and read back by the next session
@@ -156,6 +156,15 @@ board, photographed as it stands. Nothing here is a mockup.
 ---
 
 ## Try it in a minute
+
+```bash
+npx shipward setup ~/code/your-project --seed-from-branches
+cd ~/code/your-project && npx shipward serve   # open localhost:4747
+```
+
+No install step: the first run puts a durable copy at `~/.shipward/app` and wires to that,
+so nothing ever points into a package cache. Prefer a clone? Same thing, stable by
+construction:
 
 ```bash
 git clone https://github.com/albertoclemente/shipward

@@ -235,7 +235,11 @@ it had a single star.
 - **[Peter](https://dev.to/peterbuildssecure)** — [pointed out](https://dev.to/albertoclemente/every-ai-coding-agent-tracker-is-a-self-report-system-53nm/comments/3d153)
   that a check proved nothing about the tree being marked complete, because the
   tree was only read *before* the run. Fixed in
-  [`9feb4bd`](https://github.com/albertoclemente/shipward/commit/9feb4bd).
+  [`9feb4bd`](https://github.com/albertoclemente/shipward/commit/9feb4bd). A day
+  later he [found](https://dev.to/albertoclemente/every-ai-coding-agent-tracker-is-a-self-report-system-53nm/comments/3d225)
+  the window that fix still left — the tree could move between the verified
+  reading and the write — so the promotion is a compare-and-swap now. Fixed in
+  [`13450bb`](https://github.com/albertoclemente/shipward/commit/13450bb).
 - **[Reid Marlow](https://dev.to/reidmarlow)** — [found](https://dev.to/albertoclemente/every-ai-coding-agent-tracker-is-a-self-report-system-53nm/comments/3d17h)
   that a pass over a dirty tree threw away the only record of what had run. Fixed
   in the same commit.

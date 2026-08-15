@@ -1340,3 +1340,67 @@ test('a tree that moves between the verdict and the write is not marked complete
     holder.kill();
   }
 });
+
+/* ── selection fills a blank, it does not change a standard (SW-085) ── */
+
+// Found by a reader: any declared check used to satisfy any card, and the
+// selection then BECAME the card's check — one hand-back against the cheapest
+// declared command quietly lowered the standard for every later one.
+
+const LINT = ['node', '-e', 'process.exit(0)'];
+
+test('a card that carries a check refuses a hand-back naming a different one', async () => {
+  await withChecks({ default: FAIL, lint: LINT }, { check: 'default' });
+  const { c } = await handshake();
+  const { text, isError } = await c.call('done', { id: 'TS-001', check: 'lint', note: 'lint is green, shipping' });
+
+  assert.equal(isError, false, 'the write still lands — what the gate governs is the status');
+  assert.match(text.split('\n')[0], /NOT handed back/, 'the verdict leads');
+  assert.match(text, /tried to change its own exam/);
+  assert.match(text, /Selection fills a blank; it does not change a standard/);
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.status, 'claude', 'a green lint run must not carry a card whose standard is the suite');
+  assert.equal(card.check, 'default', 'the refused selection must NOT become the card\'s check — that would be the silent lowering, one hand-back later');
+  assert.equal(card.verification, undefined, 'nothing ran, so nothing is recorded as having run');
+  const last = card.note[card.note.length - 1];
+  assert.equal(last.kind, 'finding');
+  assert.match((await doc()).feed[0].msg, /different check than its own/);
+});
+
+test('force switches the standard, runs the chosen check, and records the decision', async () => {
+  await withChecks({ default: FAIL, lint: LINT }, { check: 'default' });
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', check: 'lint', force: true, note: 'the suite is quarantined this week, lint gates for now' });
+  assert.match(text, /→ review/);
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.status, 'review');
+  assert.equal(card.check, 'lint', 'the forced switch becomes the card\'s standard');
+  assert.equal(card.verification.check, 'lint', 'and the chosen check really ran');
+  assert.equal(card.verification.ok, true);
+  const decision = card.note.find((e) => e.kind === 'decision' && /switched from "default" to "lint"/.test(e.text));
+  assert.ok(decision, 'a standard that changes silently is indistinguishable from one that was met');
+});
+
+test('selection still fills a blank: a card with no check takes the named one', async () => {
+  await withChecks({ default: FAIL, lint: LINT });
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', check: 'lint', note: 'first standard set at hand-back' });
+  assert.match(text, /→ review/);
+
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.check, 'lint', 'filling a blank needs no force — there was no standard to lower');
+  assert.equal(card.verification.ok, true);
+  assert.ok(!card.note.some((e) => e.kind === 'decision'), 'no switch happened, so no decision entry');
+});
+
+test('naming the card\'s own check is not a switch', async () => {
+  await withChecks({ default: PASS }, { check: 'default' });
+  const { c } = await handshake();
+  const { text } = await c.call('done', { id: 'TS-001', check: 'default', note: 'held to the same standard, said explicitly' });
+  assert.match(text, /→ review/);
+  const card = (await doc()).cards.find((x) => x.id === 'TS-001');
+  assert.equal(card.verification.ok, true);
+  assert.ok(!card.note.some((e) => e.kind === 'decision'));
+});

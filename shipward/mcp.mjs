@@ -586,7 +586,19 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
   const { doc: pre } = await readRaw();
   const preCard = findCard(pre, id);
   const project = pre.projects.find((p) => p.id === preCard.p) || null;
-  let verdict = await runCheck(project, chosen ? { ...preCard, check: chosen } : preCard);
+  // SW-085, found by a reader: any declared check used to satisfy any card,
+  // and the selection then BECAME the card's check — so one hand-back against
+  // the cheapest declared command quietly lowered the standard for every
+  // later one. There is no strength ordering between commands, so the tool
+  // cannot know lint is weaker than the suite; what it can hold is that
+  // selection FILLS A BLANK, it never changes a standard silently. A card
+  // that already carries a check refuses a hand-back naming a different one —
+  // nothing runs, nothing is proved, the same bucket as a check nobody
+  // declares. force:true switches it, and is recorded as a decision below.
+  const switched = chosen && preCard.check && chosen !== preCard.check ? preCard.check : null;
+  let verdict = switched && !force
+    ? { ran: false, ok: false, state: 'switch', name: chosen, from: switched }
+    : await runCheck(project, chosen ? { ...preCard, check: chosen } : preCard);
   // One rule, so there is no gap to fall through: a check that was PROMISED and
   // did not pass does not earn the promotion — failed, timed out, could not
   // spawn, or named something this project does not declare. Treating a
@@ -642,9 +654,12 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
       if (to === 'pushed' && !moved.pushed) moved.pushed = nowIso();
     }
     if (sha) moved.commit = sha;
-    // A check selected at hand-back becomes the card's check: the next done()
-    // on it should be held to the same standard without being told again.
-    if (chosen) moved.check = chosen;
+    // A check selected at hand-back becomes the card's check — when it fills
+    // a blank, or was forced through (SW-085): the next done() should be held
+    // to the same standard without being told again. A REFUSED switch must
+    // not write itself onto the card, or the silent lowering this refusal
+    // exists to stop would happen anyway, one hand-back later.
+    if (chosen && verdict.state !== 'switch') moved.check = chosen;
     if (verdict.ran) moved.verification = verificationOf(verdict, nowIso());
     // resolves with no prose still deserves an entry: the assertion is the point.
     const text = addition || (resolves ? `Resolves ${resolves}.` : '');
@@ -668,6 +683,16 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
         { kind: 'decision' },
       ));
     }
+    // SW-085: the switch that force pushed through is a change of standard,
+    // and a standard that changes silently is indistinguishable from one
+    // that was met. Its own entry, separate from any failure override above —
+    // the switch is a decision even when the chosen check then passed.
+    if (switched && force) {
+      moved.note = appendedNote(moved.note, moved.created, entryOf(
+        `The card's check was switched from "${switched}" to "${chosen}" at hand-back, with force. The standard for every later done() on this card changed here.`,
+        { kind: 'decision' },
+      ));
+    }
     doc.cards[doc.cards.indexOf(found)] = moved;
     doc.feed = feedAdd(
       doc.feed, moved.p,
@@ -682,7 +707,9 @@ async function doneCard({ id, commit, note, kind, resolves, pushed = false, chec
   // skimming, which is every caller.
   if (held) {
     return [
-      `${card.id} was NOT handed back — its check refuted the claim.`,
+      verdict.state === 'switch'
+        ? `${card.id} was NOT handed back — it tried to change its own exam.`
+        : `${card.id} was NOT handed back — its check refuted the claim.`,
       verdictText(verdict, { cmd }),
       `The card stays in progress (claude/working)${card.commit ? ` at ${card.commit}` : ''}; the note and the commit were still written.`,
       'Fix the work and call done again, or pass force:true to hand it back anyway — which is recorded on the card, not swallowed.',

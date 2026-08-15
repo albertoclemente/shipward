@@ -503,6 +503,15 @@ const sleptClause = (r) => (r.suspendedMs > 0
 // find again — and a pass over a dirty tree says so in the same breath, rather
 // than letting the sha imply a cleanliness it did not have.
 export function verdictText(r, { cmd }) {
+  // SW-085 before the !ran early return: a refused switch is not an absence
+  // of verification, it is a refusal to sit a different exam. A card that
+  // carries a check declines a hand-back naming another one, because there is
+  // no strength ordering between commands — the tool cannot know lint is
+  // weaker than the suite, so what it holds instead is that a standard set on
+  // the card never changes silently.
+  if (r.state === 'switch') {
+    return `Check "${r.name}" was selected, but this card's standard is "${r.from}". Selection fills a blank; it does not change a standard — nothing ran, nothing was proved, and the card keeps the check it had. Hand back against "${r.from}", or pass force:true to switch, which is recorded on the card as a decision.`;
+  }
   if (!r.ran) return `Unverified — ${r.reason}. done() proved nothing about this work.`;
   const where = r.sha ? `at ${r.sha}${r.dirty ? ' with uncommitted changes in the tree, so this is not reproducible from the sha alone' : ''}` : 'at an unknown commit — git could not be read';
   switch (r.state) {

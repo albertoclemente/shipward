@@ -101,6 +101,7 @@ export function verifyMsg(id, state, { forced = false } = {}) {
   switch (state) {
     case 'fail': return `${id} did not pass its check — still in progress`;
     case 'moved': return `${id} check ran but the tree changed under it — nothing proved about this hand-back`;
+    case 'switch': return `${id} tried to hand back against a different check than its own — refused, still in progress`;
     case 'timeout': return `${id} check ran out of time — nothing proved either way`;
     case 'error': return `${id} check could not be run — nothing proved either way`;
     case 'unresolved': return `${id} names a check this project does not declare — nothing proved`;

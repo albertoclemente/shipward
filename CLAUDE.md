@@ -128,7 +128,12 @@ carries only its **name**:
 You may **select** a declared check (`done({check: "e2e"})`); you may never
 define one. That is not ceremony — this file is written by you and by an
 unauthenticated `PUT /api/tracker`, so a command stored in it would be an exec
-for anything that can write the tracker. Argv arrays run with no shell, so
+for anything that can write the tracker. Selection also only **fills a blank**
+(SW-085): a card that already carries a check refuses a hand-back that names a
+different one — nothing runs, nothing is proved — because any declared check
+earning the same green would let you pick the cheapest exam, and a selected
+check becomes the card's standard for every later `done()`. Switching a card's
+check takes `force: true` and is recorded on the card as a decision. Argv arrays run with no shell, so
 nothing inside a check is ever parsed as syntax.
 
 A check also runs with **no `SHIPWARD_*` in its environment**, and with
@@ -151,6 +156,7 @@ What happens then:
 | the tree changed AFTER the check, before the write | **stays `claude`/`working`** | `finding` — the promotion is a compare-and-swap: a third tree reading under the write lock, and the card moves only if it still equals the one the check verified |
 | exits non-zero | **stays `claude`/`working`** | `finding`, with the exit code and the output |
 | timed out, could not spawn, or names a check nobody declares | **stays `claude`/`working`** | `finding` — absence of evidence, neither pass nor fail |
+| named a check DIFFERENT from the card's own | **stays `claude`/`working`** | `finding` — selection fills a blank, it does not change a standard; switch with `force`, which writes a `decision` |
 | no check declared anywhere | `review` / `pushed` as asked | nothing; the reply alone says it proved nothing |
 
 Nothing here blocks the write: the note, the commit and the record all land. What

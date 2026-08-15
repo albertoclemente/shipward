@@ -212,3 +212,4 @@
 {"t":"2026-07-28T11:35:56.397Z","p":"shipward","msg":"SW-029 handed to Claude Code — queued","by":"claude"}
 {"t":"2026-07-28T11:39:20.641Z","p":"shipward","msg":"SW-029 moved to Review — give it a look","by":"claude"}
 {"t":"2026-07-28T11:40:10.856Z","p":"shipward","msg":"Reconciled with git — 2 cards corrected from the repository","by":"claude"}
+{"t":"2026-07-28T13:01:23.159Z","p":"shipward","msg":"SW-030 handed to Claude Code — queued","by":"claude"}

@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-085",
+      "p": "shipward",
+      "title": "The agent picks the exam: selecting a cheaper declared check still earns the green",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-15T06:16:25.688Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-084",
       "p": "shipward",
       "title": "A GIF of the board refusing a false done() — the pitch's only unillustrated beat",
@@ -1825,6 +1840,12 @@
   ],
   "feed": [
     {
+      "t": "2026-08-15T06:16:25.688Z",
+      "p": "shipward",
+      "msg": "You added SW-085 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-14T18:06:39.620Z",
       "p": "shipward",
       "msg": "Synced with git — SW-084 refusal GIF merged to main",
@@ -3017,17 +3038,11 @@
       "p": "shipward",
       "msg": "SW-030 moved to Review — give it a look",
       "by": "user"
-    },
-    {
-      "t": "2026-07-28T13:01:23.159Z",
-      "p": "shipward",
-      "msg": "SW-030 handed to Claude Code — queued",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 118
+  "rev": 119
 }

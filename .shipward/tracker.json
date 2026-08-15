@@ -1849,9 +1849,66 @@
       "created": "2026-07-25T15:25:44.607Z",
       "pushed": "2026-07-27T16:29:20.433Z",
       "shipped": "2026-07-27T16:29:20.433Z"
+    },
+    {
+      "id": "SW-086",
+      "p": "shipward",
+      "title": "schema.json describes the tracker but never the sidecar it now depends on",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "pushed",
+      "claude": "done",
+      "branch": "chore/schema-documents-the-sidecar",
+      "commit": "ea5d215",
+      "created": "2026-08-15T19:00:00Z",
+      "pushed": "2026-08-15T19:20:00Z",
+      "shipped": null
+    },
+    {
+      "id": "SW-087",
+      "p": "shipward",
+      "title": "schema.json still omits mcp and says nothing about feed-archive.jsonl",
+      "type": "chore",
+      "pri": "P3",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-15T19:20:00Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
+      "id": "SW-088",
+      "p": "shipward",
+      "title": "an onboarded repo never receives a schema or protocol update",
+      "type": "chore",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-15T19:20:00Z",
+      "pushed": null,
+      "shipped": null
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-15T19:20:00Z",
+      "p": "shipward",
+      "by": "claude",
+      "msg": "SW-086 pushed at ea5d215 — the schema documents notes.jsonl; SW-087 and SW-088 filed"
+    },
+    {
+      "t": "2026-08-15T19:00:00Z",
+      "p": "shipward",
+      "by": "claude",
+      "msg": "SW-086 filed and taken — the schema documents tracker.json only, and the sidecar is undescribed"
+    },
     {
       "t": "2026-08-15T06:43:44.104Z",
       "p": "shipward",

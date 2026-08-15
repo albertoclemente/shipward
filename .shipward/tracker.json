@@ -23,13 +23,26 @@
       "type": "bug",
       "pri": "P2",
       "effort": "M",
-      "status": "backlog",
-      "claude": null,
-      "branch": null,
-      "commit": null,
+      "status": "pushed",
+      "claude": "done",
+      "branch": "fix/the-agent-picks",
+      "commit": "e10c1da",
       "created": "2026-08-15T06:16:25.688Z",
-      "pushed": null,
-      "shipped": null
+      "pushed": "2026-08-15T06:43:44.104Z",
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-08-15T06:43:38.225Z",
+        "sha": "e10c1da",
+        "dirty": false,
+        "ms": 41576
+      }
     },
     {
       "id": "SW-084",
@@ -1840,6 +1853,24 @@
   ],
   "feed": [
     {
+      "t": "2026-08-15T06:43:44.104Z",
+      "p": "shipward",
+      "msg": "Synced with git — SW-085 merged to main",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-15T06:43:38.225Z",
+      "p": "shipward",
+      "msg": "SW-085 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-08-15T06:38:36.493Z",
+      "p": "shipward",
+      "msg": "SW-085 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-15T06:16:25.688Z",
       "p": "shipward",
       "msg": "You added SW-085 to Backlog — it's on the list",
@@ -3020,29 +3051,11 @@
       "p": "shipward",
       "msg": "Reconciled with git — SW-030 review → pushed",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T13:04:32.605Z",
-      "p": "shipward",
-      "msg": "SW-030 moved to Review — give it a look",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T13:03:29.611Z",
-      "p": "shipward",
-      "msg": "SW-030 handed to Claude Code — queued",
-      "by": "user"
-    },
-    {
-      "t": "2026-07-28T13:03:19.883Z",
-      "p": "shipward",
-      "msg": "SW-030 moved to Review — give it a look",
-      "by": "user"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 119
+  "rev": 122
 }

@@ -1894,9 +1894,30 @@
       "created": "2026-08-15T19:20:00Z",
       "pushed": null,
       "shipped": null
+    },
+    {
+      "id": "SW-089",
+      "p": "shipward",
+      "title": "Flaky in CI: contended stale-lock breaking admits a second writer",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-08-15T19:35:00Z",
+      "pushed": null,
+      "shipped": null
     }
   ],
   "feed": [
+    {
+      "t": "2026-08-15T19:35:00Z",
+      "p": "shipward",
+      "by": "claude",
+      "msg": "SW-089 filed — store.test.mjs:121 failed once in CI and passed on re-run with no change"
+    },
     {
       "t": "2026-08-15T19:20:00Z",
       "p": "shipward",

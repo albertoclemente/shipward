@@ -1,5 +1,71 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$defs": {
+    "noteEntry": {
+      "type": "object",
+      "required": [
+        "t",
+        "text"
+      ],
+      "properties": {
+        "t": {
+          "type": "string",
+          "format": "date-time",
+          "description": "when this entry was written"
+        },
+        "kind": {
+          "enum": [
+            "open",
+            "finding",
+            "decision",
+            "evidence",
+            "outcome",
+            "brief"
+          ],
+          "description": "stated kind; omitted = classified from the text"
+        },
+        "text": {
+          "type": "string"
+        },
+        "resolves": {
+          "type": "string",
+          "pattern": "^[A-Z]+-[0-9]{3}$",
+          "description": "card id whose open items this entry settles"
+        },
+        "sha": {
+          "type": "string",
+          "description": "the commit this entry was true of (SW-044). Evidence without one cannot be expired — it can only be dated."
+        },
+        "dirty": {
+          "type": "boolean",
+          "description": "the tree carried uncommitted changes, so this entry is not reproducible from its sha"
+        }
+      },
+      "description": "One dated thing somebody learned, decided, or was bitten by. Append-only by protocol: push an entry, never edit one."
+    },
+    "notesSidecarLine": {
+      "description": "ONE LINE OF .shipward/notes.jsonl, which this schema DOCUMENTS rather than validates — that file is JSONL and JSON Schema describes a single document at a time. A line is a noteEntry plus the card it belongs to. Oldest first, append-only, never rewritten and never compacted: it is the memory, and the protocol above it says push an entry rather than edit one. A line that will not parse is skipped and COUNTED on stderr rather than dropped in silence; an absent file is a board that has never written a note, not an error. The store spreads the entry whole rather than copying named fields (SW-053 added sha and dirty and an earlier field-by-field copy dropped them silently), so treat these properties as what is KNOWN to travel, not as a closed set.",
+      "type": "object",
+      "required": [
+        "card",
+        "t",
+        "text"
+      ],
+      "properties": {
+        "card": {
+          "type": "string",
+          "pattern": "^[A-Z]+-[0-9]{3}$",
+          "description": "the card this entry is filed under — a finding goes under the card that FOUND it, not the code it concerns"
+        }
+      },
+      "allOf": [
+        {
+          "$ref": "#/$defs/noteEntry"
+        }
+      ]
+    }
+  },
+  "description": "The BOARD. Note text lives beside it in .shipward/notes.jsonl — see $defs.notesSidecarLine. The two files hold DISJOINT facts: after a write the tracker carries no note text and the sidecar carries no board state, so there is nothing for them to disagree about. Commit them together — a board without its memory is cards with nothing written on them.",
   "title": "Shipward tracker file (.shipward/tracker.json)",
   "type": "object",
   "required": [
@@ -147,7 +213,7 @@
             "description": "short sha of the latest relevant commit"
           },
           "note": {
-            "description": "Since SW-039 note entries are STORED in .shipward/notes.jsonl, not here — a written tracker carries no note text at all. This field remains valid because the store hydrates it on every read (so every consumer still sees card.note) and because hand-editing a note straight into the tracker is still supported: the next write moves it to the sidecar.",
+            "description": "Since SW-039 note entries are STORED in .shipward/notes.jsonl, not here — a written tracker carries no note text at all, and $defs.notesSidecarLine is the shape of a line there. This field remains valid because the store hydrates it on every read (so every consumer still sees card.note) and because hand-editing a note straight into the tracker is still supported: the next write moves it to the sidecar.",
             "oneOf": [
               {
                 "type": "string",
@@ -157,49 +223,10 @@
                 "type": "array",
                 "description": "structured entries, append-only in spirit (SW-028)",
                 "items": {
-                  "type": "object",
-                  "required": [
-                    "t",
-                    "text"
-                  ],
-                  "properties": {
-                    "t": {
-                      "type": "string",
-                      "format": "date-time",
-                      "description": "when this entry was written"
-                    },
-                    "kind": {
-                      "enum": [
-                        "open",
-                        "finding",
-                        "decision",
-                        "evidence",
-                        "outcome",
-                        "brief"
-                      ],
-                      "description": "stated kind; omitted = classified from the text"
-                    },
-                    "text": {
-                      "type": "string"
-                    },
-                    "resolves": {
-                      "type": "string",
-                      "pattern": "^[A-Z]+-[0-9]{3}$",
-                      "description": "card id whose open items this entry settles"
-                    },
-                    "sha": {
-                      "type": "string",
-                      "description": "the commit this entry was true of (SW-044). Evidence without one cannot be expired — it can only be dated."
-                    },
-                    "dirty": {
-                      "type": "boolean",
-                      "description": "the tree carried uncommitted changes, so this entry is not reproducible from its sha"
-                    }
-                  }
+                  "$ref": "#/$defs/noteEntry"
                 }
               }
-            ],
-            "description": "context / decisions; Claude Code appends here. String prose or an array of dated entries."
+            ]
           },
           "check": {
             "type": [
@@ -307,7 +334,7 @@
           },
           "msg": {
             "type": "string",
-            "description": "one human-readable line, e.g. 'Claude Code pushed 3f8c21a \u2014 BW-014 moved to Review'"
+            "description": "one human-readable line, e.g. 'Claude Code pushed 3f8c21a — BW-014 moved to Review'"
           },
           "by": {
             "enum": [

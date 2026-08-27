@@ -200,8 +200,21 @@ export async function untrackedMemory(cwd = REPO) {
 // list covers files appearing or disappearing. A change to the CONTENTS of an
 // untracked file is not seen. Hashing every untracked file could mean reading a
 // node_modules-sized tree twice per done(), and this runs on every hand-back.
+//
+// SW-090. The board is excluded from the PATCH as well, and not only from the
+// path list below. The two had drifted apart: `dirty` has always ignored
+// `.shipward/` on the stated ground that the board is not the code under test
+// and something writes to it constantly, while the digest hashed a bare
+// `git diff HEAD` — which is every board write, every note, every feed entry.
+//
+// Measured on this repo mid-card: three of the four changed files were the
+// board's own. So any second Shipward writer — the desk, the fleet, another
+// session — moving tracker.json while a check ran was enough to refuse a
+// legitimate pass as "the tree moved", and the digest done() records is
+// invalidated by the very write that records it. An attestation that expires
+// on arrival is worse than no attestation, because it reads like a finding.
 async function treeDigest(cwd, sha, paths) {
-  const patch = await git(['diff', 'HEAD'], cwd);
+  const patch = await git(['diff', 'HEAD', '--', '.', `:!${BOARD_DIR}`], cwd);
   if (patch === null) return null;
   return createHash('sha256')
     .update(`${sha} ${paths.join(' ')} ${patch}`)

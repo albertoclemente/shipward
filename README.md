@@ -206,6 +206,11 @@ A tool that argues against overconfidence shouldn't be overconfident about itsel
 - **It proves a command passed. It doesn't prove your work is right.** Different things, and
   Shipward always says which one it means. An agent that writes a passing test for broken
   code defeats this completely.
+- **A pass attests one tree, not your workspace.** The card keeps the fingerprint of the
+  tree the check ran against, and the Trust tab tells you when what's on disk is no longer
+  that tree. A completion and a working directory are two things anything can write
+  independently; nothing here can make them one atomic fact, so the claim stops where it
+  can still be kept.
 - **A check is only as good as the command you pick.** A flaky test will block good work.
 - **Until you set a check, it proves nothing** — cards move on the agent's word, like
   everywhere else.

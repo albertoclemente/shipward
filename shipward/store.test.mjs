@@ -486,6 +486,23 @@ test('validate accepts both note forms and rejects malformed entries', async () 
   assert.match(await v(mk([{ t: '2026-07-28T10:00:00Z', text: 'x', resolves: 'not-an-id' }])), /resolves must be a card id/);
 });
 
+/* ── SW-090: the tree a check was verified against ───────── */
+
+test('validate carries the attestation digest, and refuses one that is not a string', async () => {
+  const base = seed();
+  const mk = (verification) => JSON.parse(JSON.stringify({ ...base, cards: [{ ...card(1), verification }] }));
+  const v = async (doc) => {
+    const { validate } = await import(STORE);
+    return validate(doc);
+  };
+  const passed = { check: 'default', argv: ['node', '--test'], exit: 0, ok: true, at: '2026-08-27T10:00:00Z', sha: 'abc1234', dirty: false, ms: 5 };
+
+  assert.equal(await v(mk({ ...passed, digest: 'deadbeefdeadbeef' })), null);
+  assert.equal(await v(mk(passed)), null, 'absent is valid: every card written before this has none');
+  assert.equal(await v(mk({ ...passed, digest: null })), null, 'and so is an explicit absence');
+  assert.match(await v(mk({ ...passed, digest: 42 })), /verification\.digest must be a string/);
+});
+
 /* ── the card-loss warning (SW-035) ──────────────────────── */
 
 const manyCards = (n) => Array.from({ length: n }, (_, i) => card(i + 1));

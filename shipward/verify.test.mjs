@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import {
   resolveCheck, timeoutOf, clip, readOutcome, kindFor, verdictText,
-  spawnCheck, runCheck, verificationOf, cmdOf, movedAtWrite,
+  spawnCheck, runCheck, verificationOf, cmdOf, movedAtWrite, attestation, ATTESTATION,
   DEFAULT_TIMEOUT_MS, OUTPUT_BUDGET, checkEnv, CHECK_TRACKER,
   suspendedMsOf, deadlineVerdict, wallCapOf, WALL_CAP_FLOOR_MS,
 } from './verify.mjs';
@@ -860,6 +860,44 @@ test('writes to the BOARD do not count as the tree moving', async (t) => {
   assert.equal(r.state, 'pass', 'a write to the board is not a change to the code under test');
 });
 
+// SW-090. The test above stages the board as a NEW file, and an untracked
+// path is excluded twice over — once by the BOARD_DIR filter and once by
+// `git diff HEAD`, which cannot see it at all. So it passed without ever
+// exercising the case every onboarded repo is actually in: the board is
+// COMMITTED, and rewriting it is a tracked modification that landed in the
+// digest's patch. Three of the four changed files on this repo mid-card were
+// the board's own. This is that case, and it fails without the exclusion.
+test('a write to a COMMITTED board file does not count as the tree moving', async (t) => {
+  const { dir, g } = await stagedRepo(t);
+  await mkdir(join(dir, '.shipward'), { recursive: true });
+  await writeFile(join(dir, '.shipward', 'tracker.json'), '{"rev":1}\n');
+  g('add', '-A');
+  g('commit', '-qm', 'board');
+  const r = await runCheck(NOOP, { check: 'default' }, {
+    cwd: dir,
+    run: async () => {
+      await writeFile(join(dir, '.shipward', 'tracker.json'), '{"rev":2}\n');
+      return { exit: 0, ms: 5, out: '' };
+    },
+  });
+  assert.equal(r.state, 'pass', 'the board is not the code under test, tracked or not');
+});
+
+test('the digest a pass is recorded against survives the board write that records it', async (t) => {
+  // The point of the exclusion, stated as the invariant it exists for: done()
+  // writes tracker.json and notes.jsonl as it stamps the card, so a digest
+  // that counted them would be stale the instant it was persisted.
+  const { dir, g } = await stagedRepo(t);
+  await mkdir(join(dir, '.shipward'), { recursive: true });
+  await writeFile(join(dir, '.shipward', 'notes.jsonl'), '{"card":"TS-001"}\n');
+  g('add', '-A');
+  g('commit', '-qm', 'board');
+  const r = await runCheck(NOOP, { check: 'default' }, { cwd: dir, run: async () => ({ exit: 0, ms: 5, out: '' }) });
+  const record = verificationOf(r, '2026-08-27T10:00:00.000Z');
+  await writeFile(join(dir, '.shipward', 'notes.jsonl'), '{"card":"TS-001"}\n{"card":"TS-001","kind":"evidence"}\n');
+  assert.equal(attestation(record, await headState(dir)).state, 'holds');
+});
+
 test('a failing check that also moved reports moved, and neither grants the status', async (t) => {
   const { dir } = await stagedRepo(t);
   const r = await runCheck(NOOP, { check: 'default' }, {
@@ -995,4 +1033,57 @@ test('the at-write refusal is kept apart from SW-078 in the record', async (t) =
   const during = verificationOf({ ...refused, atWrite: undefined }, '2026-08-14T00:00:00Z');
   assert.equal(during.treeMoved, true);
   assert.equal(during.atWrite, undefined, 'SW-078 records stay exactly as they were');
+});
+
+
+/* ── what the record is worth to a later reader (SW-090) ── */
+
+const passed = (over = {}) => verificationOf(
+  { ran: true, ok: true, state: 'pass', name: 'default', argv: ['node', '-e', ''], exit: 0, ms: 5, sha: 'abc1234', digest: 'deadbeefdeadbeef', ...over },
+  '2026-08-27T10:00:00.000Z',
+);
+
+test('the record written to the card carries the tree it was verified against', () => {
+  const v = passed();
+  assert.equal(v.digest, 'deadbeefdeadbeef');
+  assert.equal(v.sha, 'abc1234', 'the sha stays: it is what SW-044 expires the evidence by');
+});
+
+test('a verdict with no digest records none rather than a null nobody can tell from a mismatch', () => {
+  assert.equal('digest' in passed({ digest: undefined }), false);
+});
+
+test('the tree still being the verified one is the claim that holds', () => {
+  const a = attestation(passed(), { known: true, digest: 'deadbeefdeadbeef' });
+  assert.equal(a.state, 'holds');
+  assert.match(a.label, /deadbeefdeadbeef/);
+});
+
+test('a tree that moved under a recorded pass is stale, and names both trees', () => {
+  const a = attestation(passed(), { known: true, digest: 'feedfacefeedface' });
+  assert.equal(a.state, 'stale');
+  assert.match(a.label, /deadbeefdeadbeef/);
+  assert.match(a.label, /feedfacefeedface/);
+});
+
+test('uncomparable is never reported as stale — the two ways of not knowing stay apart', () => {
+  assert.equal(attestation(passed({ digest: undefined }), { known: true, digest: 'x' }).state, 'uncomparable');
+  assert.equal(attestation(passed(), { known: false, digest: null }).state, 'uncomparable');
+  assert.equal(attestation(passed(), null).state, 'uncomparable');
+});
+
+test('only a pass attests anything at all', () => {
+  const failed = verificationOf({ ran: true, ok: false, state: 'fail', name: 'default', exit: 1, ms: 5, sha: 'abc1234', digest: 'deadbeefdeadbeef' }, '2026-08-27T10:00:00.000Z');
+  assert.equal(attestation(failed, { known: true, digest: 'feedfacefeedface' }), null);
+  assert.equal(attestation(null, { known: true, digest: 'x' }), null);
+});
+
+test('every state the comparison can report is one the list declares', () => {
+  const seen = [
+    attestation(passed(), { known: true, digest: 'deadbeefdeadbeef' }),
+    attestation(passed(), { known: true, digest: 'feedfacefeedface' }),
+    attestation(passed({ digest: undefined }), { known: true, digest: 'x' }),
+  ].map((a) => a.state);
+  assert.deepEqual([...new Set(seen)].sort(), [...ATTESTATION].sort().filter((s) => seen.includes(s)));
+  for (const s of seen) assert.ok(ATTESTATION.includes(s));
 });

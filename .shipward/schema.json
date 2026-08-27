@@ -280,6 +280,13 @@
                 ],
                 "description": "HEAD when the check ran — what SW-044 reads to expire this evidence"
               },
+              "digest": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "the working tree the check was verified against (SW-090). Completion attests \"digest X passed check Y\", not \"this workspace is complete\" — a consumer compares this against the tree it is about to act on. Absent means it could not be taken, which is not the same as not matching."
+              },
               "dirty": {
                 "type": "boolean",
                 "description": "true if the tree carried uncommitted changes; a pass nobody else can reproduce"

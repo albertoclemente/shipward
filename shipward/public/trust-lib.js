@@ -114,7 +114,37 @@ export function trustFindings(cards, {
     });
   }
 
-  // 5. Memory arithmetic: handed back since checks started working here, and
+  // 5. SW-090. The evidence outlived the tree it was true of. A pass attests
+  // "digest X passed check Y" and nothing wider, so the comparison is owed by
+  // whoever acts on the status — and on this board that is a human about to
+  // move a card out of review. The reader who raised it put the alternative
+  // plainly: either the claim spans two independently writable systems, or a
+  // later mutation shows up as visibly stale evidence. This is the second.
+  //
+  // Scoped to `review` on purpose, and the scope is the whole difference
+  // between a finding and a nag. A `pushed` card's claim is about the trunk and
+  // git already answers it (not-on-trunk, above); every card ever closed would
+  // otherwise be indicted the moment the next commit landed, which is the
+  // fifty-findings-about-the-past failure checksBegan exists to avoid.
+  //
+  // Silent when either side is missing: a card with no digest predates this or
+  // could not have one taken, and a tree that cannot be read is not a tree that
+  // moved. Uncomparable is not a mismatch.
+  for (const c of cards) {
+    if (c.status !== 'review') continue;
+    const v = c.verification;
+    if (!v?.ok || !v.digest || !tree?.digest) continue;
+    if (v.digest === tree.digest) continue;
+    out.push({
+      rule: 'stale-attestation',
+      card: c.id,
+      title: c.title,
+      headline: `${c.id} was verified against a tree that is no longer here`,
+      detail: `"${v.check}" passed against ${v.digest}; the working tree is now ${tree.digest}. Not wrong and not a failure — the pass says what it proved and no longer describes what you would be promoting. Re-run the check, or promote knowing the evidence is about a different tree.`,
+    });
+  }
+
+  // 6. Memory arithmetic: handed back since checks started working here, and
   // still carrying no evidence anything ever ran.
   const began = checksBegan(cards);
   if (began != null) {
@@ -138,7 +168,7 @@ export function trustFindings(cards, {
 // Ordered for a reader, not for a machine: what git can disprove comes first
 // because it is the only category where the board is making a false claim right
 // now. Within a rule, newest cards first.
-const RULE_ORDER = ['not-on-trunk', 'untracked-branch', 'uncarded-changes', 'stale-review', 'never-verified'];
+const RULE_ORDER = ['not-on-trunk', 'untracked-branch', 'uncarded-changes', 'stale-review', 'stale-attestation', 'never-verified'];
 
 export const rankFindings = (findings) => [...findings].sort((a, b) => {
   const r = RULE_ORDER.indexOf(a.rule) - RULE_ORDER.indexOf(b.rule);
@@ -166,6 +196,7 @@ export const LABEL = {
   'untracked-branch': 'unclaimed',
   'uncarded-changes': 'uncarded',
   'stale-review': 'waiting too long',
+  'stale-attestation': 'verified against another tree',
   'never-verified': 'unproven',
 };
 
@@ -191,5 +222,6 @@ export const HEADING = {
   'untracked-branch': 'Work no card claims',
   'uncarded-changes': 'Changes with no card',
   'stale-review': 'Waiting on you',
+  'stale-attestation': 'Evidence outlived its tree',
   'never-verified': 'Closed without a check',
 };

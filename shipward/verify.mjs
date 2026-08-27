@@ -470,6 +470,39 @@ export function movedAtWrite(verdict, now) {
   return { ...verdict, state: 'moved', atWrite: true, ok: false, movedFrom: verdict.sha, movedTo: now.sha };
 }
 
+// SW-090. What the recorded verdict is worth to somebody reading it LATER,
+// which is the half movedAtWrite never covered: that one compares inside the
+// hand-back it belongs to and is gone by the time the card is written.
+//
+// The narrowing this implements was the reader's, and it is the point of the
+// card: completion attests "digest X passed check Y", not "this workspace is
+// complete". Two independently writable systems (the filesystem and the card
+// store) cannot be made one transaction by any lock available here — the lock
+// done() takes serializes Shipward writers and is nothing to git or an editor —
+// so the claim is narrowed to one nobody has to defend, and a later mutation
+// becomes visibly stale evidence instead of a quiet lie.
+//
+// Three states, and the two ways of not knowing are kept apart, as everywhere
+// else here: not matching and not being comparable are different facts, and a
+// reader who is shown the second as the first learns to distrust the first.
+export const ATTESTATION = ['holds', 'stale', 'uncomparable'];
+
+export function attestation(verification, now) {
+  // Only a PASS attests anything. A fail or a timeout promoted nothing, so
+  // there is no claim for a moving tree to outlive.
+  if (!verification || verification.ok !== true) return null;
+  if (!verification.digest) {
+    return { state: 'uncomparable', label: 'no tree recorded — this pass is datable, not checkable' };
+  }
+  if (!now?.known || !now.digest) {
+    return { state: 'uncomparable', label: `verified against ${verification.digest}, and the tree cannot be read here` };
+  }
+  if (now.digest === verification.digest) {
+    return { state: 'holds', label: `the tree is still the one this passed against (${verification.digest})` };
+  }
+  return { state: 'stale', label: `passed against ${verification.digest}; the tree is now ${now.digest}` };
+}
+
 /* ── what it becomes on the card ─────────────────────────── */
 
 export const verificationOf = (r, at) => ({
@@ -481,6 +514,17 @@ export const verificationOf = (r, at) => ({
   sha: r.sha ?? null,
   dirty: !!r.dirty,
   ms: Number.isInteger(r.ms) ? r.ms : 0,
+  // SW-090, and the whole of what this card is: the tree the check was verified
+  // against, kept rather than dropped. It existed already — runCheck stamps it,
+  // movedAtWrite compares against it — and then died with the verdict, so what
+  // reached the card was `sha`, which proves least in the case that needs it
+  // most: a dirty tree carries one sha through every edit made to it.
+  //
+  // Optional on purpose. Absent means the digest could not be taken (git
+  // unreadable either side), or the card was written before this existed, and
+  // both must read as "cannot be compared" rather than as "does not match" —
+  // the `comparable` rule from runCheck, one layer out.
+  ...(r.digest ? { digest: r.digest } : {}),
   ...(r.state === 'timeout' ? { timedOut: true } : {}),
   // atWrite keeps the two windows apart in the record: moved DURING the run
   // (SW-078) and moved between the verdict and the write (SW-082) are the same

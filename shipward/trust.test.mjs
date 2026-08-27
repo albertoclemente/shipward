@@ -142,6 +142,60 @@ test('cards still in flight are not unproven — they are unfinished', () => {
   assert.deepEqual(rules(out), []);
 });
 
+/* ── SW-090: evidence that outlived the tree it was true of ─ */
+
+const attested = (digest, at) => ({ check: 'default', argv: ['node'], exit: 0, ok: true, at, sha: 'abc1234', dirty: false, ms: 1, digest });
+// Handed back yesterday, so stale-review (7 days) never co-fires and these
+// tests are about one rule at a time.
+const handedBack = { note: [{ t: daysAgo(1), text: 'handed back' }] };
+
+test('a review card verified against a tree that has since moved is reported', () => {
+  const [f] = run([card({ id: 'SW-020', status: 'review', title: 'The thing', ...handedBack, verification: attested('aaaa1111', daysAgo(1)) })], {
+    tree: { known: true, digest: 'bbbb2222', dirtyPaths: [] },
+  });
+  assert.equal(f.rule, 'stale-attestation');
+  assert.equal(f.card, 'SW-020');
+  assert.match(f.headline, /no longer here/);
+  assert.match(f.detail, /aaaa1111/);
+  assert.match(f.detail, /bbbb2222/, 'both trees, or the reader cannot tell what changed');
+  assert.doesNotMatch(f.detail, /failed/, 'a pass that no longer describes the tree is not a failure');
+});
+
+test('a review card whose tree has not moved is not reported', () => {
+  const out = run([card({ status: 'review', ...handedBack, verification: attested('aaaa1111', daysAgo(1)) })], {
+    tree: { known: true, digest: 'aaaa1111', dirtyPaths: [] },
+  });
+  assert.deepEqual(rules(out), []);
+});
+
+test('what cannot be compared is never reported as moved', () => {
+  // Both halves of uncomparable: a card written before digests existed, and a
+  // tree git could not read. Neither is a mismatch, and rendering them as one
+  // would make the panel's worst finding its least trustworthy.
+  const noDigest = card({ status: 'review', ...handedBack, verification: verified(daysAgo(1)) });
+  assert.deepEqual(rules(run([noDigest], { tree: { known: true, digest: 'bbbb2222', dirtyPaths: [] } })), []);
+  const withDigest = card({ status: 'review', ...handedBack, verification: attested('aaaa1111', daysAgo(1)) });
+  assert.deepEqual(rules(run([withDigest], { tree: { known: false, digest: null, dirtyPaths: [] } })), []);
+  assert.deepEqual(rules(run([withDigest])), [], 'no tree supplied at all is not evidence of drift');
+});
+
+test('a failed check that was forced through does not also become a stale attestation', () => {
+  const failed = { ...attested('aaaa1111', daysAgo(1)), ok: false, exit: 1 };
+  assert.deepEqual(rules(run([card({ status: 'review', ...handedBack, verification: failed })], {
+    tree: { known: true, digest: 'bbbb2222', dirtyPaths: [] },
+  })), []);
+});
+
+test('a pushed card is not indicted for the trunk moving on beneath it', () => {
+  // Scope is the difference between a finding and a nag: every card ever
+  // closed would light up on the next commit, and git already answers what a
+  // landed claim is worth (not-on-trunk).
+  const out = run([card({ id: 'SW-021', status: 'pushed', pushed: daysAgo(2), verification: attested('aaaa1111', daysAgo(2)) })], {
+    tree: { known: true, digest: 'bbbb2222', dirtyPaths: [] },
+  });
+  assert.deepEqual(rules(out), []);
+});
+
 /* ── presentation ────────────────────────────────────────── */
 
 test('the false claim ranks above the merely unproven', () => {
@@ -151,6 +205,24 @@ test('the false claim ranks above the merely unproven', () => {
     { rule: 'not-on-trunk', card: 'SW-001' },
   ]);
   assert.deepEqual(rules(out), ['not-on-trunk', 'stale-review', 'never-verified']);
+});
+
+test('evidence that outlived its tree ranks between the parked and the unproven', () => {
+  const out = rankFindings([
+    { rule: 'never-verified', card: 'SW-002' },
+    { rule: 'stale-attestation', card: 'SW-004' },
+    { rule: 'stale-review', card: 'SW-003' },
+  ]);
+  assert.deepEqual(rules(out), ['stale-review', 'stale-attestation', 'never-verified']);
+});
+
+test('every rule the panel can emit has a heading and a label', () => {
+  // A rule added without either renders as its own slug, which reads as a bug
+  // in the tool rather than a fact about the board.
+  for (const rule of ['not-on-trunk', 'untracked-branch', 'uncarded-changes', 'stale-review', 'stale-attestation', 'never-verified']) {
+    assert.ok(HEADING[rule], `${rule} has no heading`);
+    assert.ok(LABEL[rule], `${rule} has no label`);
+  }
 });
 
 test('an empty panel says what was checked, not merely that it found nothing', () => {

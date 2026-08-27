@@ -576,6 +576,7 @@ export function validate(d) {
       if (!isStr(v.at) || Number.isNaN(Date.parse(v.at))) return `${c.id}.verification.at must be a date-time`;
       if (v.sha != null && !isStr(v.sha)) return `${c.id}.verification.sha must be a string or null`;
       if (v.dirty != null && typeof v.dirty !== 'boolean') return `${c.id}.verification.dirty must be a boolean`;
+      if (v.digest != null && !isStr(v.digest)) return `${c.id}.verification.digest must be a string or null`;
       if (v.timedOut != null && typeof v.timedOut !== 'boolean') return `${c.id}.verification.timedOut must be a boolean`;
       if (v.ms != null && !Number.isInteger(v.ms)) return `${c.id}.verification.ms must be an integer`;
       if (v.argv != null && (!Array.isArray(v.argv) || !v.argv.every(isStr))) return `${c.id}.verification.argv must be an array of strings`;

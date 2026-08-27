@@ -71,6 +71,15 @@ check that passed.
 A pass proves that a declared command exited zero on a named tree. **It does not
 prove the work is correct**, and the note says so in those words.
 
+What it attests is narrower still, and the record now says which: **"digest X
+passed check Y"**, not "this workspace is complete". The card keeps the
+fingerprint of the tree the check was verified against, so anyone acting on the
+status can compare it with the tree in front of them — and the desk's Trust tab
+does, for anything still in review. A completion and a working tree live in two
+systems that can be written independently, and no lock inside one of them can
+make the pair atomic; so the claim is narrowed to one that stays true, and a
+later edit becomes visibly stale evidence rather than a quiet lie.
+
 ## Evidence expires
 
 Every piece of evidence carries the commit it was true of, so the caveat can be a

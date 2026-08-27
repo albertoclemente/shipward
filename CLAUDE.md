@@ -170,7 +170,31 @@ prove the work is correct, and the note says so in those words. If the tree was
 dirty when the check ran, the evidence says that too — a pass over uncommitted
 changes is not reproducible from the sha. `.shipward/` does not count toward
 that: the board is not the code under test, and the heartbeat writes to it every
-minute, so counting it made every check dirty and the caveat meaningless.
+minute, so counting it made every check dirty and the caveat meaningless. The
+same exclusion holds for the tree **digest** (SW-090) — it did not, and the
+board's own writes were three of every four changed files, which was enough to
+refuse a legitimate pass and to expire an attestation the moment it was written.
+
+## What completion attests
+
+`verification.digest` is the fingerprint of the tree the check was verified
+against, and the claim it makes is deliberately narrow: **"digest X passed check
+Y"**, never "this workspace is complete". The second claim cannot be kept. A
+completion lives in the card store and the work lives in the filesystem, two
+systems anything can write independently — the lock `done` holds serializes
+Shipward's own writers and means nothing to git, an editor or a second process —
+so the compare-and-swap (SW-082) narrows that window to milliseconds and cannot
+close it.
+
+So the comparison is **owed by whoever acts on the status**. `attestation()` in
+`verify.mjs` is that comparison, and it has three answers, keeping the two ways
+of not knowing apart as everything here does: `holds` (the tree is still the one
+that passed), `stale` (it has moved, and both fingerprints are named), and
+`uncomparable` (no digest recorded, or the tree cannot be read — which must
+never render as a mismatch). The desk's Trust tab asks it for every card in
+`review`, so evidence that has outlived its tree is visible before you promote
+it rather than after. Scoped to `review` on purpose: a `pushed` card's claim is
+about the trunk, which git already answers.
 
 ## Evidence expires
 
@@ -195,7 +219,7 @@ verdict on the Memory tab, fading as the work drifts out from under it.
 
 Desk tab **Trust**. The `reported` tier has always been defined and never shown;
 this is where it surfaces, alongside the questions the board can ask about
-itself. Five rules, and none of them writes anything:
+itself. Six rules, and none of them writes anything:
 
 | Finding | Means |
 |---|---|
@@ -203,6 +227,7 @@ itself. Five rules, and none of them writes anything:
 | **Work no card claims** | a branch with commits that no card names |
 | **Changes with no card** | source modified with nothing in `claude` |
 | **Waiting on you** | a `review` handed back more than 7 days ago |
+| **Evidence outlived its tree** | a `review` whose check passed against a tree that is no longer the one here |
 | **Closed without a check** | handed back after checks began here, with nothing recorded as having run |
 
 The last one is scoped on purpose: "after checks began" is derived from the

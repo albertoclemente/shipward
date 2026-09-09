@@ -1902,12 +1902,12 @@
       "type": "chore",
       "pri": "P2",
       "effort": "S",
-      "status": "claude",
-      "claude": "working",
-      "branch": "chore/an-onboarded-repo",
-      "commit": null,
+      "status": "pushed",
+      "claude": "done",
+      "branch": "fix/versioned-artifacts",
+      "commit": "f1336b2",
       "created": "2026-08-15T19:20:00Z",
-      "pushed": null,
+      "pushed": "2026-09-09T12:20:36.000Z",
       "shipped": null
     },
     {
@@ -3132,5 +3132,5 @@
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 124
+  "rev": 125
 }

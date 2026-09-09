@@ -216,3 +216,11 @@
 {"t":"2026-07-28T13:03:19.883Z","p":"shipward","msg":"SW-030 moved to Review — give it a look","by":"user"}
 {"t":"2026-07-28T13:03:29.611Z","p":"shipward","msg":"SW-030 handed to Claude Code — queued","by":"user"}
 {"t":"2026-07-28T13:04:32.605Z","p":"shipward","msg":"SW-030 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T13:04:47.045Z","p":"shipward","msg":"Reconciled with git — SW-030 review → pushed","by":"claude"}
+{"t":"2026-07-28T13:06:33.565Z","p":"shipward","msg":"SW-031 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T13:10:09.893Z","p":"shipward","msg":"SW-031 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T13:10:26.494Z","p":"shipward","msg":"Reconciled with git — SW-031 review → pushed","by":"claude"}
+{"t":"2026-07-28T13:19:36.099Z","p":"shipward","msg":"SW-032 handed to Claude Code — queued","by":"claude"}
+{"t":"2026-07-28T13:20:22.896Z","p":"shipward","msg":"SW-032 moved to Review — give it a look","by":"claude"}
+{"t":"2026-07-28T13:20:23.394Z","p":"shipward","msg":"Reconciled with git — SW-032 review → pushed","by":"claude"}
+{"t":"2026-07-28T14:18:52.470Z","p":"shipward","msg":"SW-033 handed to Claude Code — queued","by":"claude"}

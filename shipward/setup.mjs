@@ -12,18 +12,21 @@
 //
 // What one run wires into the target:
 //   .shipward/tracker.json      seeded, one project, empty board
-//   .shipward/schema.json       copied from here
+//   .shipward/schema.json       copied from here, and re-copied on any later
+//                               run where it has fallen behind (SW-088)
 //   .claude/settings.json       statusline + the four hooks (merged, never
 //                               clobbered), pointing at the central scripts
 //                               with SHIPWARD_TRACKER/SHIPWARD_REPO inlined
 //   .mcp.json                   the shipward server, same env
-//   CLAUDE.md                   the protocol section, appended under a marker
+//   CLAUDE.md                   the protocol section, appended under a marker,
+//                               and refreshed on any later run where the text
+//                               here has moved on (SW-088)
 //
 // Idempotent by checking, not by overwriting: a second run reports "already
 // wired" and changes nothing, and a hand-edited settings.json keeps every key
 // it had. Exits non-zero on the first thing it will not do (no repo, no git).
 import { existsSync } from 'node:fs';
-import { mkdir, readFile, writeFile, copyFile, appendFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, appendFile } from 'node:fs/promises';
 import { join, resolve, basename, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readGit, branchLog } from './git.mjs';
@@ -184,10 +187,31 @@ if (seedRequested) {
     kept.push('the board (no unmerged branch without a card — nothing to seed)');
   }
 }
-if (!existsSync(join(shipDir, 'schema.json'))) {
-  await copyFile(join(CENTRAL, '.shipward', 'schema.json'), join(shipDir, 'schema.json'));
+// SW-088. Idempotent by CONTENT, not by existence. The old guard was
+// existsSync, so a repo onboarded before any schema change kept its copy
+// forever and no re-run could advance it — measured on catch_grocery_app,
+// whose schema predated seven documented fields, and in youtube_transcriber,
+// whose copy still described note entries at the inline oneOf[1] path this
+// schema has since moved to $defs/noteEntry. A session hand-repairing a
+// tracker reads this file as the authority on what a card may contain, so a
+// stale copy does not merely lag, it misleads.
+//
+// The file is a verbatim copy of the contract, not a customisation point, so
+// "differs" means "out of date" and replacing it is the repair. A version
+// integer was considered and rejected: it has to be remembered, and forgetting
+// to bump it is the same class of bug as the one being fixed.
+const schemaTarget = join(shipDir, 'schema.json');
+const schemaCanonical = await readFile(join(CENTRAL, '.shipward', 'schema.json'), 'utf8');
+const schemaCurrent = existsSync(schemaTarget) ? await readFile(schemaTarget, 'utf8') : null;
+if (schemaCurrent === null) {
+  await writeFile(schemaTarget, schemaCanonical, 'utf8');
   done.push('.shipward/schema.json — copied');
-} else kept.push('.shipward/schema.json');
+} else if (schemaCurrent !== schemaCanonical) {
+  await writeFile(schemaTarget, schemaCanonical, 'utf8');
+  done.push('.shipward/schema.json — updated (the copy here was out of date)');
+} else {
+  kept.push('.shipward/schema.json (up to date)');
+}
 
 /* ── 2. hooks + statusline ───────────────────────────────── */
 const claudeDir = join(target, '.claude');
@@ -313,11 +337,25 @@ if (existingMd?.includes(MARK)) {
   const first = existingMd.indexOf(MARK);
   const last = existingMd.lastIndexOf(MARK);
   const block = existingMd.slice(first, last + MARK.length);
-  if (block.includes(CENTRAL) && last > first) {
-    kept.push('CLAUDE.md (already points here)');
+  // SW-088. The guard used to be block.includes(CENTRAL), which asks whether
+  // the block names THIS install — not whether its text is current. A correctly
+  // wired repo therefore took the "already points here" branch forever, and the
+  // block was never advanced: youtube_transcriber sat on a six-tool block
+  // against a seven-tool install, with notes.jsonl undocumented, and a session
+  // reading it as the authority hand-wrote a note that took down every command
+  // in that repo (SW-091).
+  //
+  // Comparing against the freshly generated block subsumes both concerns: a
+  // moved install and a changed protocol each produce different text, so one
+  // rule replaces two guards. Only what lies BETWEEN the markers is replaced,
+  // so prose the user wrote around the block is still never touched.
+  if (block === protocol.trimEnd() && last > first) {
+    kept.push('CLAUDE.md (protocol up to date)');
   } else if (last > first) {
     await writeFile(claudeMd, existingMd.slice(0, first) + protocol.trimEnd() + existingMd.slice(last + MARK.length), 'utf8');
-    done.push('CLAUDE.md — protocol section repointed at this install');
+    done.push(block.includes(CENTRAL)
+      ? 'CLAUDE.md — protocol section updated (the block here was out of date)'
+      : 'CLAUDE.md — protocol section repointed at this install');
   } else {
     // One marker only: a hand-edited or truncated block. Say so rather than
     // guess where it ends and eat somebody's prose.

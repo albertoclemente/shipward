@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-092",
+      "p": "shipward",
+      "title": "setup.mjs copies the schema from the install's WORKING TREE, so an in-review branch leaks downstream",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-09-09T12:28:45.308Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-091",
       "p": "shipward",
       "title": "One bad note kind throws from every command and names an index nobody can find",
@@ -1928,6 +1943,12 @@
   ],
   "feed": [
     {
+      "t": "2026-09-09T12:28:45.308Z",
+      "p": "shipward",
+      "msg": "You added SW-092 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-09-09T12:11:56.402Z",
       "p": "shipward",
       "msg": "SW-088 handed to Claude Code — queued",
@@ -3120,17 +3141,11 @@
       "p": "shipward",
       "msg": "You added SW-034 and SW-035 to Backlog",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T14:26:46.531Z",
-      "p": "shipward",
-      "msg": "SW-033 moved to Review — give it a look",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 125
+  "rev": 126
 }

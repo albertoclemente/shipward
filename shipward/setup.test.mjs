@@ -238,3 +238,78 @@ test('setup refuses to run from a package cache, and writes nothing', async () =
   assert.ok(!existsSync(join(repo, '.mcp.json')), 'a refusal must write nothing');
   await rm(cache, { recursive: true, force: true });
 });
+
+/* ── stale artefacts are advanced, not reported as fine (SW-088) ── */
+
+const MARK = '<!-- shipward-protocol -->';
+
+// Rewrite the block's text while leaving the markers and the install path
+// alone: this is a repo wired correctly to THIS install whose protocol has
+// simply moved on. The old guard (block.includes(CENTRAL)) called that fine.
+const ageProtocol = async () => {
+  const p = join(repo, 'CLAUDE.md');
+  const md = await readFile(p, 'utf8');
+  const first = md.indexOf(MARK);
+  const last = md.lastIndexOf(MARK);
+  const oldBlock = `${MARK}\n# Shipward\n\nSix tools live at ${CENTRAL}. Nothing here mentions the sidecar.\n${MARK}`;
+  await writeFile(p, md.slice(0, first) + oldBlock + md.slice(last + MARK.length), 'utf8');
+};
+
+test('re-running setup advances a schema copy that has fallen behind', async () => {
+  // The bug this closes: the guard was existsSync, so a repo onboarded before
+  // any schema change kept its copy forever. A session hand-repairing a tracker
+  // reads that file as the authority on what a card may contain.
+  await setup();
+  const canonical = await readFile(join(CENTRAL, '.shipward', 'schema.json'), 'utf8');
+  await writeFile(join(repo, '.shipward', 'schema.json'), '{"ancient": true}\n', 'utf8');
+
+  const { stdout } = await setup();
+  assert.equal(await readFile(join(repo, '.shipward', 'schema.json'), 'utf8'), canonical,
+    'the stale schema was not refreshed');
+  assert.match(stdout, /schema\.json — updated/, 'the update was not reported');
+});
+
+test('re-running setup advances a protocol block whose text has fallen behind', async () => {
+  // The bug this closes: block.includes(CENTRAL) asks whether the block names
+  // THIS install, not whether its text is current — so a correctly wired repo
+  // never received a protocol update at all.
+  await setup();
+  await ageProtocol();
+
+  const { stdout } = await setup();
+  const md = await readFile(join(repo, 'CLAUDE.md'), 'utf8');
+  assert.ok(!md.includes('Nothing here mentions the sidecar'), 'the stale block survived');
+  assert.match(md, /notes\.jsonl/, 'the refreshed block is missing current protocol text');
+  assert.match(stdout, /protocol section updated/, 'the update was not reported');
+});
+
+test('refreshing a stale block still does not touch the prose around it', async () => {
+  await writeFile(join(repo, 'CLAUDE.md'), '# My project\n\nRules of the house.\n');
+  await setup();
+  await ageProtocol();
+  await setup();
+
+  const md = await readFile(join(repo, 'CLAUDE.md'), 'utf8');
+  // Assert the refresh actually happened first. Without this the test passes
+  // vacuously against the old code, which left the block alone entirely — and
+  // prose is trivially intact when nothing was rewritten.
+  assert.match(md, /notes\.jsonl/, 'the block was not refreshed, so this proves nothing');
+  assert.ok(!md.includes('Nothing here mentions the sidecar'), 'the stale block survived');
+  assert.match(md, /# My project/, "the user's heading was eaten");
+  assert.match(md, /Rules of the house\./, "the user's prose was eaten");
+  assert.equal(md.split(MARK).length - 1, 2, 'the markers were duplicated or lost');
+});
+
+test('an up-to-date schema and protocol are reported as such, and rewritten never', async () => {
+  await setup();
+  const before = await Promise.all(['.shipward/schema.json', 'CLAUDE.md']
+    .map((f) => readFile(join(repo, f), 'utf8')));
+
+  const { stdout } = await setup();
+  const after = await Promise.all(['.shipward/schema.json', 'CLAUDE.md']
+    .map((f) => readFile(join(repo, f), 'utf8')));
+
+  assert.deepEqual(after, before, 'a clean re-run rewrote a file it had no reason to touch');
+  assert.match(stdout, /schema\.json \(up to date\)/);
+  assert.match(stdout, /protocol up to date/);
+});

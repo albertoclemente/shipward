@@ -17,6 +17,21 @@
   ],
   "cards": [
     {
+      "id": "SW-091",
+      "p": "shipward",
+      "title": "One bad note kind throws from every command and names an index nobody can find",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "M",
+      "status": "backlog",
+      "claude": null,
+      "branch": null,
+      "commit": null,
+      "created": "2026-09-08T14:28:36.652Z",
+      "pushed": null,
+      "shipped": null
+    },
+    {
       "id": "SW-085",
       "p": "shipward",
       "title": "The agent picks the exam: selecting a cheaper declared check still earns the green",
@@ -1913,6 +1928,30 @@
   ],
   "feed": [
     {
+      "t": "2026-09-09T10:30:10.862Z",
+      "p": "shipward",
+      "msg": "SW-088 note — Second artefact, measured the same day: the schema drift is…",
+      "by": "claude"
+    },
+    {
+      "t": "2026-09-09T10:29:04.601Z",
+      "p": "shipward",
+      "msg": "SW-088 note — MEASURED 2026-09-09 in youtube_transcriber: the CLAUDE.md…",
+      "by": "claude"
+    },
+    {
+      "t": "2026-09-09T10:07:54.723Z",
+      "p": "shipward",
+      "msg": "SW-091 note — RECURRED 2026-09-09, and worse - this time the bad entry…",
+      "by": "claude"
+    },
+    {
+      "t": "2026-09-08T14:28:36.652Z",
+      "p": "shipward",
+      "msg": "You added SW-091 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-08-15T19:35:00Z",
       "p": "shipward",
       "by": "claude",
@@ -3135,5 +3174,5 @@
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 122
+  "rev": 123
 }

@@ -572,6 +572,21 @@ test('a prose note has no anchor, and says so by having none', () => {
   assert.equal(e.dirty, false);
 });
 
+// SW-093. gridsort's sidecar states gotcha, done and ship. They are read as the kinds they mean — as facts, not
+// handed to the classifier, which would have filed "THE BUG THAT COST THE FILM" by whatever marker it happened to quote.
+test('the kinds sessions write by hand are read as the kinds they mean', () => {
+  const t = '2026-09-24T12:50:14.000Z';
+  const entries = memoryEntries([card({ note: [
+    { t, kind: 'gotcha', text: 'THE BUG THAT COST THE FILM: the give-up judged the film by its events' },
+    { t, kind: 'done', text: 'Shipped in TestFlight 1.0 (38)' },
+    { t, kind: 'ship', text: 'TODO nothing, this is the ship note' },
+  ] })], 'shipward');
+  assert.deepEqual(entries.map((e) => e.kind), ['finding', 'outcome', 'outcome'], 'a stated alias is its canonical kind');
+  assert.equal(stillOpen(entries).length, 0, 'a ship note that quotes TODO is not an open item: its kind was stated');
+  const [odd] = memoryEntries([card({ note: [{ t, kind: 'constructor', text: 'x' }] })], 'shipward');
+  assert.notEqual(typeof odd.kind, 'function', 'an unknown kind is never looked up on a prototype');
+});
+
 test('only evidence can expire', () => {
   for (const kind of ['decision', 'open', 'finding', 'outcome', 'brief']) {
     assert.equal(freshness({ kind, sha: 'abc1234' }, {}), null, `${kind} is not a claim a commit can invalidate`);

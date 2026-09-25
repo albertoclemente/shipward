@@ -483,9 +483,16 @@ const rewriteEntry = (doc, fileRev, journal) => ({
 const STATUS = new Set(['backlog', 'claude', 'review', 'pushed', 'shipped']);
 const CLAUDE = new Set(['queued', 'working', 'done']);
 const TYPE = new Set(['feature', 'bug', 'chore']);
-const PRI = new Set(['P1', 'P2', 'P3']);
+// SW-093. P0 is a priority people use — gridsort's board carried it on two cards —
+// and refusing it refused the whole board: every command, read-only ones too.
+const PRI = new Set(['P0', 'P1', 'P2', 'P3']);
 const EFFORT = new Set(['S', 'M', 'L']);
-const NOTE_KIND = new Set(['open', 'finding', 'decision', 'evidence', 'outcome', 'brief']);
+// The six kinds, and (SW-093) three names sessions have written by hand when the
+// note tool was not reaching their board — gotcha, done, ship (gridsort, 09-23/24).
+// Stored as written, because the sidecar is never rewritten; memory-lib's
+// KIND_ALIASES reads them as finding, outcome and outcome. Any other unknown kind
+// is still refused (SW-091's territory).
+const NOTE_KIND = new Set(['open', 'finding', 'decision', 'evidence', 'outcome', 'brief', 'gotcha', 'done', 'ship']);
 const ID_RE = /^[A-Z]+-[0-9]{3}$/;
 
 const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);

@@ -865,7 +865,7 @@ function renderDialog(doc, project) {
     ),
     el('div', { style: 'display:flex;gap:var(--space-4);flex-wrap:wrap' },
       segGroup('Type', 'type', ['feature', 'bug', 'chore'], c.type, 'feature'),
-      segGroup('Priority', 'pri', ['P1', 'P2', 'P3'], c.pri, 'P2'),
+      segGroup('Priority', 'pri', ['P0', 'P1', 'P2', 'P3'], c.pri, 'P2'),
       segGroup('Effort', 'effort', ['S', 'M', 'L'], c.effort, 'M'),
     ),
     // The keyboard's answer to dragging. Radios are arrow-key navigable, and

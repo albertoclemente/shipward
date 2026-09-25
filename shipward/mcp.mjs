@@ -162,7 +162,7 @@ const TOOLS = [
       properties: {
         title: str('One line: what is being built or fixed.'),
         type: { type: 'string', enum: ['feature', 'bug', 'chore'], description: 'Defaults to feature.' },
-        pri: { type: 'string', enum: ['P1', 'P2', 'P3'], description: 'Defaults to P2.' },
+        pri: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3'], description: 'Defaults to P2.' },
         effort: { type: 'string', enum: ['S', 'M', 'L'], description: 'Defaults to M.' },
         note: str('Context for whoever picks this up — including a later you.'),
         project: str('Project id or name. Defaults to the active project.'),
@@ -269,7 +269,7 @@ const TOOLS = [
             properties: {
               title: str('One line.'),
               type: { type: 'string', enum: ['feature', 'bug', 'chore'] },
-              pri: { type: 'string', enum: ['P1', 'P2', 'P3'] },
+              pri: { type: 'string', enum: ['P0', 'P1', 'P2', 'P3'] },
               effort: { type: 'string', enum: ['S', 'M', 'L'] },
               status: { type: 'string', enum: ['backlog', 'claude', 'review', 'pushed', 'shipped'] },
               branch: str('Branch name.'),

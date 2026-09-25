@@ -284,6 +284,7 @@ textarea.input { min-height: 90px; resize: vertical; }
 .swcard-top { display: flex; align-items: center; gap: 8px; }
 .swcard-id { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; color: var(--color-neutral-700); }
 .swcard-pri { margin-left: auto; font-size: 11px; font-weight: 800; font-family: var(--font-heading); }
+.pri-P0 { color: var(--color-accent-800); text-decoration: underline; text-underline-offset: 2px; }   /* SW-093: set apart from P1 by more than a shade */
 .pri-P1 { color: var(--color-accent-700); }
 .pri-P2 { color: var(--color-neutral-700); }
 .pri-P3 { color: var(--color-neutral-500); }

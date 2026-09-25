@@ -20,9 +20,12 @@
             "decision",
             "evidence",
             "outcome",
-            "brief"
+            "brief",
+            "gotcha",
+            "done",
+            "ship"
           ],
-          "description": "stated kind; omitted = classified from the text"
+          "description": "stated kind; omitted = classified from the text. gotcha, done and ship (SW-093) are accepted names sessions have written by hand, read as finding, outcome and outcome; write the six canonical kinds"
         },
         "text": {
           "type": "string"
@@ -167,6 +170,7 @@
           },
           "pri": {
             "enum": [
+              "P0",
               "P1",
               "P2",
               "P3"

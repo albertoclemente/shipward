@@ -17,6 +17,34 @@
   ],
   "cards": [
     {
+      "id": "SW-093",
+      "p": "shipward",
+      "title": "Accept P0 and the note kinds agents actually write (gotcha, done, ship) instead of refusing the whole board",
+      "type": "bug",
+      "pri": "P2",
+      "effort": "S",
+      "status": "review",
+      "claude": "done",
+      "branch": "fix/accept-p0-and",
+      "commit": "b6527d6",
+      "created": "2026-09-25T12:10:35.317Z",
+      "pushed": null,
+      "shipped": null,
+      "verification": {
+        "check": "default",
+        "argv": [
+          "node",
+          "--test"
+        ],
+        "exit": 0,
+        "ok": true,
+        "at": "2026-09-25T12:16:19.611Z",
+        "sha": "b6527d6",
+        "dirty": false,
+        "ms": 36025
+      }
+    },
+    {
       "id": "SW-092",
       "p": "shipward",
       "title": "setup.mjs copies the schema from the install's WORKING TREE, so an in-review branch leaks downstream",
@@ -1943,6 +1971,24 @@
   ],
   "feed": [
     {
+      "t": "2026-09-25T12:16:19.611Z",
+      "p": "shipward",
+      "msg": "SW-093 moved to Review — give it a look",
+      "by": "claude"
+    },
+    {
+      "t": "2026-09-25T12:10:37.264Z",
+      "p": "shipward",
+      "msg": "SW-093 handed to Claude Code — queued",
+      "by": "claude"
+    },
+    {
+      "t": "2026-09-25T12:10:35.317Z",
+      "p": "shipward",
+      "msg": "You added SW-093 to Backlog — it's on the list",
+      "by": "claude"
+    },
+    {
       "t": "2026-09-09T12:28:45.308Z",
       "p": "shipward",
       "msg": "You added SW-092 to Backlog — it's on the list",
@@ -3123,29 +3169,11 @@
       "p": "shipward",
       "msg": "SW-035 handed to Claude Code — queued",
       "by": "claude"
-    },
-    {
-      "t": "2026-07-28T14:27:39.431Z",
-      "p": "shipward",
-      "msg": "Reconciled with git — SW-033 review → pushed",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T14:26:46.531Z",
-      "p": "shipward",
-      "msg": "Tracker restored after the serve.test clobber — cards from git (204b735), feed from feed-archive.jsonl, nothing lost",
-      "by": "claude"
-    },
-    {
-      "t": "2026-07-28T14:26:46.531Z",
-      "p": "shipward",
-      "msg": "You added SW-034 and SW-035 to Backlog",
-      "by": "claude"
     }
   ],
   "mcp": {
     "lastSeen": "2026-08-13T08:00:52.267Z",
     "pid": 65323
   },
-  "rev": 126
+  "rev": 129
 }

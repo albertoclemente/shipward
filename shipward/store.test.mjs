@@ -486,6 +486,21 @@ test('validate accepts both note forms and rejects malformed entries', async () 
   assert.match(await v(mk([{ t: '2026-07-28T10:00:00Z', text: 'x', resolves: 'not-an-id' }])), /resolves must be a card id/);
 });
 
+// SW-093. gridsort's board carried pri P0 on two cards and eight notes stated gotcha, done or ship; each one alone
+// made the store refuse the whole board, read-only commands included. They are accepted now — and nothing else is.
+test('validate accepts P0 and the kinds sessions write by hand, and still refuses the rest', async () => {
+  const { validate } = await import(STORE);
+  const base = seed();
+  const one = (over) => JSON.parse(JSON.stringify({ ...base, cards: [{ ...card(1), ...over }] }));
+  assert.equal(validate(one({ pri: 'P0' })), null, 'P0 is a priority');
+  assert.match(validate(one({ pri: 'P4' })), /pri is invalid/, 'but the set is still a set');
+  for (const kind of ['gotcha', 'done', 'ship']) {
+    assert.equal(validate(one({ note: [{ t: '2026-09-24T12:50:14.000Z', kind, text: 'x' }] })), null, `a note of kind ${kind} is accepted`);
+  }
+  assert.match(validate(one({ note: [{ t: '2026-09-24T12:50:14.000Z', kind: 'context', text: 'x' }] })), /kind is invalid/,
+    'an unknown kind is still refused: that is SW-091, not this card');
+});
+
 /* ── the card-loss warning (SW-035) ──────────────────────── */
 
 const manyCards = (n) => Array.from({ length: n }, (_, i) => card(i + 1));

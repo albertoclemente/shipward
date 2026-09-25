@@ -33,6 +33,15 @@ export const SEGMENT_SEP = ' || ';
 // stated.
 const VALID_KIND = (k) => ALL_KINDS.some((x) => x.key === k);
 
+// SW-093. Three names sessions have written by hand for kinds that already exist:
+// a gotcha is a finding, and done and ship are what shipped. The store accepts
+// them (NOTE_KIND keeps the same list, literally) and they stay in the sidecar as
+// written — it is never rewritten — so they are read here as the kind they mean:
+// a stated kind is still a fact, not handed to the classifier. A Map, not an
+// object, so a kind named "constructor" is not found on a prototype.
+export const KIND_ALIASES = new Map([['gotcha', 'finding'], ['done', 'outcome'], ['ship', 'outcome']]);
+const canonKind = (k) => (VALID_KIND(k) ? k : KIND_ALIASES.get(k));
+
 // A card's note as raw segments, whichever form it is in. `kind`/`t`/`resolves`
 // are present only when the note actually stored them.
 export function noteSegments(note) {
@@ -41,7 +50,7 @@ export function noteSegments(note) {
       .filter((e) => e && typeof e.text === 'string' && e.text.trim())
       .map((e) => ({
         text: e.text.trim(),
-        kind: VALID_KIND(e.kind) ? e.kind : undefined,
+        kind: canonKind(e.kind),
         t: typeof e.t === 'string' ? e.t : undefined,
         resolves: typeof e.resolves === 'string' ? e.resolves : undefined,
         // SW-044: the commit this was true of, carried through so freshness()
